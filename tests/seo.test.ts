@@ -1,0 +1,135 @@
+﻿import assert from "node:assert/strict";
+import { afterEach, mock, test } from "node:test";
+import { createServer } from "node:http";
+import { gzipSync } from "node:zlib";
+import { checkUrlStatus, fetchSitemapUrls } from "../lib/seo";
+
+const nativeFetch = globalThis.fetch;
+afterEach(() => { mock.restoreAll(); globalThis.fetch = nativeFetch; });
+const site = "https://example.com";
+const urlset = (locs: string[]) => `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${locs.map((loc) => `<url><loc>${loc}</loc></url>`).join("")}</urlset>`;
+const index = (locs: string[]) => `<sitemapindex>${locs.map((loc) => `<sitemap><loc>${loc}</loc></sitemap>`).join("")}</sitemapindex>`;
+function routes(map: Record<string, () => Response>) {
+  const calls: { url: string; method: string }[] = [];
+  mock.method(globalThis, "fetch", async (input: string | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? "GET";
+    calls.push({ url, method });
+    assert.equal(init?.cache, "no-store");
+    assert.ok(init?.signal);
+    const route = map[`${method} ${url}`] ?? map[url];
+    if (!route) throw new Error(`Unexpected request ${method} ${url}`);
+    return route();
+  });
+  return calls;
+}
+
+test("extracts direct loc values, decodes XML entities, deduplicates and skips invalid URLs", async () => {
+  routes({ [`${site}/sitemap.xml`]: () => new Response(urlset([`${site}/a?x=1&amp;y=2`, `${site}/a?x=1&amp;y=2`, "javascript:alert(1)", "/relative", "https://user:password@example.com/secret"])) });
+  assert.deepEqual(await fetchSitemapUrls("example.com"), [`${site}/a?x=1&y=2`]);
+});
+
+test("supports namespace prefixes, CDATA, and ignores image extension loc elements", async () => {
+  routes({ [`${site}/sitemap.xml`]: () => new Response(`<sm:urlset xmlns:sm="urn:sitemap" xmlns:image="urn:image"><sm:url><sm:loc><![CDATA[${site}/article]]></sm:loc><image:image><image:loc>${site}/photo.jpg</image:loc></image:image></sm:url></sm:urlset>`) });
+  assert.deepEqual(await fetchSitemapUrls("example.com"), [`${site}/article`]);
+});
+
+test("traverses indexes, gzip documents, and cycles without duplicate requests", async () => {
+  const calls = routes({
+    [`${site}/sitemap.xml`]: () => new Response(index([`${site}/child.xml.gz`, `${site}/sitemap.xml`])),
+    [`${site}/child.xml.gz`]: () => new Response(gzipSync(urlset([`${site}/one`, `${site}/two`]))),
+  });
+  assert.deepEqual(await fetchSitemapUrls(site), [`${site}/one`, `${site}/two`]);
+  assert.equal(calls.length, 2);
+});
+
+test("falls back to robots directives and combines multiple advertised sitemaps", async () => {
+  routes({
+    [`${site}/sitemap.xml`]: () => new Response("missing", { status: 404 }),
+    [`${site}/robots.txt`]: () => new Response(`User-agent: *\r\nSitemap: ${site}/one.xml\r\nsitemap: /two.xml # comment\r\nSitemap: file:///bad`),
+    [`${site}/one.xml`]: () => new Response(urlset([`${site}/one`])),
+    [`${site}/two.xml`]: () => new Response(urlset([`${site}/two`, `${site}/one`])),
+  });
+  assert.deepEqual(await fetchSitemapUrls("example.com"), [`${site}/one`, `${site}/two`]);
+});
+
+test("falls back when the default sitemap is HTML or malformed XML", async () => {
+  routes({
+    [`${site}/sitemap.xml`]: () => new Response("<html><body>not a sitemap</body></html>"),
+    [`${site}/robots.txt`]: () => new Response(`Sitemap: ${site}/valid.xml`),
+    [`${site}/valid.xml`]: () => new Response(urlset([`${site}/valid`])),
+  });
+  assert.deepEqual(await fetchSitemapUrls("example.com"), [`${site}/valid`]);
+});
+
+test("empty valid sitemaps return an empty array; missing discovery rejects", async () => {
+  routes({ [`${site}/sitemap.xml`]: () => new Response("<urlset/>") });
+  assert.deepEqual(await fetchSitemapUrls("example.com"), []);
+  mock.restoreAll();
+  routes({ [`${site}/sitemap.xml`]: () => new Response("missing", { status: 404 }), [`${site}/robots.txt`]: () => new Response("User-agent: *") });
+  await assert.rejects(fetchSitemapUrls("example.com"), /No usable sitemap/);
+});
+
+test("rejects entity declarations and never returns partial index results", async () => {
+  routes({
+    [`${site}/sitemap.xml`]: () => new Response(index([`${site}/one.xml`, `${site}/bad.xml`])),
+    [`${site}/one.xml`]: () => new Response(urlset([`${site}/one`])),
+    [`${site}/bad.xml`]: () => new Response('<!DOCTYPE urlset [<!ENTITY x "bad">]><urlset/>'),
+    [`${site}/robots.txt`]: () => new Response(`Sitemap: ${site}/bad.xml`),
+  });
+  await assert.rejects(fetchSitemapUrls("example.com"), /must not contain a DTD/);
+});
+
+test("HEAD preserves 200/404/500 and follows redirects to their final status", async () => {
+  const calls = routes({
+    [`HEAD ${site}/ok`]: () => new Response(null, { status: 200 }),
+    [`HEAD ${site}/missing`]: () => new Response(null, { status: 404 }),
+    [`HEAD ${site}/error`]: () => new Response(null, { status: 500 }),
+    [`HEAD ${site}/redirect`]: () => new Response(null, { status: 301, headers: { location: "/missing" } }),
+  });
+  assert.equal(await checkUrlStatus(`${site}/ok`), 200);
+  assert.equal(await checkUrlStatus(`${site}/missing`), 404);
+  assert.equal(await checkUrlStatus(`${site}/error`), 500);
+  assert.equal(await checkUrlStatus(`${site}/redirect`), 404);
+  assert.ok(calls.every((call) => call.method === "HEAD"));
+});
+
+test("HEAD rejection falls back to GET, returning the GET status", async () => {
+  for (const rejected of [403, 405, 501]) {
+    const calls = routes({ [`HEAD ${site}/page`]: () => new Response(null, { status: rejected }), [`GET ${site}/page`]: () => new Response("missing", { status: 404 }) });
+    assert.equal(await checkUrlStatus(`${site}/page`), 404);
+    assert.deepEqual(calls.map((call) => call.method), ["HEAD", "GET"]);
+    mock.restoreAll();
+  }
+});
+
+test("redirect loops and unsafe redirect protocols reject", async () => {
+  routes({ [`${site}/loop`]: () => new Response(null, { status: 302, headers: { location: "/loop" } }), [`${site}/unsafe`]: () => new Response(null, { status: 302, headers: { location: "file:///etc/passwd" } }) });
+  await assert.rejects(checkUrlStatus(`${site}/loop`), /Too many redirects/);
+  await assert.rejects(checkUrlStatus(`${site}/unsafe`), /HTTP\(S\)/);
+});
+
+test("invalid inputs reject before making requests; network failures are not 404", async () => {
+  const calls = routes({});
+  await assert.rejects(fetchSitemapUrls("example.com/path"), /without a path/);
+  await assert.rejects(checkUrlStatus("ftp://example.com/page"), /HTTP\(S\)/);
+  assert.equal(calls.length, 0);
+  mock.restoreAll();
+  mock.method(globalThis, "fetch", async () => { throw new TypeError("network unavailable"); });
+  await assert.rejects(checkUrlStatus(`${site}/page`), /network unavailable/);
+});
+
+test("real network timeout aborts a stalled response instead of inventing a status", async () => {
+  const server = createServer(() => {});
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const originalTimeout = AbortSignal.timeout.bind(AbortSignal);
+  mock.method(AbortSignal, "timeout", () => originalTimeout(50));
+  try {
+    await assert.rejects(checkUrlStatus(`http://127.0.0.1:${address.port}/slow`), { name: "TimeoutError" });
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});

@@ -32,3 +32,15 @@ and Supabase integration, and reconnect live Gemini later.
 - [x] Save and push the revised Day 3 implementation; hosted persistence verification succeeded through the Server Action.
 
 Recovery: Ask Codex to inspect and undo the specific broken change.
+
+## Day 4: Sitemap fetcher and HTTP status checker (COMPLETED)
+
+- [x] Implement server-only lib/seo.ts using native fetch and fast-xml-parser.
+- [x] Discover /sitemap.xml and robots.txt declarations, traverse sitemap indexes, decode XML/gzip, and deduplicate valid page URLs.
+- [x] Implement HEAD/GET status checks with bounded redirects, timeouts, body cancellation, and explicit network errors.
+- [x] Pass 12 focused tests covering discovery, parsing, status codes, redirects, failure paths, and a real HTTP timeout.
+- [x] Verify development server, lint, and production build with zero errors; existing homepage/API and mock audit action pass regression checks.
+- [x] Commit and push the verified Day 4 changes.
+
+Previous days and the mock audit workflow remain unchanged.
+Recovery: Ask Codex to inspect and undo the specific broken change.

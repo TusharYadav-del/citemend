@@ -172,3 +172,31 @@ Adjust the port to match your server. `lib/gemini.ts` is retained for later live
 API reconnection but is not imported by the mock action. `GEMINI_API_KEY` stays
 server-only and is not required for mock mode. No live Gemini probes are needed
 for the revised Day 3 acceptance criteria.
+
+## Day 4: Sitemap discovery and HTTP status checks
+
+Server-side code can import `fetchSitemapUrls` and `checkUrlStatus` from
+`@/lib/seo`. These utilities are independent of the existing mock audit UI.
+
+- `await fetchSitemapUrls("example.com")` starts at HTTPS `/sitemap.xml`.
+  If that cannot be used, it reads `Sitemap:` directives in `/robots.txt`.
+  It follows sitemap indexes, handles namespaces, escaped entities and gzip,
+  removes duplicate URLs, and skips malformed, non-HTTP(S), or credential-bearing
+  page URLs. It extracts page entries, not image-extension URLs. A full HTTP(S)
+  origin is also accepted; paths and query strings are rejected for this input.
+- `await checkUrlStatus("https://example.com/page")` follows redirects and
+  returns the final HTTP status. It tries HEAD first, then GET for HEAD
+  responses of 403, 405, or 501. GET bodies are cancelled after headers arrive.
+  A returned 404 is an actual HTTP response; timeouts and network failures throw.
+
+Discovery has a 30-second overall timeout and stops with an error rather than
+silently truncating results above 50 sitemap documents or 50,000 unique URLs.
+Each XML document is limited to 50 MiB (including after gzip decompression);
+robots.txt is limited to 512 KiB. Status checks have a 10-second overall timeout.
+Requests bypass caching and allow at most five redirects. Empty valid sitemaps
+return `[]`; missing or invalid discovery and failed child sitemaps reject.
+The utility parses robots.txt for discovery only; it is not a crawler.
+
+Run the focused tests with `npm run test:seo`. Tests use fixtures and a local
+HTTP server, so no third-party service or credentials are required. No Gemini
+calls, database writes, API routes, or UI changes were added for Day 4.
