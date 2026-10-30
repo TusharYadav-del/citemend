@@ -1,5 +1,6 @@
 ﻿import "server-only";
 import Groq from "groq-sdk";
+import { extractTextUrls } from "./citation-urls";
 
 export interface CitationProbeResult {
   text: string;
@@ -80,14 +81,10 @@ export async function runCitationProbe(domain: string, buyerPrompt: string): Pro
     });
     text = completion.choices[0]?.message?.content ?? "";
   } catch (error) {
-    throw new CitationProviderError("Groq could not complete the citation probe. Check provider access and rate limits.", error instanceof Groq.APIError ? error.status : undefined);
+    const status = error instanceof Groq.APIError ? error.status : undefined;
+    throw new CitationProviderError(status === 429 ? "The AI provider is rate limiting requests. Wait before trying another audit." : "Groq could not complete the citation probe. Check provider access and availability.", status);
   }
   if (!text.trim()) throw new CitationProviderError("Groq returned no generated text.");
-  for (const match of text.matchAll(/https?:\/\/[^\s<>"'`]+/gi)) {
-    let candidate = match[0].replace(/[.,;!?]+$/, "").replace(/\]+$/, "");
-    while (candidate.endsWith(")") && (candidate.match(/\)/g)?.length ?? 0) > (candidate.match(/\(/g)?.length ?? 0)) candidate = candidate.slice(0, -1);
-    const url = validUrl(candidate);
-    if (url) discoveredUrls.add(url);
-  }
+  extractTextUrls(text).forEach((url) => discoveredUrls.add(url));
   return { text, citedUrls: [...discoveredUrls], providerUsed: `groq-${model}`, searchGrounding: { status, sources }, warnings };
 }

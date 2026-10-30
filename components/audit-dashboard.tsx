@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { citationHealth, normalizeDashboardDomain, redirectRule, type DashboardReport } from "@/lib/audit-dashboard";
+import { citationHealth, normalizeDashboardDomain, parseDashboardReport, redirectRule, type DashboardReport } from "@/lib/audit-dashboard";
 
 const subscribeToHydration = () => () => {};
 
@@ -40,11 +40,10 @@ export default function AuditDashboard({ liveEnabled }: { liveEnabled: boolean }
     try {
       const response = await fetch("/api/audit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ domain: cleanDomain, buyerPrompt: prompt.trim() }), signal: controller.signal });
       const data = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(data?.error || "The audit could not finish. Please try again.");
-      if (!data || !Array.isArray(data.findings) || !Array.isArray(data.warnings) || typeof data.auditId !== "string") throw new Error("The audit returned an unexpected report. Please try again.");
-      setReport(data);
+      if (!response.ok) throw new Error(response.status === 429 ? "The AI provider is rate limiting requests. Wait a moment before trying again." : typeof data?.error === "string" ? data.error : "The audit could not finish. Please try again.");
+      setReport(parseDashboardReport(data));
     } catch (cause) {
-      setError(controller.signal.aborted ? "The request took too long. It may still be running; wait a moment before starting another audit." : cause instanceof Error ? cause.message : "Connection lost. Please check your connection and try again.");
+      setError(controller.signal.aborted ? "The request took too long. It may still be running; wait a moment before starting another audit." : cause instanceof TypeError ? "Connection lost. Please check your connection and try again." : cause instanceof Error ? cause.message : "Connection lost. Please check your connection and try again.");
     } finally { clearTimeout(timeout); setPending(false); }
   }
   async function copyRule(url: string, destination: string) {

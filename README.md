@@ -292,3 +292,27 @@ node scripts/check-dashboard-live.mjs http://localhost:3000 stripe.com
 
 This live check creates a real saved audit. Browser screenshots are written to
 ignored `test-results/` for desktop, phone, results, and live-report inspection.
+
+## Day 7: Week 1 testing and retro
+
+Five live website audits and their saved results are recorded in
+[docs/WEEK1_RETRO.md](docs/WEEK1_RETRO.md) and
+[docs/week1-live-results.json](docs/week1-live-results.json). To repeat the real
+browser run against an already running dev server:
+
+```sh
+node scripts/check-week1-live.mjs http://localhost:3000
+```
+
+This creates five real audits using provider quota and saves them to Supabase.
+The output includes actual warnings and errors, never fabricated success.
+For deterministic UI checks against an existing server in PowerShell:
+
+```powershell
+$env:PLAYWRIGHT_BASE_URL = 'http://localhost:3000'
+npm run test:ui
+```
+
+Day 7 adds strict rendered-report validation, corrected citation punctuation
+parsing, numeric-IP alias rejection, and streamed request-size enforcement.
+The retro lists concrete Week 2 authentication prerequisites; auth is not started.

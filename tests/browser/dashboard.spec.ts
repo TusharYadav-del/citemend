@@ -56,7 +56,7 @@ test("loading prevents duplicate audits and failures are shown without a stale r
   await expect(page.getByRole("button", { name: "Running your audit...", exact: true })).toBeDisabled();
   await expect(page.getByLabel("Your website domain")).toBeDisabled();
   release();
-  await expect(page.locator("main").getByRole("alert")).toContainText("Provider rate limit");
+  await expect(page.locator("main").getByRole("alert")).toContainText(/rate limiting/i);
   await expect(page.getByTestId("health-score")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Run AI Audit", exact: true })).toBeEnabled();
 });
@@ -82,4 +82,34 @@ test("healthy reports show the no-404 state and invalid domains do not submit", 
   await expect(page.getByTestId("health-score")).toHaveText("100/ 100");
   await expect(page.getByText("No confirmed 404s in this audit", { exact: true })).toBeVisible();
   await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
+});
+
+test("malformed API findings and network errors show a recoverable error state", async ({ page }) => {
+  const crashes: string[] = [];
+  page.on("pageerror", (error) => crashes.push(error.message));
+  await page.route("**/api/audit", (route) => route.fulfill({ status: 201, json: { ...report, findings: [{ url: "bad", httpStatus: "404" }] } }));
+  await page.goto("/"); await fill(page);
+  await page.getByRole("button", { name: "Run AI Audit", exact: true }).click();
+  await expect(page.locator("main").getByRole("alert")).toContainText("unexpected report");
+  await expect(page.getByTestId("health-score")).toHaveCount(0);
+  await page.unroute("**/api/audit");
+  await page.route("**/api/audit", (route) => route.abort("failed"));
+  await page.getByRole("button", { name: "Run AI Audit", exact: true }).click();
+  await expect(page.locator("main").getByRole("alert")).toContainText("Connection lost");
+  await expect(page.getByRole("button", { name: "Run AI Audit", exact: true })).toBeEnabled();
+  expect(crashes).toEqual([]);
+});
+
+test("a stalled audit stops the spinner and explains that the server may still be running", async ({ page }) => {
+  await page.clock.install();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  await page.route("**/api/audit", async (route) => { await gate; await route.abort("aborted").catch(() => {}); });
+  await page.goto("/"); await fill(page);
+  await page.getByRole("button", { name: "Run AI Audit", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Running your audit...", exact: true })).toBeDisabled();
+  await page.clock.fastForward(180_001);
+  await expect(page.locator("main").getByRole("alert")).toContainText("may still be running");
+  await expect(page.getByRole("button", { name: "Run AI Audit", exact: true })).toBeEnabled();
+  release();
 });

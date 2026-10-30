@@ -12,12 +12,26 @@ export async function GET() {
 export async function POST(request: Request) {
   // Authentication is not implemented yet. Never expose admin-backed writes publicly.
   if (process.env.NODE_ENV !== "development") return Response.json({ error: "Audit POST is development-only until authentication is implemented." }, { status: 403 });
-  if (!request.headers.get("content-type")?.includes("application/json")) return Response.json({ error: "Use Content-Type: application/json." }, { status: 415 });
+  if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get("content-type") ?? "")) return Response.json({ error: "Use Content-Type: application/json." }, { status: 415 });
   let input: unknown;
   try {
-    const body = await request.text();
-    if (Buffer.byteLength(body) > 16_384) return Response.json({ error: "Request body exceeds 16 KiB." }, { status: 413 });
-    input = JSON.parse(body);
+    const reader = request.body?.getReader();
+    if (!reader) return Response.json({ error: "JSON body is required." }, { status: 400 });
+    const chunks: Uint8Array[] = [];
+    let bytes = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        bytes += value.byteLength;
+        if (bytes > 16_384) {
+          await reader.cancel().catch(() => {});
+          return Response.json({ error: "Request body exceeds 16 KiB." }, { status: 413 });
+        }
+        chunks.push(value);
+      }
+    } finally { reader.releaseLock(); }
+    input = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks)));
   } catch { return Response.json({ error: "Invalid JSON body." }, { status: 400 }); }
   try {
     return Response.json(await runAudit(input), { status: 201 });

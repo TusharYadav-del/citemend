@@ -1,0 +1,134 @@
+{
+  "testedDate": "2026-10-31",
+  "flow": "dashboard -> live Groq/Tavily -> sitemap/HTTP -> Supabase -> dashboard",
+  "results": [
+    {
+      "domain": "nextjs.org",
+      "httpStatus": 201,
+      "auditId": "bbefef67-2381-4245-a644-1e8565a8c397",
+      "status": "completed",
+      "provider": "groq-openai/gpt-oss-120b",
+      "searchStatus": "available",
+      "checkedCitations": 5,
+      "confirmed404s": 0,
+      "unresolvedChecks": 0,
+      "sitemapUrls": 1144,
+      "warnings": [],
+      "error": null,
+      "frontendState": "report",
+      "browserErrors": [],
+      "durationSeconds": 11,
+      "persistenceVerified": true,
+      "persistedBrokenLinks": []
+    },
+    {
+      "domain": "stripe.com",
+      "httpStatus": 201,
+      "auditId": "11043686-314b-4dcb-9cd8-0a6add9de525",
+      "status": "completed",
+      "provider": "groq-openai/gpt-oss-120b",
+      "searchStatus": "available",
+      "checkedCitations": 6,
+      "confirmed404s": 1,
+      "unresolvedChecks": 0,
+      "sitemapUrls": 7176,
+      "warnings": [],
+      "error": null,
+      "frontendState": "report",
+      "browserErrors": [],
+      "durationSeconds": 28,
+      "persistenceVerified": true,
+      "persistedBrokenLinks": [
+        {
+          "cited_url": "https://stripe.com/docs/getting-started",
+          "http_status": 404,
+          "suggested_redirect": "https://stripe.com/resources/more/delaware-llcs-a-guide-to-getting-started"
+        }
+      ]
+    },
+    {
+      "domain": "vercel.com",
+      "httpStatus": 201,
+      "auditId": "b0c3e368-9462-41e9-9e27-0277e907e681",
+      "status": "completed",
+      "provider": "groq-openai/gpt-oss-120b",
+      "searchStatus": "available",
+      "checkedCitations": 5,
+      "confirmed404s": 2,
+      "unresolvedChecks": 0,
+      "sitemapUrls": 9280,
+      "warnings": [],
+      "error": null,
+      "frontendState": "report",
+      "browserErrors": [],
+      "durationSeconds": 8,
+      "persistenceVerified": true,
+      "persistedBrokenLinks": [
+        {
+          "cited_url": "https://vercel.com/docs/getting-started",
+          "http_status": 404,
+          "suggested_redirect": "https://vercel.com/docs/eve/getting-started"
+        },
+        {
+          "cited_url": "https://vercel.com/docs%E3%80%901%E3%80%91",
+          "http_status": 404,
+          "suggested_redirect": "https://vercel.com/docs"
+        }
+      ]
+    },
+    {
+      "domain": "supabase.com",
+      "httpStatus": 201,
+      "auditId": "10475d22-a251-4765-b061-f7c402d5f342",
+      "status": "completed",
+      "provider": "groq-openai/gpt-oss-120b",
+      "searchStatus": "available",
+      "checkedCitations": 5,
+      "confirmed404s": 3,
+      "unresolvedChecks": 0,
+      "sitemapUrls": 3756,
+      "warnings": [],
+      "error": null,
+      "frontendState": "report",
+      "browserErrors": [],
+      "durationSeconds": 11,
+      "persistenceVerified": true,
+      "persistedBrokenLinks": [
+        {
+          "cited_url": "https://supabase.com/pricing**",
+          "http_status": 404,
+          "suggested_redirect": "https://supabase.com/pricing"
+        },
+        {
+          "cited_url": "https://supabase.com/docs/guides/getting-started**",
+          "http_status": 404,
+          "suggested_redirect": "https://supabase.com/docs/guides/getting-started"
+        },
+        {
+          "cited_url": "https://supabase.com/changelog%E3%80%91",
+          "http_status": 404,
+          "suggested_redirect": "https://supabase.com/changelog"
+        }
+      ]
+    },
+    {
+      "domain": "github.com",
+      "httpStatus": 201,
+      "auditId": "99da7e41-cdcd-49c9-b5fa-fe3258fb637d",
+      "status": "completed",
+      "provider": "groq-openai/gpt-oss-120b",
+      "searchStatus": "available",
+      "checkedCitations": 9,
+      "confirmed404s": 0,
+      "unresolvedChecks": 0,
+      "sitemapUrls": 375,
+      "warnings": [],
+      "error": null,
+      "frontendState": "report",
+      "browserErrors": [],
+      "durationSeconds": 10,
+      "persistenceVerified": true,
+      "persistedBrokenLinks": []
+    }
+  ]
+}

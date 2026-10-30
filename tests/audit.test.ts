@@ -196,3 +196,26 @@ test("malformed Tavily results are disclosed and empty Groq output rejects", asy
   mock.method(globalThis, "fetch", async (value: string | URL) => String(value).includes("api.tavily.com") ? Response.json({ unexpected: [] }) : Response.json({ choices: [] }));
   await assert.rejects(runGroqProbe("example.com", "Find docs"), CitationProviderError);
 });
+
+test("URL-only AI answers strip sentence punctuation without corrupting structured source URLs", () => {
+  const result = extractCitationUrls({ ...probe, text: "https://example.com/docs).", sources: [], groundingMetadata: { groundingChunks: [{ web: { uri: "https://example.com/docs?version=1&mode=full" } }] } });
+  assert.deepEqual(result, ["https://example.com/docs", "https://example.com/docs?version=1&mode=full"]);
+});
+
+test("rejects numeric IP aliases as invalid domains before provider calls", async () => {
+  let calls = 0;
+  for (const domain of ["127.1", "127.0.0.01", "0127.0.0.1", "1.2.3.999"]) {
+    await assert.rejects(runAudit({ ...input, domain }, { probe: async () => { calls++; return probe; } }), AuditInputError);
+  }
+  assert.equal(calls, 0);
+});
+
+test("body-size limits cancel oversized streams and malformed UTF-8 is rejected", async () => {
+  let cancelled = false;
+  const stream = new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new Uint8Array(17000)); }, cancel() { cancelled = true; } });
+  const request = new Request("http://localhost/api/audit", { method: "POST", headers: { "content-type": "application/json" }, body: stream, duplex: "half" } as RequestInit);
+  assert.equal((await POST(request)).status, 413);
+  assert.equal(cancelled, true);
+  const malformed = new Request("http://localhost/api/audit", { method: "POST", headers: { "content-type": "application/json" }, body: new Uint8Array([0xff]) });
+  assert.equal((await POST(malformed)).status, 400);
+});

@@ -1,5 +1,6 @@
 ﻿import "server-only";
 import { isIP } from "node:net";
+import { normalizeCitationUrl, extractTextUrls } from "./citation-urls";
 import type { CitationProbeResult as GeminiProbeResult } from "./gemini";
 import { runCitationProbe, type CitationProbeResult } from "./citation-probe";
 type ProbeResult = CitationProbeResult | GeminiProbeResult;
@@ -29,19 +30,15 @@ export function validateAuditInput(input: unknown): { domain: string; buyerPromp
   if (hostname.length > 253 || !/^[a-z0-9.-]+$/.test(hostname) || !hostname.includes(".") || isIP(hostname) || /\.(local|localhost|internal)$/.test(hostname) || hostname.split(".").some((label) => !label || label.length > 63 || label.startsWith("-") || label.endsWith("-"))) {
     throw new AuditInputError("domain must be a public hostname such as example.com, without a scheme, path, or port.");
   }
+  let parsedHost: string;
+  try { parsedHost = new URL(`https://${hostname}`).hostname; }
+  catch { throw new AuditInputError("Enter a valid public domain, not an IP address."); }
+  if (parsedHost !== hostname || isIP(parsedHost)) throw new AuditInputError("Enter a public domain, not an IP address or numeric alias.");
   if (!buyerPrompt.trim() || buyerPrompt.length > 4000) throw new AuditInputError("buyerPrompt must contain 1 to 4000 characters.");
   return { domain: hostname, buyerPrompt: buyerPrompt.trim() };
 }
 
-function normalizedUrl(value: string): string | null {
-  try {
-    if (value.length > 2048) return null;
-    const url = new URL(value);
-    if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.port) return null;
-    url.hash = "";
-    return url.href;
-  } catch { return null; }
-}
+const normalizedUrl = normalizeCitationUrl;
 function inDomain(url: string, domain: string): boolean {
   const host = new URL(url).hostname;
   return host === domain || host.endsWith(`.${domain}`);
@@ -53,23 +50,15 @@ function isGroundingRedirect(url: string): boolean {
 
 /** Extracts URLs from text and all string values in grounding metadata. */
 export function extractCitationUrls(probe: ProbeResult): string[] {
-  const found = new Set<string>();
+  const found = new Set(extractTextUrls(probe.text));
   function visit(value: unknown): void {
     if (typeof value === "string") {
       const direct = /\s/.test(value.trim()) ? null : normalizedUrl(value.trim());
       if (direct) found.add(direct);
-      else for (const match of value.matchAll(/https?:\/\/[^\s<>"'`]+/gi)) {
-        let candidate = match[0].replace(/[.,;:!?]+$/, "");
-        // Remove Markdown delimiters while preserving balanced parentheses in paths.
-        while (candidate.endsWith(")") && (candidate.match(/\)/g)?.length ?? 0) > (candidate.match(/\(/g)?.length ?? 0)) candidate = candidate.slice(0, -1);
-        candidate = candidate.replace(/\]+$/, "");
-        const url = normalizedUrl(candidate.replaceAll("&amp;", "&"));
-        if (url) found.add(url);
-      }
+      else extractTextUrls(value).forEach((url) => found.add(url));
     } else if (Array.isArray(value)) value.forEach(visit);
     else if (value && typeof value === "object") Object.values(value).forEach(visit);
   }
-  visit(probe.text);
   if ("citedUrls" in probe) visit(probe.citedUrls);
   else { visit(probe.groundingMetadata); visit(probe.sources); }
   return [...found];

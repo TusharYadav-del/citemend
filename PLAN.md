@@ -75,3 +75,16 @@ Recovery: Ask Codex to inspect and undo the specific broken change.
 - [x] Commit and push Day 6 changes.
 
 Recovery: Ask Codex to inspect and undo the specific broken change.
+
+## Day 7: Testing, bug fixes, and Week 1 retro (COMPLETED)
+
+- [x] Review the existing route, homepage, dashboard, and active Groq/Tavily pipeline without starting authentication work.
+- [x] Test the complete dashboard-to-Supabase flow on nextjs.org, stripe.com, vercel.com, supabase.com, and github.com: five HTTP 201 completed reports, 30 citations, six confirmed 404s, no warnings or unresolved checks.
+- [x] Independently read back all five saved audits and six broken-link/redirect rows from Supabase.
+- [x] Fix citation punctuation parsing, malformed report rendering, numeric-IP domain aliases, request body bounds, and provider/network error messages.
+- [x] Pass 34 unit/backend tests and seven browser tests, including rate limits, failed sitemap discovery, real HTTP timeout, frontend timeout, loading, parsing failures, and clipboard behavior.
+- [x] Write docs/WEEK1_RETRO.md and docs/week1-live-results.json with observed results and Week 2 authentication handoff.
+- [x] Verify final lint and production build with zero errors.
+- [x] Commit and push the Week 1 save-point.
+
+Recovery: Ask Codex to inspect and undo the specific broken change.
