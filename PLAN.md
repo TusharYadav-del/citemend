@@ -44,3 +44,21 @@ Recovery: Ask Codex to inspect and undo the specific broken change.
 
 Previous days and the mock audit workflow remain unchanged.
 Recovery: Ask Codex to inspect and undo the specific broken change.
+
+## Day 5: Audit pipeline API (IN PROGRESS)
+
+- [x] Preserve GET /api/audit and add validated, development-only POST accepting domain and buyerPrompt.
+- [x] Connect live Gemini grounding, response/metadata URL extraction, Google citation redirect resolution, sitemap discovery, and target-domain HTTP checks.
+- [x] Rank sitemap replacements by string similarity and suggest only verified 2xx URLs for confirmed 404s.
+- [x] Persist audit status and confirmed broken links in Supabase with read-back and failed-save cleanup.
+- [x] Pass 12 pipeline/API tests and all 12 existing SEO tests, including controlled full-route success, provider failures, and persistence rollback.
+- [x] Verify hosted Supabase persistence independently with a temporary test audit; read-back passed and test rows were removed.
+- [x] Verify npm run dev, existing GET, and unchanged mock workflow; live POST correctly returns a safe Gemini 429 without saving an audit.
+- [ ] Verify a successful live POST end-to-end when Google accepts grounded requests (currently blocked by upstream HTTP 429).
+- [x] Verify final lint and production build with zero errors.
+- [x] Save the verified Day 5 implementation in Git; successful live Gemini verification remains pending.
+
+The user requested live Gemini for Day 5. Do not silently replace it with mock
+results or mark live end-to-end verification complete while Google rejects it.
+Previous completed days and the existing mock UI remain unchanged.
+Recovery: Ask Codex to inspect and undo the specific broken change.

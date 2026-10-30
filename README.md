@@ -200,3 +200,43 @@ The utility parses robots.txt for discovery only; it is not a crawler.
 Run the focused tests with `npm run test:seo`. Tests use fixtures and a local
 HTTP server, so no third-party service or credentials are required. No Gemini
 calls, database writes, API routes, or UI changes were added for Day 4.
+
+## Day 5: Audit pipeline API
+
+`GET /api/audit` preserves the setup check. `POST /api/audit` accepts a JSON
+object with `domain` (hostname only) and `buyerPrompt` (1-4000 characters).
+Start `npm run dev` and test from PowerShell:
+
+```powershell
+$body = @{ domain = 'nextjs.org'; buyerPrompt = 'Find official Next.js installation documentation and cite its URLs.' } | ConvertTo-Json
+Invoke-RestMethod -Uri http://localhost:3000/api/audit -Method Post -ContentType 'application/json' -Body $body
+```
+
+The POST pipeline uses live Gemini 3.8 Flash with Google Search grounding,
+extracts text/metadata URLs (including Google citation redirect destinations),
+discovers the sitemap, checks citations matching the target hostname or its
+subdomains, and suggests the closest verified 2xx sitemap destination for 404s.
+Ranking combines path-token and character-bigram similarity, checks up to five
+candidates per 404, and leaves the suggestion null if none is verified live.
+Third-party citations remain in extractedUrls but are not scanned.
+
+A successful save returns HTTP 201 with `auditId`, `createdAt`, generated text,
+grounding metadata, extracted URLs, findings, warnings, and completed/partial
+status. Unknown network statuses stay null; they never become invented 404s.
+Sitemap or individual-check failures produce explicit partial reports. The
+existing database schema saves audit domain/status and confirmed 404s with their
+suggested redirects; prompt, generated text, and metadata are returned in JSON
+but are not stored in the current tables. Saves are verified by read-back;
+failed partial saves attempt to remove only the newly created audit.
+
+This admin-backed endpoint is development-only until authentication is added;
+production POST returns 403. It requires the existing Gemini and server-only
+Supabase configuration. No mock fallback is used. Gemini failures return a safe
+upstream error (429 for Google's rate-limit response), and do not save an audit.
+The previous Day 3 mock workspace remains unchanged and makes no Gemini calls.
+
+Input is limited to 16 KiB, 100 extracted citations and 50 target-domain URLs.
+Status checks run with concurrency five; no new checks start after a 30-second
+checking budget, and each in-flight check retains its Day 4 timeout. Sitemap
+and Gemini calls use their own existing timeouts. Run `npm run test:audit` and
+`npm run test:seo` for deterministic backend coverage without live providers.
