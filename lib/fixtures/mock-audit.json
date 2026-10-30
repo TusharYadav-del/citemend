@@ -1,0 +1,17 @@
+{
+  "mode": "mock",
+  "text": "Sample citation audit: two demonstration URLs return simulated 404 results, with suggested replacement paths. No web search or HTTP scan was performed.",
+  "sources": [
+    { "index": 0, "path": "/docs/getting-started", "title": "Getting started - sample citation" },
+    { "index": 1, "path": "/docs/api", "title": "API reference - sample citation" },
+    { "index": 2, "path": "/guides", "title": "Guides - sample citation" }
+  ],
+  "citations": [
+    { "text": "Getting started documentation", "sourceIndices": [0] },
+    { "text": "API reference and guides", "sourceIndices": [1, 2] }
+  ],
+  "brokenLinks": [
+    { "path": "/docs/legacy-start", "httpStatus": 404, "redirectPath": "/docs/getting-started" },
+    { "path": "/old-api-reference", "httpStatus": 404, "redirectPath": "/docs/api" }
+  ]
+}

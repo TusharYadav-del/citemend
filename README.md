@@ -136,40 +136,39 @@ After configuration, application code can import `{ supabase }` from
 configuration error. A successful app build alone does not verify the hosted
 schema or credentials.
 
-## Day 3: Gemini citation probe
+## Day 3: Mock audit workspace
 
-1. Create a key at https://aistudio.google.com/apikey and save it in `.env.local`:
-   `GEMINI_API_KEY=your_key`. Never use a `NEXT_PUBLIC_` prefix for this key.
-2. Run `npm run dev`, then open `/dev/citation-probe` at the URL printed in the
-   terminal. Enter a hostname and a research prompt, then click **Run citation probe**.
-3. A successful server action displays generated text, raw `groundingMetadata`,
-   extracted sources, and citation segments linked by zero-based source indices.
-   Missing grounding metadata means no sources were returned; it is not proof of
-   a successful grounded search. Source URLs are preserved as returned, including
-   Google grounding redirect URLs; no HTTP link scanning is performed.
+Live Gemini calls are paused at the user's request. Run `npm run dev` and open
+`/dev/citation-probe` to use the mock frontend. Generate a report to see citation
+cards, simulated 404 findings, suggested redirects, and the fixed JSON response.
+No search or HTTP scan is performed. The fixture lives in
+`lib/fixtures/mock-audit.json`; changing the domain only personalizes sample URLs.
 
-`lib/gemini.ts` reads the key only on the server when a probe runs. The test page
-and its action are disabled in production. No Gemini call occurs during a build
-or when loading the existing homepage. The probe does not save database rows.
-Provider access and free-tier quota depend on your AI Studio project. An HTTP
-error on the form shows the status without exposing provider request details.
+To save the report, add `SUPABASE_SECRET_KEY=...` to ignored `.env.local`, using
+the project's server-only secret key, then restart the development server.
+Never prefix this key with `NEXT_PUBLIC_`. Click **Save mock audit** to insert an
+audit and its broken links, then read them back through the foreign-key relation.
+The status is `mock_completed`; real findings are never implied. Citations remain
+in the preview because the existing schema stores only audits and broken links.
+A failed partial save attempts to remove only the newly created mock audit.
 
-With the development server running, verify an actual server-action response:
+This unauthenticated demo and its database actions are development-only; row
+level security stays enabled. A production build returns 404 for this route.
+The existing starter homepage, placeholder API, schema, and public client remain.
+
+With the dev server running, verify the mock preview without database writes:
 
 ```sh
 node scripts/check-citation-probe.mjs http://localhost:3000
 ```
 
-Adjust the port to match your server. This submits one Gemini request and exits
-successfully only when text, grounding metadata, sources, and citation segments
-are returned. It does not print your key or the generated response.
+To verify a real Supabase save and read-back (creates one labeled mock audit):
 
-The Day 3 model was changed to `gemini-3.8-flash` with user approval because
-Google rejects `gemini-2.5-flash` for new users. The configured project currently
-returns HTTP 429 RESOURCE_EXHAUSTED. Check its quota at https://ai.dev/rate-limit;
-a successful live grounded response is still required to complete Day 3.
+```sh
+node scripts/check-citation-probe.mjs http://localhost:3000 --save
+```
 
-Troubleshooting: a 429 does not establish that all project quota is exhausted.
-Check the project owning the saved key, the selected model's RPM/TPM/RPD limits,
-and Google Search grounding limits. A 503 indicates temporary model overload.
-The probe retries 503 once and does not automatically retry 429 responses.
+Adjust the port to match your server. `lib/gemini.ts` is retained for later live
+API reconnection but is not imported by the mock action. `GEMINI_API_KEY` stays
+server-only and is not required for mock mode. No live Gemini probes are needed
+for the revised Day 3 acceptance criteria.

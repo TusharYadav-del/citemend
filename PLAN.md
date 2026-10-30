@@ -16,27 +16,19 @@
 Day 2 completed: hosted configuration and both table schemas verified. Row level security remains enabled; public row access awaits future ownership policies.
 Recovery: Ask Codex to inspect and undo the specific broken change.
 
-## Day 3: Gemini SDK and Google Search grounding (IN PROGRESS)
+## Day 3: Mock audit UI and Supabase integration (IN PROGRESS)
 
-- [x] Install @google/genai and add server-only lib/gemini.ts.
-- [x] Implement runCitationProbe(domain, prompt) with gemini-3.8-flash, Google Search, raw grounding metadata, sources, and citation segments.
-- [x] Add a development-only server-action test form at /dev/citation-probe; previous app and database features remain unchanged.
-- [x] Configure GEMINI_API_KEY in ignored .env.local; Google model listing authenticates successfully.
-- [ ] Verify a live grounded Gemini response through the server action.
-- [x] Verify development routes and server-action missing-key handling; lint and production build pass. Mocked SDK checks cover citation mapping, missing metadata, and invalid inputs.
-- [x] Save the verified Day 3 implementation in Git; live verification remains blocked by Google project quota.
+Scope revised by the user: skip live Gemini probes due to provider 503/429
+responses. Use hardcoded mock citations and audit findings, finish the frontend
+and Supabase integration, and reconnect live Gemini later.
+
+- [x] Retain the server-only Google GenAI utility for future reconnection.
+- [x] Add hardcoded mock JSON with citations, simulated 404s, and redirects.
+- [x] Build the development audit UI with loading, empty, error, and saved states.
+- [x] Implement server-only Supabase save/read-back with mock_completed status, foreign-key verification, and partial-save cleanup.
+- [x] Verify mock generation through the Server Action without Gemini calls (3 citations and 2 simulated 404s).
+- [ ] Configure the server-only Supabase key and verify a hosted save/read-back.
+- [x] Verify lint and production build with zero errors; homepage/API return 200 and production mock route returns 404. Mocked database tests verify save/read-back, cleanup, missing key, and production guard.
+- [x] Save the revised Day 3 implementation in Git; hosted save verification awaits the server-only Supabase key.
 
 Recovery: Ask Codex to inspect and undo the specific broken change.
-
-Live verification blocker: Google rejects gemini-2.5-flash for new users. The
-user approved gemini-3.8-flash, which currently returns HTTP 429
-RESOURCE_EXHAUSTED for this key's project. Await available project quota before
-marking the live probe and Day 3 complete. Production probe route returns 404;
-the existing homepage and placeholder API still return HTTP 200.
-
-Quota diagnostics: the saved key has no shell override or surrounding whitespace.
-Google returned 503 high demand for plain Gemini 3.8 Flash generation and 429
-RESOURCE_EXHAUSTED for grounded generation, without a specific quota metric.
-The exact quota cause is unconfirmed; available general quota alone does not
-verify model-specific or Google Search limits. Automatic retries are restricted
-to one retry for 503; HTTP 429 is not automatically retried.
