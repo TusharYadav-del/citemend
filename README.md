@@ -90,3 +90,9 @@ TypeScript, ESLint, and the existing Tailwind CSS 4 setup are retained.
 `lucide-react` is installed for future icons. Tailwind is configured through
 `app/globals.css` and the existing Turbopack loader in `next.config.ts`;
 no additional Tailwind configuration file is needed.
+
+## Recovery
+
+Ask Codex to inspect and undo the specific broken change.
+
+A hard reset discards uncommitted tracked work.
