@@ -1,4 +1,4 @@
-# CiteMind
+﻿# CiteMind
 
 Day 1 repository and environment setup. The starter page is unchanged.
 The audit endpoint is a setup check only; no real audit, authentication,
@@ -135,3 +135,36 @@ After configuration, application code can import `{ supabase }` from
 `@/lib/supabase`. Importing it without both environment variables gives a clear
 configuration error. A successful app build alone does not verify the hosted
 schema or credentials.
+
+## Day 3: Gemini citation probe
+
+1. Create a key at https://aistudio.google.com/apikey and save it in `.env.local`:
+   `GEMINI_API_KEY=your_key`. Never use a `NEXT_PUBLIC_` prefix for this key.
+2. Run `npm run dev`, then open `/dev/citation-probe` at the URL printed in the
+   terminal. Enter a hostname and a research prompt, then click **Run citation probe**.
+3. A successful server action displays generated text, raw `groundingMetadata`,
+   extracted sources, and citation segments linked by zero-based source indices.
+   Missing grounding metadata means no sources were returned; it is not proof of
+   a successful grounded search. Source URLs are preserved as returned, including
+   Google grounding redirect URLs; no HTTP link scanning is performed.
+
+`lib/gemini.ts` reads the key only on the server when a probe runs. The test page
+and its action are disabled in production. No Gemini call occurs during a build
+or when loading the existing homepage. The probe does not save database rows.
+Provider access and free-tier quota depend on your AI Studio project. An HTTP
+error on the form shows the status without exposing provider request details.
+
+With the development server running, verify an actual server-action response:
+
+```sh
+node scripts/check-citation-probe.mjs http://localhost:3000
+```
+
+Adjust the port to match your server. This submits one Gemini request and exits
+successfully only when text, grounding metadata, sources, and citation segments
+are returned. It does not print your key or the generated response.
+
+The Day 3 model was changed to `gemini-3.8-flash` with user approval because
+Google rejects `gemini-2.5-flash` for new users. The configured project currently
+returns HTTP 429 RESOURCE_EXHAUSTED. Check its quota at https://ai.dev/rate-limit;
+a successful live grounded response is still required to complete Day 3.

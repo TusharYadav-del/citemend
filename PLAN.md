@@ -1,4 +1,4 @@
-> **AGENT RULE:** Only build the single Day I ask for in chat. Do NOT touch completed days or start future days.
+﻿> **AGENT RULE:** Only build the single Day I ask for in chat. Do NOT touch completed days or start future days.
 
 ## Day 1: [Repository Setup & Environment Initialization] (COMPLETED - DO NOT TOUCH)
 ...
@@ -15,3 +15,21 @@
 
 Day 2 completed: hosted configuration and both table schemas verified. Row level security remains enabled; public row access awaits future ownership policies.
 Recovery: Ask Codex to inspect and undo the specific broken change.
+
+## Day 3: Gemini SDK and Google Search grounding (IN PROGRESS)
+
+- [x] Install @google/genai and add server-only lib/gemini.ts.
+- [x] Implement runCitationProbe(domain, prompt) with gemini-3.8-flash, Google Search, raw grounding metadata, sources, and citation segments.
+- [x] Add a development-only server-action test form at /dev/citation-probe; previous app and database features remain unchanged.
+- [x] Configure GEMINI_API_KEY in ignored .env.local; Google model listing authenticates successfully.
+- [ ] Verify a live grounded Gemini response through the server action.
+- [x] Verify development routes and server-action missing-key handling; lint and production build pass. Mocked SDK checks cover citation mapping, missing metadata, and invalid inputs.
+- [x] Save the verified Day 3 implementation in Git; live verification remains blocked by Google project quota.
+
+Recovery: Ask Codex to inspect and undo the specific broken change.
+
+Live verification blocker: Google rejects gemini-2.5-flash for new users. The
+user approved gemini-3.8-flash, which currently returns HTTP 429
+RESOURCE_EXHAUSTED for this key's project. Await available project quota before
+marking the live probe and Day 3 complete. Production probe route returns 404;
+the existing homepage and placeholder API still return HTTP 200.
