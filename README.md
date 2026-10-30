@@ -99,18 +99,18 @@ A hard reset discards uncommitted tracked work.
 
 ## Day 2: Supabase database
 
-1. In Supabase, create a free project named `citefix-prod`. Choose your nearest
+1. In Supabase, create a free project named `citemend`. Choose your nearest
    available region and store the database password in your password manager.
 2. In the project's API settings or Connect dialog, copy the project URL and
-   public anon key into `.env.local` (already ignored by Git):
+   public publishable key into `.env.local` (already ignored by Git):
 
    ```ini
    NEXT_PUBLIC_SUPABASE_URL=your_project_url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_public_anon_key
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_public_publishable_key
    ```
 
    Never use a `service_role` or secret key in a `NEXT_PUBLIC_` variable.
-   Restart the development server after changing these values.
+   Legacy projects may use `NEXT_PUBLIC_SUPABASE_ANON_KEY` instead. Restart the development server after changing these values.
 3. Open **SQL Editor > New Query**, paste `supabase/migrations/001_init.sql`,
    and click **Run** once. The migration is transactional and expects new tables;
    do not rerun it after success.
