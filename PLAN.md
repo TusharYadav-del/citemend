@@ -33,3 +33,10 @@ user approved gemini-3.8-flash, which currently returns HTTP 429
 RESOURCE_EXHAUSTED for this key's project. Await available project quota before
 marking the live probe and Day 3 complete. Production probe route returns 404;
 the existing homepage and placeholder API still return HTTP 200.
+
+Quota diagnostics: the saved key has no shell override or surrounding whitespace.
+Google returned 503 high demand for plain Gemini 3.8 Flash generation and 429
+RESOURCE_EXHAUSTED for grounded generation, without a specific quota metric.
+The exact quota cause is unconfirmed; available general quota alone does not
+verify model-specific or Google Search limits. Automatic retries are restricted
+to one retry for 503; HTTP 429 is not automatically retried.

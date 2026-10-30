@@ -168,3 +168,8 @@ The Day 3 model was changed to `gemini-3.8-flash` with user approval because
 Google rejects `gemini-2.5-flash` for new users. The configured project currently
 returns HTTP 429 RESOURCE_EXHAUSTED. Check its quota at https://ai.dev/rate-limit;
 a successful live grounded response is still required to complete Day 3.
+
+Troubleshooting: a 429 does not establish that all project quota is exhausted.
+Check the project owning the saved key, the selected model's RPM/TPM/RPD limits,
+and Google Search grounding limits. A 503 indicates temporary model overload.
+The probe retries 503 once and does not automatically retry 429 responses.

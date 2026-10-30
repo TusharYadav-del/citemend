@@ -30,7 +30,10 @@ export async function runCitationProbe(
     throw new CitationProbeError("Set GEMINI_API_KEY in .env.local and restart the development server.");
   }
 
-  const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 60000 } });
+  const ai = new GoogleGenAI({ apiKey, httpOptions: {
+    timeout: 60000,
+    retryOptions: { attempts: 2, httpStatusCodes: [503], initialDelay: 1, maxDelay: 2 },
+  } });
   const response = await ai.models.generateContent({
     model: "gemini-3.8-flash",
     contents: `Research the domain ${url.hostname} using Google Search. Answer the following request with verifiable sources. Do not claim a URL was checked for HTTP errors.\n\n${prompt.trim()}`,

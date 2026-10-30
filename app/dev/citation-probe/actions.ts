@@ -25,7 +25,10 @@ export async function probeCitationAction(
       return { result: null, error: error.message };
     }
     if (error instanceof ApiError && error.status === 429) {
-      return { result: null, error: "Gemini quota is exhausted (HTTP 429). Check this key's project quota at https://ai.dev/rate-limit before retrying." };
+      return { result: null, error: "Google rejected the grounded Gemini 3.8 Flash request with HTTP 429. Check this API key's project, model-specific RPM/TPM/RPD limits, and Google Search grounding quota at https://ai.dev/rate-limit. This response does not identify which limit was hit." };
+    }
+    if (error instanceof ApiError && error.status === 503) {
+      return { result: null, error: "Gemini 3.8 Flash is temporarily unavailable due to high demand (HTTP 503). Try again later." };
     }
     if (error instanceof ApiError) {
       return { result: null, error: `Gemini request failed (HTTP ${error.status}). Check the key, model access, and quota in AI Studio.` };
