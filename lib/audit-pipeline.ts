@@ -1,5 +1,6 @@
 ﻿import "server-only";
 import { isIP } from "node:net";
+import { publicFetch } from "./public-http";
 import { normalizeCitationUrl, extractTextUrls } from "./citation-urls";
 import type { CitationProbeResult as GeminiProbeResult } from "./gemini";
 import { runCitationProbe, type CitationProbeResult } from "./citation-probe";
@@ -70,10 +71,10 @@ async function resolveGroundingRedirect(value: string): Promise<string | null> {
   const signal = AbortSignal.timeout(10_000);
   for (let hop = 0; hop < 5; hop++) {
     if (!isGroundingRedirect(url)) return url;
-    let response = await fetch(url, { method: "HEAD", redirect: "manual", cache: "no-store", signal });
+    let response = await publicFetch(url, { method: "HEAD", redirect: "manual", cache: "no-store", signal });
     if ([403, 405, 501].includes(response.status)) {
       await response.body?.cancel();
-      response = await fetch(url, { method: "GET", redirect: "manual", cache: "no-store", signal });
+      response = await publicFetch(url, { method: "GET", redirect: "manual", cache: "no-store", signal });
     }
     const location = response.headers.get("location");
     await response.body?.cancel();
@@ -153,6 +154,17 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
   const groundingMetadata = "groundingMetadata" in probe ? probe.groundingMetadata : null;
   if (!("searchGrounding" in probe) && !groundingMetadata) warnings.push("The probe returned no grounding metadata; only response text URLs could be inspected.");
   const report: AuditReport = { domain, buyerPrompt, generatedText: probe.text, groundingMetadata, providerUsed: "providerUsed" in probe ? probe.providerUsed : "gemini", ...("searchGrounding" in probe ? { searchGrounding: probe.searchGrounding } : {}), extractedUrls: allUrls, sitemapUrlCount: sitemap.length, findings, warnings: [...new Set(warnings)], status: warnings.length ? "partial" : "completed" };
-  const saved = await deps.save(report);
-  return { ...report, auditId: saved.id, createdAt: saved.createdAt, suggestionCandidatesPer404: 5 };
+  if (process.env.AUDIT_PERSISTENCE_MODE === "local") {
+    report.status = "partial";
+    report.warnings.push("Local report only: database persistence is disabled.");
+    return { ...report, auditId: null, createdAt: new Date().toISOString(), persistence: { status: "disabled" as const }, suggestionCandidatesPer404: 5 };
+  }
+  try {
+    const saved = await deps.save(report);
+    return { ...report, auditId: saved.id, createdAt: saved.createdAt, persistence: { status: "saved" as const }, suggestionCandidatesPer404: 5 };
+  } catch {
+    report.status = "partial";
+    report.warnings.push("Database save could not be verified. This report is available here but is not confirmed in audit history.");
+    return { ...report, auditId: null, createdAt: new Date().toISOString(), persistence: { status: "failed" as const }, suggestionCandidatesPer404: 5 };
+  }
 }

@@ -66,11 +66,16 @@ test("never suggests an unchecked, failed, or missing URL", async () => {
   assert.ok(report.findings.every((item) => item.suggestedRedirect === null));
 });
 
-test("provider and persistence failures reject instead of reporting success", async () => {
+test("provider failures reject while persistence failures preserve an explicitly unsaved report", async () => {
   let saved = false;
   await assert.rejects(runAudit(input, { probe: async () => { throw new Error("provider down"); }, save: async () => { saved = true; return save(); } }), /provider down/);
   assert.equal(saved, false);
-  await assert.rejects(runAudit(input, { probe: async () => probe, sitemap: async () => [], check: async () => 200, save: async () => { throw new Error("database down"); } }), /database down/);
+  const degraded = await runAudit(input, { probe: async () => probe, sitemap: async () => [], check: async () => 200, save: async () => { throw new Error("database down"); } });
+  assert.equal(degraded.auditId, null);
+  assert.equal(degraded.status, "partial");
+  assert.equal(degraded.persistence.status, "failed");
+  assert.ok(degraded.findings.length);
+  assert.ok(degraded.warnings.some((warning) => warning.includes("not confirmed")));
 });
 
 function apiRequest(body: string, contentType = "application/json") {
@@ -218,4 +223,62 @@ test("body-size limits cancel oversized streams and malformed UTF-8 is rejected"
   assert.equal(cancelled, true);
   const malformed = new Request("http://localhost/api/audit", { method: "POST", headers: { "content-type": "application/json" }, body: new Uint8Array([0xff]) });
   assert.equal((await POST(malformed)).status, 400);
+});
+
+test("active probe handles provider timeouts without leaking request details", async () => {
+  delete process.env.TAVILY_API_KEY;
+  mock.method(globalThis, "fetch", async () => { throw new DOMException("sensitive-request-details", "TimeoutError"); });
+  await assert.rejects(runGroqProbe("example.com", "Find docs"), (error: unknown) => error instanceof CitationProviderError && !error.message.includes("sensitive"));
+});
+
+test("Tavily network timeout is disclosed while Groq remains available", async () => {
+  mock.method(globalThis, "fetch", async (url: string | URL) => {
+    if (String(url).includes("api.tavily.com")) throw new DOMException("timeout", "TimeoutError");
+    return Response.json({ choices: [{ message: { content: "See https://example.com/docs." } }] });
+  });
+  const result = await runGroqProbe("example.com", "Find docs");
+  assert.equal(result.searchGrounding.status, "unavailable");
+  assert.ok(result.warnings.length);
+  assert.deepEqual(result.citedUrls, ["https://example.com/docs"]);
+});
+
+test("citation prose strips each trailing punctuation type and keeps balanced path parentheses", async () => {
+  const { extractTextUrls } = await import("../lib/citation-urls");
+  assert.deepEqual(extractTextUrls("https://example.com/a. https://example.com/b, https://example.com/c) https://example.com/d] https://example.com/e(foo)."), ["https://example.com/a", "https://example.com/b", "https://example.com/c", "https://example.com/d", "https://example.com/e(foo)"]);
+});
+
+test("local persistence mode produces a usable report without touching the database", async () => {
+  process.env.AUDIT_PERSISTENCE_MODE = "local";
+  let calls = 0;
+  const result = await runAudit(input, { probe: async () => probe, sitemap: async () => [], check: async () => 200, save: async () => { calls++; return save(); } });
+  assert.equal(calls, 0);
+  assert.equal(result.persistence.status, "disabled");
+  assert.equal(result.auditId, null);
+  assert.equal(result.status, "partial");
+});
+
+test("API returns the structured computed report on database insert failure", async () => {
+  mock.method(globalThis, "fetch", async (value: string | URL, options?: RequestInit) => {
+    const url = String(value);
+    if (url.includes("api.tavily.com")) return Response.json({ results: [{ url: "https://example.com/docs/api", title: "API" }] });
+    if (url.includes("api.groq.com")) return Response.json({ choices: [{ message: { content: probe.text } }] });
+    if (url.endsWith("sitemap.xml")) return new Response("<urlset/>");
+    if (url.startsWith("https://example.com")) return new Response(null, { status: 200 });
+    assert.ok(url.startsWith("https://db.example.com"));
+    assert.ok(options?.signal);
+    return Response.json({ message: "private database details" }, { status: 503 });
+  });
+  const response = await POST(apiRequest(JSON.stringify(input)));
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.auditId, null);
+  assert.equal(result.persistence.status, "failed");
+  assert.ok(result.findings.length);
+  assert.ok(!JSON.stringify(result).includes("private database details"));
+});
+
+test("non-string model output is a safe provider failure", async () => {
+  delete process.env.TAVILY_API_KEY;
+  mock.method(globalThis, "fetch", async () => Response.json({choices:[{message:{content:42}}]}));
+  await assert.rejects(runGroqProbe("example.com", "Find docs"), CitationProviderError);
 });

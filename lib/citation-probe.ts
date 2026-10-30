@@ -79,7 +79,8 @@ export async function runCitationProbe(domain: string, buyerPrompt: string): Pro
         { role: "user", content: `Buyer Query: ${buyerPrompt}\nTarget Domain: ${cleanDomain}\n\nSearch Context:\n${searchContext || "No live search context is available. Explicitly state this limitation."}` },
       ], temperature: 0.2, max_completion_tokens: 2048,
     });
-    text = completion.choices[0]?.message?.content ?? "";
+    const content: unknown = completion.choices?.[0]?.message?.content;
+    text = typeof content === "string" ? content : "";
   } catch (error) {
     const status = error instanceof Groq.APIError ? error.status : undefined;
     throw new CitationProviderError(status === 429 ? "The AI provider is rate limiting requests. Wait before trying another audit." : "Groq could not complete the citation probe. Check provider access and availability.", status);

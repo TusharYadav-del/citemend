@@ -34,7 +34,8 @@ export async function POST(request: Request) {
     input = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks)));
   } catch { return Response.json({ error: "Invalid JSON body." }, { status: 400 }); }
   try {
-    return Response.json(await runAudit(input), { status: 201 });
+    const report = await runAudit(input);
+    return Response.json(report, { status: report.persistence.status === "saved" ? 201 : 200 });
   } catch (error) {
     if (error instanceof AuditInputError) return Response.json({ error: error.message }, { status: 400 });
     if (error instanceof AuditStorageError) return Response.json({ error: error.message, stage: "persistence" }, { status: 502 });

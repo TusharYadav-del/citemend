@@ -1,4 +1,5 @@
 ﻿import "server-only";
+import { assertPublicUrl, publicFetch } from "./public-http";
 import { gunzipSync } from "node:zlib";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 
@@ -8,7 +9,7 @@ const MAX_URLS = 50_000;
 const parser = new XMLParser({ removeNSPrefix: true, ignoreAttributes: true, parseTagValue: false, trimValues: true });
 
 function httpUrl(value: string): URL {
-  const url = new URL(value);
+  const url = assertPublicUrl(value);
   if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) {
     throw new Error("Expected an HTTP(S) URL without credentials.");
   }
@@ -26,9 +27,9 @@ function domainOrigin(domain: string): URL {
 async function request(url: URL, method: "HEAD" | "GET", signal: AbortSignal): Promise<Response> {
   for (let redirects = 0; redirects <= 5; redirects++) {
     signal.throwIfAborted();
-    const response = await fetch(url, {
+    const response = await publicFetch(url, {
       method, signal, redirect: "manual", cache: "no-store",
-      headers: { "User-Agent": "Citemend/1.0 (sitemap and status checker)", Accept: "application/xml,text/plain,*/*" },
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Citemend/1.0", Accept: "application/xml,text/plain,*/*" },
     });
     if (![301, 302, 303, 307, 308].includes(response.status)) return response;
     const location = response.headers.get("location");
@@ -95,7 +96,7 @@ function parseSitemap(xml: string): { pages: string[]; sitemaps: string[] } {
 /** Discovers pages; throws if discovery fails or configured bounds would truncate results. */
 export async function fetchSitemapUrls(domain: string): Promise<string[]> {
   const origin = domainOrigin(domain);
-  const signal = AbortSignal.timeout(30_000);
+  const signal = AbortSignal.timeout(8_000);
   const seen = new Set<string>();
   const pages = new Set<string>();
   async function load(url: string): Promise<void> {
@@ -132,7 +133,7 @@ export async function fetchSitemapUrls(domain: string): Promise<string[]> {
 /** Returns the final HTTP status; invalid URLs, timeouts, and network failures reject. */
 export async function checkUrlStatus(url: string): Promise<number> {
   const target = httpUrl(url);
-  const signal = AbortSignal.timeout(10_000);
+  const signal = AbortSignal.timeout(8_000);
   let response = await request(target, "HEAD", signal);
   const status = response.status;
   await response.body?.cancel();

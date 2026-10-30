@@ -126,10 +126,33 @@ test("real network timeout aborts a stalled response instead of inventing a stat
   assert.ok(address && typeof address !== "string");
   const originalTimeout = AbortSignal.timeout.bind(AbortSignal);
   mock.method(AbortSignal, "timeout", () => originalTimeout(50));
+  mock.method(globalThis, "fetch", (_url: string | URL, init: RequestInit) => nativeFetch(`http://127.0.0.1:${address.port}/slow`, { method: init.method, signal: init.signal }));
   try {
-    await assert.rejects(checkUrlStatus(`http://127.0.0.1:${address.port}/slow`), { name: "TimeoutError" });
+    await assert.rejects(checkUrlStatus("https://example.com/slow"), { name: "TimeoutError" });
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
+});
+
+test("normalizes schemes, trailing slashes, and www hostnames", async () => {
+  routes({ "https://www.example.com/sitemap.xml": () => new Response(urlset(["https://www.example.com/page"])) });
+  assert.deepEqual(await fetchSitemapUrls("https://www.example.com/"), ["https://www.example.com/page"]);
+});
+test("410 is preserved and each redirect is screened for private destinations", async () => {
+  routes({ [`${site}/gone`]: () => new Response(null, { status: 410 }), [`${site}/private`]: () => new Response(null, { status: 302, headers: {location: "http://169.254.169.254/metadata"} }) });
+  assert.equal(await checkUrlStatus(`${site}/gone`), 410);
+  await assert.rejects(checkUrlStatus(`${site}/private`), /Private/);
+});
+test("uses an eight-second request budget and a browser-compatible User-Agent", async () => {
+  const original = AbortSignal.timeout.bind(AbortSignal);
+  const budgets: number[] = [];
+  mock.method(AbortSignal, "timeout", (ms: number) => { budgets.push(ms); return original(ms); });
+  mock.method(globalThis, "fetch", async (_url: string | URL, init: RequestInit) => {
+    assert.match(String((init.headers as Record<string,string>)["User-Agent"]), /Mozilla\/5\.0.*Citemend/);
+    return init.method === "HEAD" ? new Response(null) : new Response("<urlset/>");
+  });
+  await fetchSitemapUrls("example.com/");
+  await checkUrlStatus(`${site}/ok`);
+  assert.deepEqual(budgets, [8000, 8000]);
 });

@@ -75,3 +75,10 @@ Provider quotas, host-specific HTTP restrictions, and sitemap size/time bounds
 remain real operating limits. Partial reports disclose incomplete checks; they
 are not silently converted into successful scans. Redirect rules are suggestions
 for manual review, not deployed fixes.
+
+## Follow-up readiness audit
+
+The subsequent automated readiness audit adds outbound SSRF protection, typed
+Supabase queries, bounded database requests, and transparent local/failed-save
+reports. See [WEEK1_READINESS.md](./WEEK1_READINESS.md) for current behavior and
+verification; the observations above describe the earlier Week 1 test run.

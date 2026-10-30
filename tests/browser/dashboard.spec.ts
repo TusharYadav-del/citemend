@@ -113,3 +113,45 @@ test("a stalled audit stops the spinner and explains that the server may still b
   await expect(page.getByRole("button", { name: "Run AI Audit", exact: true })).toBeEnabled();
   release();
 });
+
+const hydrationFailures = new WeakMap<Page, string[]>();
+test.beforeEach(({ page }) => {
+  const failures: string[] = [];
+  hydrationFailures.set(page, failures);
+  page.on("console", (message) => { if (/hydration|hydrated.*match/i.test(message.text())) failures.push(message.text()); });
+  page.on("pageerror", (error) => failures.push(error.message));
+});
+test.afterEach(({ page }) => { expect(hydrationFailures.get(page)).toEqual([]); });
+
+test("unsaved reports remain visible and never claim database success", async ({ page }) => {
+  await page.route("**/api/audit", (route) => route.fulfill({status: 200, json: {...report, auditId: null, persistence: {status: "failed"}, status: "partial", warnings: ["Database save could not be verified."]}}));
+  await page.goto("/"); await fill(page);
+  await page.getByRole("button", {name: "Run AI Audit", exact: true}).click();
+  await expect(page.getByTestId("health-score")).toBeVisible();
+  await expect(page.getByText("Report not saved to history", {exact: false})).toBeVisible();
+  await expect(page.getByText("Saved to your audit history", {exact: false})).toHaveCount(0);
+});
+
+test("empty and private/malformed domains are stopped before the API", async ({ page }) => {
+  let calls=0;
+  await page.route("**/api/audit", (route)=>{ calls++; return route.abort(); });
+  await page.goto("/");
+  await page.getByRole("button", {name: "Run AI Audit", exact: true}).click();
+  expect(await page.getByLabel("Your website domain").evaluate((input: HTMLInputElement)=>input.validity.valueMissing)).toBe(true);
+  for (const domain of ["127.1", "-invalid.com", "a..com"]) {
+    await page.getByLabel("Your website domain").fill(domain);
+    await page.getByRole("button", {name: "Run AI Audit", exact: true}).click();
+    await expect(page.locator("main").getByRole("alert")).toContainText("Enter a domain");
+  }
+  expect(calls).toBe(0);
+});
+
+test("clipboard denial shows a useful fallback instead of a runtime error", async ({ page }) => {
+  await page.addInitScript(() => { Object.defineProperty(navigator, "clipboard", {value: {writeText: async () => { throw new DOMException("Permission denied", "NotAllowedError"); }}}); });
+  await page.route("**/api/audit", (route) => route.fulfill({status:201,json:report}));
+  await page.goto("/"); await fill(page);
+  await page.getByRole("button", {name:"Run AI Audit",exact:true}).click();
+  await page.getByRole("button", {name:"Copy 301 Rule for https://example.com/old-pricing",exact:true}).click();
+  await expect(page.locator("main").getByRole("alert")).toContainText("Clipboard access is unavailable");
+  await expect(page.getByText("Copied!", {exact:true})).toHaveCount(0);
+});

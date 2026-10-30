@@ -6,7 +6,7 @@ payments, or database integration is implemented.
 
 ## Requirements
 
-- Node.js 20.9 or newer (an active LTS release is recommended)
+- Node.js 20.18.1 or newer (an active LTS release is recommended)
 - npm
 
 ## Installation
@@ -22,7 +22,7 @@ node --version
 npm --version
 ```
 
-Both commands should print a version. Node.js must be at least 20.9. If either
+Both commands should print a version. Node.js must be at least 20.18.1. If either
 command is not found, install Node.js LTS (which includes npm), restart VS Code,
 and open a new terminal.
 
@@ -189,10 +189,10 @@ Server-side code can import `fetchSitemapUrls` and `checkUrlStatus` from
   responses of 403, 405, or 501. GET bodies are cancelled after headers arrive.
   A returned 404 is an actual HTTP response; timeouts and network failures throw.
 
-Discovery has a 30-second overall timeout and stops with an error rather than
+Discovery has an eight-second overall timeout and stops with an error rather than
 silently truncating results above 50 sitemap documents or 50,000 unique URLs.
 Each XML document is limited to 50 MiB (including after gzip decompression);
-robots.txt is limited to 512 KiB. Status checks have a 10-second overall timeout.
+robots.txt is limited to 512 KiB. Status checks have an eight-second overall timeout.
 Requests bypass caching and allow at most five redirects. Empty valid sitemaps
 return `[]`; missing or invalid discovery and failed child sitemaps reject.
 The utility parses robots.txt for discovery only; it is not a crawler.
@@ -316,3 +316,21 @@ npm run test:ui
 Day 7 adds strict rendered-report validation, corrected citation punctuation
 parsing, numeric-IP alias rejection, and streamed request-size enforcement.
 The retro lists concrete Week 2 authentication prerequisites; auth is not started.
+
+## Week 1 readiness audit
+
+The current scorecard and executed checks are in
+[docs/WEEK1_READINESS.md](docs/WEEK1_READINESS.md). Server requests now prevent
+private-address/redirect SSRF with DNS-pinned connections and eight-second SEO
+budgets. The HTTP agent requires Node 20.18.1 or newer.
+
+A verified save returns HTTP 201 with `persistence.status= saved`. If the database
+cannot confirm a save, the API still returns the computed report with HTTP 200,
+partial status, null auditId, warnings, and `persistence.status=failed`. Setting
+`AUDIT_PERSISTENCE_MODE=local` produces a local-only report without database
+writes. The dashboard distinguishes these states from saved audit history.
+
+Run `npm run test:security` for the outbound-address tests and
+`node scripts/check-env-security.mjs --build` after building to check source,
+Git history, and browser assets without displaying credential values. Production
+audit POST remains disabled pending authentication.

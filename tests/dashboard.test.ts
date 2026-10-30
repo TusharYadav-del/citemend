@@ -20,3 +20,10 @@ test("malformed report findings cannot reach the dashboard renderer", () => {
   assert.equal(parseDashboardReport(valid).domain, "example.com");
   for (const invalid of [{ ...valid, findings: [null] }, { ...valid, findings: [{ ...finding(404), suggestedRedirect: "javascript:alert(1)" }] }, { ...valid, findings: [{ ...finding(404), httpStatus: "404" }] }, { ...valid, sitemapUrlCount: -1 }, { ...valid, warnings: [123] }]) assert.throws(() => parseDashboardReport(invalid), /unexpected report/);
 });
+
+test("accepts explicit unsaved reports and rejects contradictory persistence states", () => {
+  const report = { auditId: null, persistence: {status: "failed"}, domain: "example.com", generatedText: "answer", status: "partial", sitemapUrlCount: 0, findings: [], warnings: ["Not saved"] };
+  assert.equal(parseDashboardReport(report).auditId, null);
+  assert.throws(() => parseDashboardReport({...report, persistence: {status: "saved"}}));
+  assert.throws(() => parseDashboardReport({...report, auditId: "pretend-id"}));
+});

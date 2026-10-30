@@ -1,5 +1,5 @@
 ﻿import "server-only";
-import { createClient } from "@supabase/supabase-js";
+import { createServerDatabase } from "./supabase-server";
 import type { MockAudit } from "./mock-audit";
 
 export type SavedMockAudit = {
@@ -15,12 +15,7 @@ export async function saveMockAudit(report: MockAudit): Promise<SavedMockAudit> 
   if (process.env.NODE_ENV !== "development") {
     throw new Error("Mock audit persistence is available only in development.");
   }
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    throw new Error("Add SUPABASE_SECRET_KEY to .env.local and restart the dev server to save mock audits. Never use a NEXT_PUBLIC_ prefix for this key.");
-  }
-  const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const db = createServerDatabase();
   const { data: audit, error: auditError } = await db.from("audits")
     .insert({ domain: report.domain, status: "mock_pending" }).select("id").single();
   if (auditError || !audit) throw new Error("Supabase could not create the mock audit. Check the server key, table grants, and migration.");

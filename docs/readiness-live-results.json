@@ -1,0 +1,14 @@
+{
+  "testedDate": "2026-10-31",
+  "liveHttpStatus": 201,
+  "auditId": "9234a138-b3aa-46dd-bf79-b5800876a89d",
+  "status": "completed",
+  "citationsChecked": 13,
+  "confirmed404s": 5,
+  "persistenceVerified": true,
+  "anonymousInsertStatus": 401,
+  "productionHomepageStatus": 200,
+  "productionPostStatus": 403,
+  "publicKeyVerified": true,
+  "anonymousInsertErrorCode": "42501"
+}

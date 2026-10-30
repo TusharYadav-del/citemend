@@ -1,14 +1,12 @@
 ﻿import "server-only";
-import { createClient } from "@supabase/supabase-js";
+import { createServerDatabase } from "./supabase-server";
 import type { AuditReport } from "./audit-pipeline";
 
 export class AuditStorageError extends Error {}
 
 export async function persistAudit(report: AuditReport): Promise<{ id: string; createdAt: string }> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new AuditStorageError("Configure the server-only Supabase key and project URL.");
-  const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  let db: ReturnType<typeof createServerDatabase>;
+  try { db = createServerDatabase(); } catch { throw new AuditStorageError("Configure the server-only Supabase key and project URL."); }
   const { data: audit, error } = await db.from("audits").insert({ domain: report.domain, status: "pending" }).select("id,created_at").single();
   if (error || !audit) throw new AuditStorageError("Supabase could not create the audit.");
   const broken = report.findings.filter((item) => item.httpStatus === 404);
