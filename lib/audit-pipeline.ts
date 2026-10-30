@@ -1,6 +1,8 @@
 ﻿import "server-only";
 import { isIP } from "node:net";
-import { runCitationProbe, type CitationProbeResult } from "./gemini";
+import type { CitationProbeResult as GeminiProbeResult } from "./gemini";
+import { runCitationProbe, type CitationProbeResult } from "./citation-probe";
+type ProbeResult = CitationProbeResult | GeminiProbeResult;
 import { fetchSitemapUrls, checkUrlStatus } from "./seo";
 import { persistAudit } from "./audit-store";
 
@@ -8,12 +10,13 @@ export class AuditInputError extends Error {}
 export type AuditFinding = { url: string; httpStatus: number | null; error: string | null; suggestedRedirect: string | null };
 export type AuditReport = {
   domain: string; buyerPrompt: string; generatedText: string;
-  groundingMetadata: CitationProbeResult["groundingMetadata"];
+  groundingMetadata: GeminiProbeResult["groundingMetadata"];
+  providerUsed?: string; searchGrounding?: CitationProbeResult["searchGrounding"];
   extractedUrls: string[]; sitemapUrlCount: number;
   findings: AuditFinding[]; warnings: string[]; status: "completed" | "partial";
 };
 export type AuditDependencies = {
-  probe: typeof runCitationProbe; sitemap: typeof fetchSitemapUrls; check: typeof checkUrlStatus;
+  probe: (domain: string, buyerPrompt: string) => Promise<ProbeResult>; sitemap: typeof fetchSitemapUrls; check: typeof checkUrlStatus;
   resolve: (url: string) => Promise<string | null>;
   save: (report: AuditReport) => Promise<{ id: string; createdAt: string }>;
 };
@@ -49,7 +52,7 @@ function isGroundingRedirect(url: string): boolean {
 }
 
 /** Extracts URLs from text and all string values in grounding metadata. */
-export function extractCitationUrls(probe: CitationProbeResult): string[] {
+export function extractCitationUrls(probe: ProbeResult): string[] {
   const found = new Set<string>();
   function visit(value: unknown): void {
     if (typeof value === "string") {
@@ -66,7 +69,9 @@ export function extractCitationUrls(probe: CitationProbeResult): string[] {
     } else if (Array.isArray(value)) value.forEach(visit);
     else if (value && typeof value === "object") Object.values(value).forEach(visit);
   }
-  visit(probe.text); visit(probe.groundingMetadata); visit(probe.sources);
+  visit(probe.text);
+  if ("citedUrls" in probe) visit(probe.citedUrls);
+  else { visit(probe.groundingMetadata); visit(probe.sources); }
   return [...found];
 }
 
@@ -121,7 +126,7 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
   const probe = await deps.probe(domain, buyerPrompt);
   const extracted = extractCitationUrls(probe);
   if (extracted.length > 100) throw new AuditInputError("The generated response contains more than 100 citation URLs; narrow the buyer prompt.");
-  const warnings: string[] = [];
+  const warnings: string[] = "warnings" in probe ? [...probe.warnings] : [];
   const resolved = await mapLimited(extracted.filter(isGroundingRedirect), async (url) => {
     try { const result = await deps.resolve(url); if (result) return normalizedUrl(result); } catch {}
     warnings.push("A Google grounding citation could not be resolved.");
@@ -156,8 +161,9 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
     }
   }
   if (findings.some((item) => item.error)) warnings.push("Some citation statuses are unknown; these are not classified as 404s.");
-  if (!probe.groundingMetadata) warnings.push("Gemini returned no grounding metadata; only response text URLs could be inspected.");
-  const report: AuditReport = { domain, buyerPrompt, generatedText: probe.text, groundingMetadata: probe.groundingMetadata, extractedUrls: allUrls, sitemapUrlCount: sitemap.length, findings, warnings: [...new Set(warnings)], status: warnings.length ? "partial" : "completed" };
+  const groundingMetadata = "groundingMetadata" in probe ? probe.groundingMetadata : null;
+  if (!("searchGrounding" in probe) && !groundingMetadata) warnings.push("The probe returned no grounding metadata; only response text URLs could be inspected.");
+  const report: AuditReport = { domain, buyerPrompt, generatedText: probe.text, groundingMetadata, providerUsed: "providerUsed" in probe ? probe.providerUsed : "gemini", ...("searchGrounding" in probe ? { searchGrounding: probe.searchGrounding } : {}), extractedUrls: allUrls, sitemapUrlCount: sitemap.length, findings, warnings: [...new Set(warnings)], status: warnings.length ? "partial" : "completed" };
   const saved = await deps.save(report);
   return { ...report, auditId: saved.id, createdAt: saved.createdAt, suggestionCandidatesPer404: 5 };
 }

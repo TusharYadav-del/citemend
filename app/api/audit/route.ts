@@ -1,4 +1,4 @@
-﻿import { ApiError } from "@google/genai";
+﻿import { CitationProviderError } from "@/lib/citation-probe";
 import { AuditInputError, runAudit } from "@/lib/audit-pipeline";
 import { AuditStorageError } from "@/lib/audit-store";
 
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof AuditInputError) return Response.json({ error: error.message }, { status: 400 });
     if (error instanceof AuditStorageError) return Response.json({ error: error.message, stage: "persistence" }, { status: 502 });
-    if (error instanceof ApiError) return Response.json({ error: "Gemini could not complete the grounded request. No audit was saved.", stage: "gemini", upstreamStatus: error.status }, { status: error.status === 429 ? 429 : 502 });
+    if (error instanceof CitationProviderError) return Response.json({ error: error.message, stage: "probe", provider: "groq", upstreamStatus: error.upstreamStatus }, { status: error.upstreamStatus === 429 ? 429 : 502 });
     return Response.json({ error: "The audit could not complete. Check server configuration and provider availability.", stage: "pipeline" }, { status: 502 });
   }
 }

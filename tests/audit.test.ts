@@ -7,7 +7,7 @@ import type { CitationProbeResult } from "../lib/gemini";
 
 const originalEnv = process.env;
 const originalFetch = globalThis.fetch;
-beforeEach(() => { process.env = { ...originalEnv, NODE_ENV: "development", GEMINI_API_KEY: "test-google-key", NEXT_PUBLIC_SUPABASE_URL: "https://db.example.com", SUPABASE_SECRET_KEY: "test-server-key" }; });
+beforeEach(() => { process.env = { ...originalEnv, NODE_ENV: "development", GEMINI_API_KEY: "test-google-key", GROQ_API_KEY: "test-groq-key", GROQ_MODEL: "llama-3.3-70b-versatile", TAVILY_API_KEY: "test-tavily-key", NEXT_PUBLIC_SUPABASE_URL: "https://db.example.com", SUPABASE_SECRET_KEY: "test-server-key" }; });
 afterEach(() => { mock.restoreAll(); globalThis.fetch = originalFetch; process.env = originalEnv; });
 const input = { domain: "example.com", buyerPrompt: "Find the documentation." };
 const probe: CitationProbeResult = {
@@ -93,7 +93,8 @@ test("POST runs real SDK/parser/checker/store code against controlled HTTP fixtu
   const id = "00000000-0000-4000-8000-000000000005";
   mock.method(globalThis, "fetch", async (value: string | URL, options?: RequestInit) => {
     const url = String(value), method = options?.method ?? "GET";
-    if (url.includes("generativelanguage.googleapis.com")) return Response.json({ candidates: [{ content: { role: "model", parts: [{ text: probe.text }] }, groundingMetadata: probe.groundingMetadata }] });
+    if (url.includes("api.tavily.com")) return Response.json({ results: [{ url: "https://example.com/docs/api", title: "API", content: "Official API docs" }] });
+    if (url.includes("api.groq.com")) return Response.json({ choices: [{ message: { content: probe.text } }] });
     if (url === "https://example.com/sitemap.xml") return new Response('<urlset><url><loc>https://example.com/docs/setup</loc></url></urlset>');
     if (url.startsWith("https://example.com/")) return new Response(null, { status: url.endsWith("setup-old") ? 404 : 200 });
     if (url.startsWith("https://db.example.com/rest/v1/audits") && method === "POST") { insertCount++; return Response.json({ id, created_at: "2026-10-30T00:00:00Z" }); }
@@ -111,15 +112,17 @@ test("POST runs real SDK/parser/checker/store code against controlled HTTP fixtu
   assert.deepEqual(persistedLinks, [{ audit_id: id, cited_url: "https://example.com/docs/setup-old", http_status: 404, suggested_redirect: "https://example.com/docs/setup" }]);
 });
 
-test("POST returns a safe Gemini 429 without writing to Supabase", async () => {
+test("POST returns a safe Groq 429 without writing to Supabase", async () => {
   mock.method(globalThis, "fetch", async (value: string | URL) => {
-    assert.ok(String(value).includes("generativelanguage.googleapis.com"));
+    if (String(value).includes("api.tavily.com")) return Response.json({ results: [] });
+    assert.ok(String(value).includes("api.groq.com"));
     return Response.json({ error: { code: 429, message: "quota details with sensitive request data", status: "RESOURCE_EXHAUSTED" } }, { status: 429 });
   });
   const response = await POST(apiRequest(JSON.stringify(input)));
   assert.equal(response.status, 429);
   const result = await response.json();
-  assert.equal(result.stage, "gemini");
+  assert.equal(result.stage, "probe");
+  assert.equal(result.provider, "groq");
   assert.ok(!JSON.stringify(result).includes("sensitive"));
 });
 
@@ -145,4 +148,51 @@ test("path similarity handles typos, and no-404 reports do not invent broken lin
   assert.equal(report.findings[0].suggestedRedirect, "https://example.com/pricing");
   const healthy = await runAudit(input, { probe: async () => probe, sitemap: async () => [], check: async () => 200, save });
   assert.ok(healthy.findings.every((item) => item.httpStatus === 200 && item.suggestedRedirect === null));
+});
+
+// Provider regression checks: Tavily evidence and generated URLs remain distinct.
+import { runCitationProbe as runGroqProbe, CitationProviderError } from "../lib/citation-probe";
+
+test("Groq probe combines search-only and generated URLs and bounds provider requests", async () => {
+  let groqBody: Record<string, unknown> | undefined;
+  mock.method(globalThis, "fetch", async (value: string | URL, options?: RequestInit) => {
+    if (String(value).includes("api.tavily.com")) {
+      assert.ok(options?.signal);
+      return Response.json({ results: [{ url: "https://example.com/search-only", title: "Search result", content: "Evidence" }, { url: "javascript:alert(1)" }] });
+    }
+    groqBody = JSON.parse(String(options?.body));
+    return Response.json({ choices: [{ message: { content: "See [pricing](https://example.com/pricing). Also https://example.com/search-only" } }] });
+  });
+  const result = await runGroqProbe("https://example.com/", "Find pricing");
+  assert.equal(result.providerUsed, "groq-llama-3.3-70b-versatile");
+  assert.equal(result.searchGrounding.status, "available");
+  assert.deepEqual(result.citedUrls, ["https://example.com/search-only", "https://example.com/pricing"]);
+  assert.equal(groqBody?.model, "llama-3.3-70b-versatile");
+  assert.ok(JSON.stringify(groqBody).includes("Evidence"));
+  assert.deepEqual(extractCitationUrls(result), result.citedUrls.slice().sort((a, b) => a.endsWith("pricing") ? -1 : b.endsWith("pricing") ? 1 : 0));
+});
+
+test("Tavily failure is visible while Groq can still generate an ungrounded answer", async () => {
+  mock.method(globalThis, "fetch", async (value: string | URL) => String(value).includes("api.tavily.com") ? new Response(null, { status: 429 }) : Response.json({ choices: [{ message: { content: "See https://example.com/docs" } }] }));
+  const result = await runGroqProbe("example.com", "Find docs");
+  assert.equal(result.searchGrounding.status, "unavailable");
+  assert.ok(result.warnings.length);
+  assert.equal(result.searchGrounding.sources.length, 0);
+});
+
+test("missing Tavily configuration is disclosed; missing Groq key makes no provider call", async () => {
+  delete process.env.TAVILY_API_KEY;
+  let calls = 0;
+  mock.method(globalThis, "fetch", async () => { calls++; return Response.json({ choices: [{ message: { content: "Known documentation URLs." } }] }); });
+  const result = await runGroqProbe("example.com", "Find docs");
+  assert.equal(result.searchGrounding.status, "not_configured");
+  assert.ok(result.warnings.length);
+  delete process.env.GROQ_API_KEY;
+  await assert.rejects(runGroqProbe("example.com", "Find docs"), /GROQ_API_KEY/);
+  assert.equal(calls, 1);
+});
+
+test("malformed Tavily results are disclosed and empty Groq output rejects", async () => {
+  mock.method(globalThis, "fetch", async (value: string | URL) => String(value).includes("api.tavily.com") ? Response.json({ unexpected: [] }) : Response.json({ choices: [] }));
+  await assert.rejects(runGroqProbe("example.com", "Find docs"), CitationProviderError);
 });
