@@ -1,7 +1,12 @@
-/**
- * Placeholder for future Supabase configuration.
- * No client is initialized and no credentials are required for Day 1.
- * Add the appropriate browser/server clients when database work begins.
- * Keep privileged credentials on the server and out of committed files.
- */
-export {};
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error(
+    "Supabase configuration is missing. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local, then restart the app.",
+  );
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);

@@ -32,7 +32,7 @@ Install the locked dependencies (this step needs network access):
 npm ci
 ```
 
-No environment variables are required. `.env.example` documents the current
+The Day 1 starter runs without environment variables. `.env.example` documents the current
 setup. Future local credentials belong in `.env.local`, which Git ignores.
 Never commit real credentials to `.env.example`.
 
@@ -83,7 +83,7 @@ npm run start
 - `app/`: Next.js App Router pages and styles
 - `app/api/audit/route.ts`: placeholder GET endpoint
 - `components/`: reserved for UI components; `.gitkeep` tracks the empty folder
-- `lib/supabase.ts`: documentation-only placeholder; creates no database client
+- `lib/supabase.ts`: Supabase client configured with public project environment variables
 - `.env.example`: credential-free environment guidance
 
 TypeScript, ESLint, and the existing Tailwind CSS 4 setup are retained.
@@ -96,3 +96,42 @@ no additional Tailwind configuration file is needed.
 Ask Codex to inspect and undo the specific broken change.
 
 A hard reset discards uncommitted tracked work.
+
+## Day 2: Supabase database
+
+1. In Supabase, create a free project named `citefix-prod`. Choose your nearest
+   available region and store the database password in your password manager.
+2. In the project's API settings or Connect dialog, copy the project URL and
+   public anon key into `.env.local` (already ignored by Git):
+
+   ```ini
+   NEXT_PUBLIC_SUPABASE_URL=your_project_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_public_anon_key
+   ```
+
+   Never use a `service_role` or secret key in a `NEXT_PUBLIC_` variable.
+   Restart the development server after changing these values.
+3. Open **SQL Editor > New Query**, paste `supabase/migrations/001_init.sql`,
+   and click **Run** once. The migration is transactional and expects new tables;
+   do not rerun it after success.
+4. Confirm `audits` and `broken_links` exist in the Table Editor. In the SQL
+   Editor, check the columns and the audit relationship with:
+
+   ```sql
+   select * from public.audits limit 1;
+   select * from public.broken_links limit 1;
+   ```
+
+The migration supplies UUIDs and creation timestamps automatically. Broken links
+reference an audit and are deleted when that audit is deleted. A redirect may
+remain null until one is suggested.
+
+Row level security is enabled with no public access policies. SQL Editor access
+works, but the public client cannot read or write audit rows yet. Authentication
+and ownership policies are outside Day 2. No database call has been added to the
+starter page or placeholder API.
+
+After configuration, application code can import `{ supabase }` from
+`@/lib/supabase`. Importing it without both environment variables gives a clear
+configuration error. A successful app build alone does not verify the hosted
+schema or credentials.
