@@ -24,3 +24,32 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
 }
+
+/* shadcn/ui tokens; existing pages retain their explicit colors. */
+:root {
+  --card: #ffffff; --card-foreground: #182c25;
+  --popover: #ffffff; --popover-foreground: #182c25;
+  --primary: #214d39; --primary-foreground: #ffffff;
+  --secondary: #edf2e7; --secondary-foreground: #385134;
+  --muted: #f1f4eb; --muted-foreground: #6c7866;
+  --accent: #edf2e7; --accent-foreground: #214d39;
+  --destructive: #b54736; --border: #dfe5d8; --input: #d8e0d0; --ring: #83a45e;
+  --radius: 0.625rem;
+}
+@theme inline {
+  --color-card: var(--card); --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover); --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary); --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary); --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted); --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent); --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive); --color-border: var(--border);
+  --color-input: var(--input); --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px); --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius); --radius-xl: calc(var(--radius) + 4px);
+}
+.audit-workspace { --background: #f7f8f4; --foreground: #182c25; }
+.audit-workspace ::selection { background: #d8e9b9; color: #173f32; }
+@media (prefers-reduced-motion: reduce) { .audit-workspace *, .audit-workspace *::before, .audit-workspace *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+@layer base { .audit-workspace * { border-color: var(--border); } }

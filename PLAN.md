@@ -61,3 +61,17 @@ Recovery: Ask Codex to inspect and undo the specific broken change.
 The user replaced the active probe with Groq plus Tavily. Keep provider identity and search availability explicit; do not silently replace live results with mocks.
 Previous completed days and the existing mock UI remain unchanged.
 Recovery: Ask Codex to inspect and undo the specific broken change.
+
+## Day 6: Executive audit dashboard UI (COMPLETED)
+
+- [x] Initialize shadcn/ui default preset and install Button, Input, Card, Badge, and Table; retain the system-font setup.
+- [x] Replace the starter homepage with the responsive Citemend landing/dashboard and requested hero text.
+- [x] Connect domain/buyer-prompt submission to the existing audit POST without changing the backend or mock workspace.
+- [x] Display evidence-based citation health, confirmed 404s, verified redirect suggestions, and working Copy 301 Rule controls.
+- [x] Verify desktop/mobile screenshots and five browser scenarios for submission, loading, errors, partial reports, empty/healthy reports, validation, copy, and overflow.
+- [x] Verify a live stripe.com audit through the UI: HTTP 201, audit 6cf1e454-7e6f-4c33-8b73-58d1df9c0f4c, six citations, 7,176 sitemap URLs, no confirmed 404s; Tavily unavailability correctly shown as a partial-report warning.
+- [x] Pass dashboard helper tests and all 28 existing backend tests.
+- [x] Verify final lint and production build with zero errors.
+- [x] Commit and push Day 6 changes.
+
+Recovery: Ask Codex to inspect and undo the specific broken change.

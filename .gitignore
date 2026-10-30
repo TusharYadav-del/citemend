@@ -42,3 +42,7 @@ next-env.d.ts
 
 # Commit the credential-free environment example
 !.env.example
+
+# Browser test artifacts
+/test-results/
+/playwright-report/
