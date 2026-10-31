@@ -1,12 +1,17 @@
-﻿import "server-only";
+import "server-only";
 import { CitationProviderError } from "./citation-probe";
-import { AuditInputError, runAudit } from "./audit-pipeline";
-import { AuditStorageError } from "./audit-store";
+import { AuditInputError, runAudit, validateAuditInput } from "./audit-pipeline";
+import { AuditStorageError, persistAudit } from "./audit-store";
+import { hasProSubscription } from "./subscription";
+import { reserveFreeAudit, releaseFreeAudit } from "./free-audit";
 
 type AuditPostDependencies = {
   isConfigured?: () => boolean;
   getUserId?: () => Promise<string | null>;
   execute?: typeof runAudit;
+  hasPro?: typeof hasProSubscription;
+  reserveFree?: typeof reserveFreeAudit;
+  releaseFree?: typeof releaseFreeAudit;
 };
 
 export function createAuditPostHandler(dependencies: AuditPostDependencies = {}) {
@@ -18,6 +23,9 @@ export function createAuditPostHandler(dependencies: AuditPostDependencies = {})
     return (await auth()).userId;
   });
   const execute = dependencies.execute ?? runAudit;
+  const hasPro = dependencies.hasPro ?? hasProSubscription;
+  const reserveFree = dependencies.reserveFree ?? reserveFreeAudit;
+  const releaseFree = dependencies.releaseFree ?? releaseFreeAudit;
 
   return async function handleAuditPost(request: Request): Promise<Response> {
     if (!isConfigured()) {
@@ -55,14 +63,45 @@ export function createAuditPostHandler(dependencies: AuditPostDependencies = {})
       input = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks)));
     } catch { return Response.json({ error: "Invalid JSON body." }, { status: 400 }); }
 
+    let domain: string;
+    try { domain = validateAuditInput(input).domain; }
+    catch (error) {
+      return Response.json({ error: error instanceof AuditInputError ? error.message : "Invalid audit input." }, { status: 400 });
+    }
+
+    let isPro: boolean;
+    try { isPro = await hasPro(userId); }
+    catch { return Response.json({ error: "Subscription status is temporarily unavailable." }, { status: 503 }); }
+
+    let reservation: { id: string; createdAt: string } | undefined;
+    if (!isPro) {
+      if (process.env.AUDIT_PERSISTENCE_MODE === "local") {
+        return Response.json({ error: "Free audits require database persistence." }, { status: 503 });
+      }
+      let result: Awaited<ReturnType<typeof reserveFreeAudit>>;
+      try { result = await reserveFree(userId, domain); }
+      catch { return Response.json({ error: "Audit allowance is temporarily unavailable." }, { status: 503 }); }
+      if (result.kind === "limit") {
+        return Response.json({ error: "Your free audit has been used. Upgrade to Pro for unlimited audits.", code: "PRO_REQUIRED" }, { status: 403 });
+      }
+      if (result.kind === "busy") {
+        return Response.json({ error: "A free audit is already running. Please wait before trying again.", code: "AUDIT_IN_PROGRESS" }, { status: 429 });
+      }
+      reservation = { id: result.id, createdAt: result.createdAt };
+    }
+
     try {
-      const report = await execute(input, {}, userId);
+      const report = await execute(input, reservation
+        ? { save: (value, owner) => persistAudit(value, owner, reservation) }
+        : {}, userId);
       return Response.json(report, { status: report.persistence.status === "saved" ? 201 : 200 });
     } catch (error) {
       if (error instanceof AuditInputError) return Response.json({ error: error.message }, { status: 400 });
       if (error instanceof AuditStorageError) return Response.json({ error: error.message, stage: "persistence" }, { status: 502 });
       if (error instanceof CitationProviderError) return Response.json({ error: error.message, stage: "probe", provider: "groq", upstreamStatus: error.upstreamStatus }, { status: error.upstreamStatus === 429 ? 429 : 502 });
       return Response.json({ error: "The audit could not complete. Check server configuration and provider availability.", stage: "pipeline" }, { status: 502 });
+    } finally {
+      if (reservation) await releaseFree(userId, reservation.id, reservation.createdAt).catch(() => {});
     }
   };
 }

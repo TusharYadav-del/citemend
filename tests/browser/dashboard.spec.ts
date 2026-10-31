@@ -1,4 +1,4 @@
-﻿import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 const report = {
   domain: "example.com", buyerPrompt: "Find pricing", generatedText: "Sample answer with citations.", groundingMetadata: null,
@@ -31,6 +31,7 @@ test("landing is responsive and has no fabricated score before an audit", async 
 
 test("submits normalized input, displays real results, and copies the 301 rule", async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.route("**/api/redirect-export", route => route.fulfill({ status: 200, json: { content: 'Redirect 301 "/old-pricing" "https://example.com/pricing"' } }));
   let submitted: unknown;
   await page.route("**/api/audit", async (route) => { submitted = route.request().postDataJSON(); await route.fulfill({ status: 201, json: report }); });
   await page.goto("/"); await fill(page);
@@ -147,6 +148,7 @@ test("empty and private/malformed domains are stopped before the API", async ({ 
 });
 
 test("clipboard denial shows a useful fallback instead of a runtime error", async ({ page }) => {
+  await page.route("**/api/redirect-export", route => route.fulfill({ status: 200, json: { content: 'Redirect 301 "/old-pricing" "https://example.com/pricing"' } }));
   await page.addInitScript(() => { Object.defineProperty(navigator, "clipboard", {value: {writeText: async () => { throw new DOMException("Permission denied", "NotAllowedError"); }}}); });
   await page.route("**/api/audit", (route) => route.fulfill({status:201,json:report}));
   await page.goto("/"); await fill(page);

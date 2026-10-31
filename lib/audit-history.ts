@@ -1,4 +1,4 @@
-﻿import "server-only";
+import "server-only";
 import { createServerDatabase } from "./supabase-server";
 
 export type UserAuditHistoryItem = {
@@ -22,6 +22,7 @@ export async function getUserAuditHistory(userId: string): Promise<UserAuditHist
     .from("audits")
     .select("id,domain,status,created_at,broken_links(id,cited_url,http_status,suggested_redirect)")
     .eq("user_id", userId)
+    .not("status", "in", "(free_pending,free_saving)")
     .order("created_at", { ascending: false });
 
   if (error) throw new Error("Could not load this user's audit history.");

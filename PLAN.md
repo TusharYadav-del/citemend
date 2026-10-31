@@ -192,3 +192,16 @@ Recovery: Ask Codex to inspect and undo the specific broken change.
 
 The configured store is Cite_Mend and its published product is CiteMend Pro Tier; the Default variant is a $39/month subscription. Checkout preview succeeded. Subscription syncing remains inactive until webhook signing and registration are completed.
 Recovery: Ask Codex to inspect and undo the specific broken change.
+
+## Day 16: Pro tier access control and paywall gating (COMPLETED)
+
+- [x] Check the authenticated user's subscription on the server, including trial, payment-retry, and cancellation grace-period states; fail closed when subscription data is unavailable.
+- [x] Enforce the user-confirmed allowance of one saved free audit per account and unlimited Pro audits. Reserve the free slot using the existing audits primary key to prevent concurrent requests from consuming multiple free audits.
+- [x] Gate dashboard and public-report one-click redirect exports through an authenticated server-side Pro check; show an accessible upgrade dialog for free or signed-out users.
+- [x] Add a dashboard upgrade panel for automated weekly monitoring, clearly marked as coming soon.
+- [x] Process subscription_updated webhooks and prevent older events or conflicting owners from overwriting newer subscription state.
+- [x] Pass 46 focused and regression tests, plus browser checks for anonymous/free upgrade dialogs, mocked Pro copying, and mobile layout.
+- [x] Verify npm run lint and npm run build with zero errors. The existing development server was used on port 3000.
+
+Weekly monitoring is not implemented yet. As agreed, configure the production Lemon Squeezy webhook during Vercel deployment; subscribe to subscription_created, subscription_cancelled, and subscription_updated, and set the webhook secret and production app URL. Pro activation depends on that synchronization.
+Recovery: Ask Codex to inspect and undo the specific broken change.

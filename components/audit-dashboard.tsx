@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { SignInButton, UserButton, useAuth } from "@clerk/nextjs";
@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { citationHealth, normalizeDashboardDomain, parseDashboardReport, redirectRule, type DashboardReport } from "@/lib/audit-dashboard";
+import { citationHealth, normalizeDashboardDomain, parseDashboardReport, type DashboardReport } from "@/lib/audit-dashboard";
+import UpgradeModal from "@/components/upgrade-modal";
 
 const subscribeToHydration = () => () => {};
 
@@ -34,6 +35,7 @@ export default function AuditDashboard({ liveEnabled, clerkConfigured }: { liveE
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [copyError, setCopyError] = useState<string | null>(null);
+  const [upgrade, setUpgrade] = useState(false);
   useEffect(() => {
     if (!copied) return;
     const timer = setTimeout(() => setCopied(null), 2500);
@@ -54,7 +56,8 @@ export default function AuditDashboard({ liveEnabled, clerkConfigured }: { liveE
     try {
       const response = await fetch("/api/audit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ domain: cleanDomain, buyerPrompt: prompt.trim() }), signal: controller.signal });
       const data = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(response.status === 429 ? "The AI provider is rate limiting requests. Wait a moment before trying again." : typeof data?.error === "string" ? data.error : "The audit could not finish. Please try again.");
+      if (response.status === 403 && data?.code === "PRO_REQUIRED") { setUpgrade(true); return; }
+      if (!response.ok) throw new Error(response.status === 429 && data?.code !== "AUDIT_IN_PROGRESS" ? "The AI provider is rate limiting requests. Wait a moment before trying again." : typeof data?.error === "string" ? data.error : "The audit could not finish. Please try again.");
       setReport(parseDashboardReport(data));
     } catch (cause) {
       setError(controller.signal.aborted ? "The request took too long. It may still be running; wait a moment before starting another audit." : cause instanceof TypeError ? "Connection lost. Please check your connection and try again." : cause instanceof Error ? cause.message : "Connection lost. Please check your connection and try again.");
@@ -62,8 +65,20 @@ export default function AuditDashboard({ liveEnabled, clerkConfigured }: { liveE
   }
   async function copyRule(url: string, destination: string) {
     setCopyError(null);
-    try { await navigator.clipboard.writeText(redirectRule(url, destination)); setCopied(url); }
-    catch { setCopyError("Clipboard access is unavailable. Select and copy the rule shown below the redirect URL."); }
+    if (!report) return;
+    try {
+      const response = await fetch("/api/redirect-export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain: report.domain, format: "htaccess", single: true, links: [{ cited_url: url, http_status: 404, suggested_redirect: destination }] }),
+      });
+      const data = await response.json();
+      if (response.status === 403 && data?.code === "PRO_REQUIRED") { setUpgrade(true); return; }
+      if (!response.ok || typeof data?.content !== "string") throw new Error(data?.error || "Redirect export is temporarily unavailable.");
+      try { await navigator.clipboard.writeText(data.content); }
+      catch { throw new Error("Clipboard access is unavailable. Please allow clipboard access and try again."); }
+      setCopied(url);
+    } catch (cause) { setCopyError(cause instanceof Error ? cause.message : "Could not copy the redirect."); }
   }
   const health = report ? citationHealth(report.findings) : null;
   const broken = report?.findings.filter((finding) => finding.httpStatus === 404) ?? [];
@@ -116,7 +131,7 @@ export default function AuditDashboard({ liveEnabled, clerkConfigured }: { liveE
           </div>
           {(report.warnings.length > 0 || health.unknown > 0) && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-6 text-amber-900"><p className="font-semibold">Some checks need a closer look</p>{health.unknown > 0 && <p>{health.unknown} URL check(s) are unresolved and excluded from the health score.</p>}<ul>{report.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div>}
           <Card className="gap-0 overflow-hidden bg-white py-0 ring-[#dfe5dc]"><CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 border-b border-[#e9ede4] px-5 py-5"><h3 className="text-sm font-semibold">Broken citations & redirect opportunities</h3><Badge variant="secondary" className="bg-[#f0f3eb] text-[10px] text-[#6f8062]">{broken.length} detected</Badge></CardHeader>
-            {broken.length ? <Table className="min-w-[740px]"><TableHeader className="bg-[#fafbf7]"><TableRow><TableHead className="px-5 text-[10px] tracking-wide text-[#809074]">BROKEN AI CITATION</TableHead><TableHead className="text-[10px] tracking-wide text-[#809074]">STATUS</TableHead><TableHead className="text-[10px] tracking-wide text-[#809074]">SUGGESTED DESTINATION</TableHead><TableHead className="px-5 text-right text-[10px] tracking-wide text-[#809074]">301 RULE</TableHead></TableRow></TableHeader><TableBody>{broken.map((finding) => <TableRow key={finding.url}><TableCell className="max-w-64 px-5 py-5 whitespace-normal"><span className="break-all text-xs font-medium">{finding.url}</span></TableCell><TableCell><Badge variant="destructive" className="rounded-md text-[10px]">404</Badge></TableCell><TableCell className="max-w-72 py-5 whitespace-normal">{finding.suggestedRedirect ? <><p className="break-all text-xs text-[#456936]">{finding.suggestedRedirect}</p><code className="mt-2 block max-w-72 overflow-x-auto text-[9px] text-[#8b9583]">{redirectRule(finding.url, finding.suggestedRedirect)}</code></> : <p className="text-xs text-[#8a9483]">No verified replacement found</p>}</TableCell><TableCell className="px-5 text-right"><Button type="button" variant="outline" disabled={!finding.suggestedRedirect} onClick={() => finding.suggestedRedirect && copyRule(finding.url, finding.suggestedRedirect)} aria-label={`Copy 301 Rule for ${finding.url}`} className="h-8 gap-2 border-[#dbe3d2] text-[10px]">{copied === finding.url ? <Check className="size-3" /> : <Copy className="size-3" />}{copied === finding.url ? "Copied!" : "Copy 301 Rule"}</Button></TableCell></TableRow>)}</TableBody></Table> : <div className="flex flex-col items-center px-6 py-12 text-center"><CircleCheck className="mb-3 size-8 text-[#7d9d5d]" /><h4 className="text-sm font-medium">No confirmed 404s in this audit</h4><p className="mt-2 max-w-md text-xs leading-6 text-[#87927e]">{report.findings.length ? "Your checked citations returned no 404 responses. Review any unresolved checks above for the full picture." : "No citations matching your domain were found. Try a more specific buyer prompt to gather more evidence."}</p></div>}
+            {broken.length ? <Table className="min-w-[740px]"><TableHeader className="bg-[#fafbf7]"><TableRow><TableHead className="px-5 text-[10px] tracking-wide text-[#809074]">BROKEN AI CITATION</TableHead><TableHead className="text-[10px] tracking-wide text-[#809074]">STATUS</TableHead><TableHead className="text-[10px] tracking-wide text-[#809074]">SUGGESTED DESTINATION</TableHead><TableHead className="px-5 text-right text-[10px] tracking-wide text-[#809074]">301 RULE</TableHead></TableRow></TableHeader><TableBody>{broken.map((finding) => <TableRow key={finding.url}><TableCell className="max-w-64 px-5 py-5 whitespace-normal"><span className="break-all text-xs font-medium">{finding.url}</span></TableCell><TableCell><Badge variant="destructive" className="rounded-md text-[10px]">404</Badge></TableCell><TableCell className="max-w-72 py-5 whitespace-normal">{finding.suggestedRedirect ? <><p className="break-all text-xs text-[#456936]">{finding.suggestedRedirect}</p></> : <p className="text-xs text-[#8a9483]">No verified replacement found</p>}</TableCell><TableCell className="px-5 text-right"><Button type="button" variant="outline" disabled={!finding.suggestedRedirect} onClick={() => finding.suggestedRedirect && copyRule(finding.url, finding.suggestedRedirect)} aria-label={`Copy 301 Rule for ${finding.url}`} className="h-8 gap-2 border-[#dbe3d2] text-[10px]">{copied === finding.url ? <Check className="size-3" /> : <Copy className="size-3" />}{copied === finding.url ? "Copied!" : "Copy 301 Rule"}</Button></TableCell></TableRow>)}</TableBody></Table> : <div className="flex flex-col items-center px-6 py-12 text-center"><CircleCheck className="mb-3 size-8 text-[#7d9d5d]" /><h4 className="text-sm font-medium">No confirmed 404s in this audit</h4><p className="mt-2 max-w-md text-xs leading-6 text-[#87927e]">{report.findings.length ? "Your checked citations returned no 404 responses. Review any unresolved checks above for the full picture." : "No citations matching your domain were found. Try a more specific buyer prompt to gather more evidence."}</p></div>}
             <div className="border-t border-[#edf0e8] bg-[#fafbf7] px-5 py-3 text-[10px] leading-5 text-[#8a9483]">Rules use Apache mod_alias path-prefix matching; query strings are not matched. Review on your host before applying. No redirects are deployed automatically.</div>
           </Card>
           <p role="status" className="sr-only">{copied ? "301 rule copied to clipboard." : ""}</p>{copyError && <p role="alert" className="text-xs text-red-700">{copyError}</p>}
@@ -126,5 +141,6 @@ export default function AuditDashboard({ liveEnabled, clerkConfigured }: { liveE
       </section>
       <footer className="mt-14 flex flex-wrap items-center justify-between gap-3 border-t border-[#dfe5dc] pt-6 text-[10px] text-[#929b8b]"><p>citemend <span className="mx-2">/</span> Keep every AI mention moving forward.</p><p>Discover. Verify. Recover.</p></footer>
     </main>
+    {upgrade && <UpgradeModal onClose={() => setUpgrade(false)} />}
   </div>;
 }

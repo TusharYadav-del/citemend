@@ -1,4 +1,4 @@
-﻿import assert from "node:assert/strict";
+import assert from "node:assert/strict";
 import { afterEach, beforeEach, mock, test } from "node:test";
 import { AuditInputError, extractCitationUrls, runAudit, validateAuditInput, type AuditReport } from "../lib/audit-pipeline";
 import { persistAudit, AuditStorageError } from "../lib/audit-store";
@@ -12,7 +12,7 @@ const originalFetch = globalThis.fetch;
 beforeEach(() => { process.env = { ...originalEnv, NODE_ENV: "development", GEMINI_API_KEY: "test-google-key", GROQ_API_KEY: "test-groq-key", GROQ_MODEL: "llama-3.3-70b-versatile", TAVILY_API_KEY: "test-tavily-key", NEXT_PUBLIC_SUPABASE_URL: "https://db.example.com", SUPABASE_SECRET_KEY: "test-server-key" }; });
 afterEach(() => { mock.restoreAll(); globalThis.fetch = originalFetch; process.env = originalEnv; });
 const input = { domain: "example.com", buyerPrompt: "Find the documentation." };
-const POST = createAuditPostHandler({ isConfigured: () => true, getUserId: async () => "user_test_123" });
+const POST = createAuditPostHandler({ isConfigured: () => true, getUserId: async () => "user_test_123", hasPro: async () => true });
 const probe: CitationProbeResult = {
   text: "See [setup](https://example.com/docs/setup-old). Also https://other.com/docs/setup and https://example.com.evil.org/docs/setup",
   sources: [{ index: 0, url: "https://example.com/docs/setup-old#part", title: "Old setup" }],
@@ -92,7 +92,7 @@ test("GET remains compatible; POST rejects malformed input and supports authenti
   assert.equal((await POST(apiRequest("{}", "text/plain"))).status, 415);
   assert.equal((await POST(apiRequest('"' + "x".repeat(17000) + '"'))).status, 413);
   process.env = { ...process.env, NODE_ENV: "production" };
-  const productionPost = createAuditPostHandler({ isConfigured: () => true, getUserId: async () => "user_test_123", execute: async () => ({ persistence: { status: "saved" as const } } as Awaited<ReturnType<typeof runAudit>>) });
+  const productionPost = createAuditPostHandler({ isConfigured: () => true, getUserId: async () => "user_test_123", hasPro: async () => true, execute: async () => ({ persistence: { status: "saved" as const } } as Awaited<ReturnType<typeof runAudit>>) });
   assert.equal((await productionPost(apiRequest(JSON.stringify(input)))).status, 201);
 });
 
