@@ -4,10 +4,12 @@ import { createServerDatabase } from "./supabase-server";
 import { grantsProAccess } from "./subscription";
 import { validateAuditInput } from "./audit-pipeline";
 import type { Database } from "./database.types";
+import type { DigestLink } from "./email";
 
 export const DEFAULT_WEEKLY_PROMPT = "What are the best solutions for my business, and where can I find their pricing and documentation?";
 type Run = Database["public"]["Tables"]["weekly_scan_runs"]["Row"];
 export type WeeklyJob = Database["public"]["Tables"]["weekly_scan_jobs"]["Row"];
+export type WeeklyDigest = Database["public"]["Tables"]["weekly_scan_digests"]["Row"];
 export type WeeklyTarget = { user_id: string; domain: string; buyer_prompt: string };
 type DatabaseClient = ReturnType<typeof createServerDatabase>;
 const PAGE_SIZE = 500;
@@ -147,11 +149,105 @@ export class WeeklyScanStore {
     if (error || !data) throw new Error("Could not update weekly job log.");
   }
 
+  async prepareDigests(runId: string): Promise<void> {
+    const remaining = await this.db.from("weekly_scan_jobs").select("id", { count: "exact", head: true })
+      .eq("run_id", runId).in("status", ["pending", "running"]);
+    if (remaining.error || remaining.count === null) throw new Error("Could not read weekly job progress.");
+    if (remaining.count) return;
+    const users = new Set<string>();
+    for (let offset = 0; ; offset += PAGE_SIZE) {
+      const { data, error } = await this.db.from("weekly_scan_jobs").select("user_id")
+        .eq("run_id", runId).eq("status", "completed").order("user_id").range(offset, offset + PAGE_SIZE - 1);
+      if (error) throw new Error("Could not prepare weekly email recipients.");
+      for (const row of data ?? []) users.add(row.user_id);
+      if (!data || data.length < PAGE_SIZE) break;
+    }
+    const recipients = [...users];
+    for (let offset = 0; offset < recipients.length; offset += 100) {
+      const { error } = await this.db.from("weekly_scan_digests").upsert(
+        recipients.slice(offset, offset + 100).map((user_id) => ({ run_id: runId, user_id })),
+        { onConflict: "run_id,user_id", ignoreDuplicates: true },
+      );
+      if (error) throw new Error("Could not queue weekly email digests.");
+    }
+    const { error: preparedError } = await this.db.from("weekly_scan_runs")
+      .update({ digests_prepared_at: new Date().toISOString() }).eq("id", runId).eq("status", "running");
+    if (preparedError) throw new Error("Could not record weekly email preparation.");
+  }
+
+  async digestCandidates(runId: string, now: Date): Promise<WeeklyDigest[]> {
+    const pending = await this.db.from("weekly_scan_digests").select("*").eq("run_id", runId)
+      .eq("status", "pending").order("created_at").limit(2);
+    if (pending.error) throw new Error("Could not read weekly email digests.");
+    if ((pending.data?.length ?? 0) >= 2) return pending.data ?? [];
+    const stale = await this.db.from("weekly_scan_digests").select("*").eq("run_id", runId)
+      .eq("status", "sending").lt("started_at", new Date(now.getTime() - LEASE_MS).toISOString())
+      .order("started_at").limit(2 - (pending.data?.length ?? 0));
+    if (stale.error) throw new Error("Could not read interrupted email digests.");
+    return [...(pending.data ?? []), ...(stale.data ?? [])];
+  }
+
+  async claimDigest(digest: WeeklyDigest, now: Date): Promise<WeeklyDigest | null> {
+    const token = randomUUID();
+    let query = this.db.from("weekly_scan_digests").update({ status: "sending", lease_token: token, started_at: now.toISOString(), updated_at: now.toISOString() })
+      .eq("id", digest.id).eq("status", digest.status);
+    query = digest.lease_token ? query.eq("lease_token", digest.lease_token) : query.is("lease_token", null);
+    const { data, error } = await query.select("*").maybeSingle();
+    if (error) throw new Error("Could not claim weekly email digest.");
+    return data;
+  }
+
+  async digestLinks(digest: WeeklyDigest): Promise<DigestLink[]> {
+    const run = await this.db.from("weekly_scan_runs").select("created_at").eq("id", digest.run_id).single();
+    if (run.error || !run.data) throw new Error("Could not read weekly email window.");
+    const links: DigestLink[] = [];
+    for (let offset = 0; ; offset += PAGE_SIZE) {
+      const { data: jobs, error } = await this.db.from("weekly_scan_jobs").select("audit_id,domain")
+        .eq("run_id", digest.run_id).eq("user_id", digest.user_id).eq("status", "completed")
+        .order("id").range(offset, offset + PAGE_SIZE - 1);
+      if (error) throw new Error("Could not read completed weekly audits.");
+      for (const job of jobs ?? []) {
+        if (!job.audit_id) continue;
+        const prior = await this.db.from("audits").select("id,broken_links(cited_url)")
+          .eq("user_id", digest.user_id).eq("domain", job.domain)
+          .in("status", ["completed", "partial"]).lt("created_at", run.data.created_at)
+          .order("created_at", { ascending: false }).limit(1).maybeSingle();
+        if (prior.error) throw new Error("Could not compare prior audit findings.");
+        const previous = new Set((prior.data?.broken_links ?? []).map((link) => link.cited_url));
+        const current = await this.db.from("broken_links").select("cited_url,http_status,suggested_redirect")
+          .eq("audit_id", job.audit_id).eq("http_status", 404);
+        if (current.error) throw new Error("Could not read weekly 404 findings.");
+        for (const link of current.data ?? []) {
+          if (!previous.has(link.cited_url)) links.push({ domain: job.domain, audit_id: job.audit_id, cited_url: link.cited_url, suggested_redirect: link.suggested_redirect });
+        }
+      }
+      if (!jobs || jobs.length < PAGE_SIZE) break;
+    }
+    return links;
+  }
+
+  async finishDigest(digest: WeeklyDigest, status: "sent" | "skipped" | "pending", messageId: string | null, now: Date): Promise<void> {
+    const { data, error } = await this.db.from("weekly_scan_digests").update({
+      status, provider_message_id: messageId, lease_token: null,
+      last_error: status === "pending" ? "Email delivery failed; retry scheduled." : null,
+      finished_at: status === "pending" ? null : now.toISOString(), updated_at: now.toISOString(),
+    }).eq("id", digest.id).eq("status", "sending").eq("lease_token", digest.lease_token!).select("id").maybeSingle();
+    if (error || !data) throw new Error("Could not update weekly email delivery.");
+  }
+
   async finishRunIfDone(runId: string, now: Date): Promise<void> {
+    const prepared = await this.db.from("weekly_scan_runs").select("digests_prepared_at")
+      .eq("id", runId).single();
+    if (prepared.error || !prepared.data) throw new Error("Could not read weekly email preparation.");
+    if (!prepared.data.digests_prepared_at) return;
     const remaining = await this.db.from("weekly_scan_jobs").select("id", { count: "exact", head: true })
       .eq("run_id", runId).in("status", ["pending", "running"]);
     if (remaining.error || remaining.count === null) throw new Error("Could not read weekly progress.");
     if (remaining.count > 0) return;
+    const unsent = await this.db.from("weekly_scan_digests").select("id", { count: "exact", head: true })
+      .eq("run_id", runId).in("status", ["pending", "sending"]);
+    if (unsent.error || unsent.count === null) throw new Error("Could not read weekly email progress.");
+    if (unsent.count > 0) return;
     const failures = await this.db.from("weekly_scan_jobs").select("id", { count: "exact", head: true })
       .eq("run_id", runId).eq("status", "failed");
     if (failures.error || failures.count === null) throw new Error("Could not read weekly failures.");

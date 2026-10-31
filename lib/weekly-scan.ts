@@ -2,17 +2,19 @@ import "server-only";
 import { timingSafeEqual } from "node:crypto";
 import { runAudit } from "./audit-pipeline";
 import { persistAudit } from "./audit-store";
-import { runCitationProbe as runGeminiProbe } from "./gemini";
+import { runCitationProbe } from "./citation-probe";
+import { sendWeeklyDigest } from "./email";
 import { hasProSubscription } from "./subscription";
-import { WeeklyScanStore, type WeeklyJob } from "./weekly-scan-store";
+import { WeeklyScanStore, type WeeklyDigest, type WeeklyJob } from "./weekly-scan-store";
 
 type WeeklyRun = Awaited<ReturnType<WeeklyScanStore["getOrCreateRun"]>>;
-type WeeklyStore = Pick<WeeklyScanStore, "getOrCreateRun" | "oldestOpenRun" | "claimInitialization" | "listTargets" | "initialize" | "releaseInitialization" | "candidates" | "claimJob" | "priorAudit" | "finishJob" | "finishRunIfDone">;
+type WeeklyStore = Pick<WeeklyScanStore, "getOrCreateRun" | "oldestOpenRun" | "claimInitialization" | "listTargets" | "initialize" | "releaseInitialization" | "candidates" | "claimJob" | "priorAudit" | "finishJob" | "prepareDigests" | "digestCandidates" | "claimDigest" | "digestLinks" | "finishDigest" | "finishRunIfDone">;
 type Dependencies = {
   secret?: () => string | undefined;
   store?: () => WeeklyStore;
   hasPro?: typeof hasProSubscription;
   scan?: (job: WeeklyJob) => Promise<void>;
+  sendDigest?: typeof sendWeeklyDigest;
   now?: () => Date;
   defer?: (task: () => Promise<void>) => void;
 };
@@ -32,15 +34,15 @@ function authorized(header: string | null, secret: string): boolean {
 
 function safeJobError(error: unknown): string {
   if (error && typeof error === "object" && "status" in error && error.status === 429) {
-    return "Gemini rate limit or quota exceeded.";
+    return "Groq rate limit or quota exceeded.";
   }
-  return "Subscription check, Gemini scan, or audit save failed.";
+  return "Subscription check, Groq/Tavily scan, or audit save failed.";
 }
 
-export async function runWeeklyAudit(job: WeeklyJob, dependencies: { execute?: typeof runAudit; probe?: typeof runGeminiProbe; save?: typeof persistAudit } = {}): Promise<void> {
+export async function runWeeklyAudit(job: WeeklyJob, dependencies: { execute?: typeof runAudit; probe?: typeof runCitationProbe; save?: typeof persistAudit } = {}): Promise<void> {
   if (process.env.AUDIT_PERSISTENCE_MODE === "local") throw new Error("Weekly scans require database persistence.");
   const execute = dependencies.execute ?? runAudit;
-  const probe = dependencies.probe ?? runGeminiProbe;
+  const probe = dependencies.probe ?? runCitationProbe;
   const save = dependencies.save ?? persistAudit;
   const report = await execute(
     { domain: job.domain, buyerPrompt: job.buyer_prompt },
@@ -55,6 +57,7 @@ export function createWeeklyScanHandler(dependencies: Dependencies = {}) {
   const storeFactory = dependencies.store ?? (() => new WeeklyScanStore());
   const hasPro = dependencies.hasPro ?? hasProSubscription;
   const scan = dependencies.scan ?? runWeeklyAudit;
+  const sendDigest = dependencies.sendDigest ?? sendWeeklyDigest;
   const now = dependencies.now ?? (() => new Date());
 
   return async function handleWeeklyScan(request: Request): Promise<Response> {
@@ -126,6 +129,27 @@ export function createWeeklyScanHandler(dependencies: Dependencies = {}) {
             await store.finishJob(job, job.attempts >= 3 ? "failed" : "pending", safeJobError(error), now());
           }
           processed++;
+        }));
+        await store.prepareDigests(run.id);
+        const digests = await store.digestCandidates(run.id, now());
+        await Promise.all(digests.map(async (candidate: WeeklyDigest) => {
+          const digest = await store.claimDigest(candidate, now());
+          if (!digest) return;
+          try {
+            if (!await hasPro(digest.user_id)) {
+              await store.finishDigest(digest, "skipped", null, now());
+              return;
+            }
+            const links = await store.digestLinks(digest);
+            if (!links.length) {
+              await store.finishDigest(digest, "skipped", null, now());
+              return;
+            }
+            const messageId = await sendDigest(digest.user_id, digest.id, links);
+            await store.finishDigest(digest, "sent", messageId, now());
+          } catch {
+            await store.finishDigest(digest, "pending", null, now());
+          }
         }));
         await store.finishRunIfDone(run.id, now());
         return Response.json({ status: "processed", processed });

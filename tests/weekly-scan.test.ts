@@ -3,11 +3,12 @@ import { afterEach, test } from "node:test";
 import type { Database } from "../lib/database.types";
 import type { runAudit } from "../lib/audit-pipeline";
 import { createWeeklyScanHandler, indiaWeekStart } from "../lib/weekly-scan";
-import { WeeklyScanStore, type WeeklyJob } from "../lib/weekly-scan-store";
+import { WeeklyScanStore, type WeeklyDigest, type WeeklyJob } from "../lib/weekly-scan-store";
+import { renderWeeklyDigest } from "../lib/email";
 
 type Run = Database["public"]["Tables"]["weekly_scan_runs"]["Row"];
 const now = new Date("2026-11-02T03:30:00Z");
-const run: Run = { id: "run-1", week_start: "2026-11-02", status: "running", total_jobs: 2, lease_token: null, last_error: null, created_at: now.toISOString(), updated_at: now.toISOString(), finished_at: null };
+const run: Run = { id: "run-1", week_start: "2026-11-02", status: "running", total_jobs: 2, lease_token: null, last_error: null, created_at: now.toISOString(), updated_at: now.toISOString(), finished_at: null, digests_prepared_at: now.toISOString() };
 const makeJob = (id: string, user: string, attempts = 0): WeeklyJob => ({ id, run_id: run.id, user_id: user, domain: "example.com", buyer_prompt: "Find documentation", status: "pending", attempts, lease_token: null, started_at: null, finished_at: null, audit_id: null, last_error: null, created_at: now.toISOString(), updated_at: now.toISOString() });
 const request = (secret: string, action = "start") => new Request("http://localhost/api/cron/weekly-scan", { method: "POST", headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" }, body: JSON.stringify({ action }) });
 function fakeStore(jobs: WeeklyJob[] = []) {
@@ -30,6 +31,11 @@ function fakeStore(jobs: WeeklyJob[] = []) {
     claimJob: async (job: WeeklyJob) => ({ ...job, status: "running", attempts: job.attempts + 1, lease_token: "lease" }),
     priorAudit,
     finishJob: async (job: WeeklyJob, status: "completed" | "skipped" | "pending" | "failed", message: string | null) => { updates.push({ id: job.id, status }); if (message) messages.push(message); },
+    prepareDigests: async () => {},
+    digestCandidates: (async () => []) as WeeklyScanStore["digestCandidates"],
+    claimDigest: (async () => null) as WeeklyScanStore["claimDigest"],
+    digestLinks: (async () => []) as WeeklyScanStore["digestLinks"],
+    finishDigest: (async () => {}) as WeeklyScanStore["finishDigest"],
     finishRunIfDone: async () => { finished++; },
   };
 }
@@ -71,12 +77,12 @@ test("existing saved weekly audits are not repeated and failures retry up to thr
   assert.deepEqual(store.updates.sort((a,b) => a.id.localeCompare(b.id)), [{ id: "already-saved", status: "completed" }, { id: "last-attempt", status: "failed" }]);
 });
 
-test("Gemini rate limits are recorded without exposing provider details", async () => {
+test("Groq rate limits are recorded without exposing provider details", async () => {
   const store = fakeStore([makeJob("rate-limited", "pro")]);
   const handler = createWeeklyScanHandler({ secret: () => "secret", store: () => store, now: () => now, hasPro: async () => true, scan: async () => { throw Object.assign(new Error("private provider details"), { status: 429 }); } });
   assert.equal((await handler(request("secret", "drain"))).status, 200);
   assert.deepEqual(store.updates, [{ id: "rate-limited", status: "pending" }]);
-  assert.deepEqual(store.messages, ["Gemini rate limit or quota exceeded."]);
+  assert.deepEqual(store.messages, ["Groq rate limit or quota exceeded."]);
 });
 
 test("deferred execution acknowledges the relay before running the queued work", async () => {
@@ -163,9 +169,9 @@ test("scheduled persistence writes only confirmed 404s under the job ID and owne
   assert.equal(saved.id, jobId);
   assert.deepEqual(insertedLinks, [{ audit_id: jobId, cited_url: "https://example.com/missing", http_status: 404, suggested_redirect: null }]);
 });
-test("scheduled scans use the Gemini probe and save results to the job's owner and stable audit ID", async () => {
+test("scheduled scans use the Groq/Tavily probe and save results to the job's owner and stable audit ID", async () => {
   const { runWeeklyAudit } = await import("../lib/weekly-scan");
-  const { runCitationProbe } = await import("../lib/gemini");
+  const { runCitationProbe } = await import("../lib/citation-probe");
   process.env = { ...oldEnv, AUDIT_PERSISTENCE_MODE: "database" };
   const job = makeJob("00000000-0000-4000-8000-000000000017", "pro-user");
   const execute: typeof runAudit = async (input, overrides, userId) => {
@@ -261,13 +267,17 @@ test("a weekly run queues a Pro domain, claims it, and records completion throug
     const method = init?.method ?? "GET";
     const path = url.pathname;
     if (path.endsWith("/weekly_scan_runs") && method === "POST") {
-      runRow = { id: runId, week_start: "2026-11-02", status: "initializing", total_jobs: 0, lease_token: null, last_error: null, created_at: now.toISOString(), updated_at: now.toISOString(), finished_at: null };
+      runRow = { id: runId, week_start: "2026-11-02", status: "initializing", total_jobs: 0, lease_token: null, last_error: null, created_at: now.toISOString(), updated_at: now.toISOString(), finished_at: null, digests_prepared_at: null };
       return Response.json(runRow);
     }
     if (path.endsWith("/weekly_scan_runs") && method === "PATCH") {
       assert.ok(runRow);
       runRow = { ...runRow, ...JSON.parse(String(init?.body)) } as Run;
       return url.searchParams.has("select") ? Response.json({ id: runId }) : new Response(null, { status: 204 });
+    }
+    if (path.endsWith("/weekly_scan_runs") && method === "GET") {
+      assert.ok(runRow);
+      return Response.json({ created_at: runRow.created_at, digests_prepared_at: runRow.digests_prepared_at });
     }
     if (path.endsWith("/subscriptions") && method === "GET") return Response.json([{ id: "s1", user_id: "pro-user", status: "active", cancelled: false, ends_at: null }]);
     if (path.endsWith("/audits") && method === "GET") {
@@ -292,6 +302,10 @@ test("a weekly run queues a Pro domain, claims it, and records completion throug
       jobRow = { ...jobRow, ...JSON.parse(String(init?.body)) } as WeeklyJob;
       return Response.json(url.searchParams.get("select") === "id" ? { id: jobId } : jobRow);
     }
+    if (path.endsWith("/weekly_scan_digests") && method === "HEAD") {
+      return new Response(null, { status: 200, headers: { "content-range": "*/0" } });
+    }
+    if (path.endsWith("/weekly_scan_digests") && method === "GET") return Response.json([]);
     throw new Error(`Unexpected request: ${method} ${path}`);
   };
   const scanned: string[] = [];
@@ -369,4 +383,74 @@ test("failed queue initialization releases its lease for a later retry", async (
   assert.equal((await handler(request("secret"))).status, 503);
   assert.equal(released, 1);
   assert.equal(store.finished, 0);
+});
+
+test("weekly digest renders escaped 404 details and only verified same-domain 301 rules", () => {
+  const message = renderWeeklyDigest([
+    { domain: "example.com", cited_url: "https://example.com/old?x=<script>", suggested_redirect: "https://example.com/new", audit_id: "audit-1" },
+    { domain: "example.com", cited_url: "https://example.com/missing", suggested_redirect: "https://attacker.test/steal", audit_id: "audit-1" },
+  ], "https://citefix.io");
+  assert.match(message.html, /&lt;script&gt;/);
+  assert.doesNotMatch(message.html, /<script>/);
+  assert.match(message.text, /Redirect 301 "\/old" "https:\/\/example.com\/new"/);
+  assert.match(message.text, /No verified replacement/);
+  assert.doesNotMatch(message.text, /attacker\.test/);
+  assert.match(message.html, /https:\/\/citefix\.io\/audit\/audit-1/);
+});
+
+test("a completed weekly scan sends one account digest and records its provider ID", async () => {
+  const store = fakeStore();
+  const digest: WeeklyDigest = { id: "digest-1", run_id: run.id, user_id: "pro-user", status: "pending", lease_token: null, started_at: null, finished_at: null, last_error: null, provider_message_id: null, created_at: now.toISOString(), updated_at: now.toISOString() };
+  let prepared = 0, sent = 0;
+  const states: string[] = [];
+  store.prepareDigests = async () => { prepared++; };
+  store.digestCandidates = async () => sent ? [] : [digest];
+  store.claimDigest = async (candidate) => ({ ...candidate, status: "sending", lease_token: "lease" });
+  store.digestLinks = async () => [{ domain: "example.com", cited_url: "https://example.com/old", suggested_redirect: "https://example.com/new", audit_id: "audit-1" }];
+  store.finishDigest = async (_digest, status, messageId) => { states.push(`${status}:${messageId}`); if (status === "sent") sent++; };
+  const handler = createWeeklyScanHandler({ secret: () => "secret", store: () => store, now: () => now, hasPro: async () => true, sendDigest: async (userId, digestId, links) => {
+    assert.equal(userId, "pro-user"); assert.equal(digestId, digest.id); assert.equal(links.length, 1); return "resend-id";
+  } });
+  assert.equal((await handler(request("secret", "drain"))).status, 200);
+  assert.equal((await handler(request("secret", "drain"))).status, 200);
+  assert.equal(prepared, 2);
+  assert.deepEqual(states, ["sent:resend-id"]);
+});
+
+test("weekly digest skips unchanged links and retries provider failures", async () => {
+  const store = fakeStore();
+  const digest: WeeklyDigest = { id: "digest-2", run_id: run.id, user_id: "pro-user", status: "pending", lease_token: null, started_at: null, finished_at: null, last_error: null, provider_message_id: null, created_at: now.toISOString(), updated_at: now.toISOString() };
+  const states: string[] = [];
+  store.digestCandidates = async () => [digest];
+  store.claimDigest = async (candidate) => ({ ...candidate, status: "sending", lease_token: "lease" });
+  store.digestLinks = async () => [];
+  store.finishDigest = async (_digest, status) => { states.push(status); };
+  let sends = 0;
+  const handler = createWeeklyScanHandler({ secret: () => "secret", store: () => store, hasPro: async () => true, sendDigest: async () => { sends++; throw new Error("down"); } });
+  assert.equal((await handler(request("secret", "drain"))).status, 200);
+  assert.deepEqual(states, ["skipped"]);
+  store.digestLinks = async () => [{ domain: "example.com", cited_url: "https://example.com/new", suggested_redirect: null, audit_id: "audit-1" }];
+  assert.equal((await handler(request("secret", "drain"))).status, 200);
+  assert.deepEqual(states, ["skipped", "pending"]);
+  assert.equal(sends, 1);
+});
+
+test("digest comparison includes only newly confirmed 404s since the preceding audit", async () => {
+  process.env = { ...oldEnv, NEXT_PUBLIC_SUPABASE_URL: "https://db.example.com", SUPABASE_SECRET_KEY: "test-server-key" };
+  const digest: WeeklyDigest = { id: "digest-3", run_id: run.id, user_id: "pro-user", status: "sending", lease_token: "lease", started_at: now.toISOString(), finished_at: null, last_error: null, provider_message_id: null, created_at: now.toISOString(), updated_at: now.toISOString() };
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith("/weekly_scan_runs")) return Response.json({ created_at: now.toISOString() });
+    if (url.pathname.endsWith("/weekly_scan_jobs")) return Response.json([{ audit_id: "audit-new", domain: "example.com" }]);
+    if (url.pathname.endsWith("/audits")) {
+      assert.equal(url.searchParams.get("created_at"), `lt.${now.toISOString()}`);
+      return Response.json({ id: "audit-old", broken_links: [{ cited_url: "https://example.com/known" }] });
+    }
+    if (url.pathname.endsWith("/broken_links")) return Response.json([
+      { cited_url: "https://example.com/known", http_status: 404, suggested_redirect: null },
+      { cited_url: "https://example.com/new", http_status: 404, suggested_redirect: "https://example.com/fix" },
+    ]);
+    throw new Error("Unexpected database request");
+  };
+  assert.deepEqual(await new WeeklyScanStore().digestLinks(digest), [{ domain: "example.com", audit_id: "audit-new", cited_url: "https://example.com/new", suggested_redirect: "https://example.com/fix" }]);
 });

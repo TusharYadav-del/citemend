@@ -210,14 +210,27 @@ Recovery: Ask Codex to inspect and undo the specific broken change.
 
 - [x] Add a CRON_SECRET-protected weekly scan API and a secret-verified Supabase Edge relay.
 - [x] Queue distinct Pro-owned domains with paginated discovery, access rechecks, durable leases, bounded retries, idempotent audit IDs, and run/job logs.
-- [x] Use the requested Gemini citation probe for scheduled scans and the existing pipeline to save confirmed 404s; interactive audits remain on Groq/Tavily.
+- [x] Use the active Groq/Tavily citation probe for scheduled and interactive scans, and save confirmed 404s through the existing pipeline.
+- [x] Re-run the live weekly worker check with the configured Groq model and Tavily: `example.com` returned eight search sources and 14 citation URLs; the database save was stubbed so no hosted audit was created.
 - [x] Preserve new audit buyer prompts after migration 005, with a safe compatibility fallback before migration and a standard prompt for historical audits.
 - [x] Prepare the 9:00 AM Asia/Kolkata Monday pg_cron schedule, Vault-based secret setup, and deployment instructions.
 - [x] Generate a private local CRON_SECRET without exposing it; verify the local route rejects missing or incorrect bearer tokens.
 - [x] Pass weekly scan and previous-day regression tests, npm run lint, and npm run build.
-- [ ] Enable pg_cron and pg_net in Supabase and apply supabase/migrations/005_weekly_scans.sql.
+- [x] Enable pg_cron and pg_net in Supabase and apply supabase/migrations/005_weekly_scans.sql; the user confirmed both extensions are on and the SQL Editor migration succeeded.
 - [ ] Deploy the app and Edge Function, configure matching secrets and Vault entries, and run supabase/setup/weekly_cron.sql.
-- [ ] Resolve the Gemini HTTP 429 observed during the local live probe and verify a scheduled scan with an eligible Pro account after deployment.
+- [ ] Verify a scheduled scan with an eligible Pro account after deployment.
 
-The Supabase dashboard could not be opened because the computer-use runtime failed to initialize. Production billing webhook setup remains deferred until Vercel deployment as agreed. See docs/WEEKLY_SCANS.md for activation and verification.
+The hosted migration and extension activation are recorded from the user's confirmation. Production billing webhook setup remains deferred until Vercel deployment as agreed. See docs/WEEKLY_SCANS.md for the remaining activation and verification steps.
 Recovery: Ask Codex to inspect and undo the specific broken change.
+
+## Day 18: Weekly Pro email alerts (IMPLEMENTED; LIVE DELIVERY PENDING VERCEL)
+
+- [x] Add Resend-backed HTML and text digests for newly confirmed weekly 404 citations, with verified same-domain 301 suggestions and public report links.
+- [x] Resolve each Pro recipient through their primary Clerk email, escape report content, and use one durable digest per user and weekly run.
+- [x] Add migration 006 for a server-only digest outbox with leases, retries, provider message IDs, and a run preparation marker.
+- [x] Keep weekly runs open until digest delivery or skip is recorded; use a stable Resend idempotency key on retries.
+- [x] Document sender verification and deployment settings without claiming Groq/Tavily results came specifically from ChatGPT or Perplexity.
+- [x] Pass all 86 regression tests, npm run lint, and npm run build with zero errors; local cron route still rejects anonymous requests.
+- [ ] Apply migration 006 in hosted Supabase, configure a verified Resend sender and API key, and verify a real Pro alert after Vercel deployment.
+
+Production email delivery remains pending until the Resend account and deployed weekly scheduler are configured.
