@@ -205,3 +205,19 @@ Recovery: Ask Codex to inspect and undo the specific broken change.
 
 Weekly monitoring is not implemented yet. As agreed, configure the production Lemon Squeezy webhook during Vercel deployment; subscribe to subscription_created, subscription_cancelled, and subscription_updated, and set the webhook secret and production app URL. Pro activation depends on that synchronization.
 Recovery: Ask Codex to inspect and undo the specific broken change.
+
+## Day 17: Automated weekly Pro scans (CODE COMPLETE; ACTIVATION PENDING)
+
+- [x] Add a CRON_SECRET-protected weekly scan API and a secret-verified Supabase Edge relay.
+- [x] Queue distinct Pro-owned domains with paginated discovery, access rechecks, durable leases, bounded retries, idempotent audit IDs, and run/job logs.
+- [x] Use the requested Gemini citation probe for scheduled scans and the existing pipeline to save confirmed 404s; interactive audits remain on Groq/Tavily.
+- [x] Preserve new audit buyer prompts after migration 005, with a safe compatibility fallback before migration and a standard prompt for historical audits.
+- [x] Prepare the 9:00 AM Asia/Kolkata Monday pg_cron schedule, Vault-based secret setup, and deployment instructions.
+- [x] Generate a private local CRON_SECRET without exposing it; verify the local route rejects missing or incorrect bearer tokens.
+- [x] Pass weekly scan and previous-day regression tests, npm run lint, and npm run build.
+- [ ] Enable pg_cron and pg_net in Supabase and apply supabase/migrations/005_weekly_scans.sql.
+- [ ] Deploy the app and Edge Function, configure matching secrets and Vault entries, and run supabase/setup/weekly_cron.sql.
+- [ ] Resolve the Gemini HTTP 429 observed during the local live probe and verify a scheduled scan with an eligible Pro account after deployment.
+
+The Supabase dashboard could not be opened because the computer-use runtime failed to initialize. Production billing webhook setup remains deferred until Vercel deployment as agreed. See docs/WEEKLY_SCANS.md for activation and verification.
+Recovery: Ask Codex to inspect and undo the specific broken change.

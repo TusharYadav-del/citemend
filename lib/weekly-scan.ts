@@ -1,0 +1,146 @@
+import "server-only";
+import { timingSafeEqual } from "node:crypto";
+import { runAudit } from "./audit-pipeline";
+import { persistAudit } from "./audit-store";
+import { runCitationProbe as runGeminiProbe } from "./gemini";
+import { hasProSubscription } from "./subscription";
+import { WeeklyScanStore, type WeeklyJob } from "./weekly-scan-store";
+
+type WeeklyRun = Awaited<ReturnType<WeeklyScanStore["getOrCreateRun"]>>;
+type WeeklyStore = Pick<WeeklyScanStore, "getOrCreateRun" | "oldestOpenRun" | "claimInitialization" | "listTargets" | "initialize" | "releaseInitialization" | "candidates" | "claimJob" | "priorAudit" | "finishJob" | "finishRunIfDone">;
+type Dependencies = {
+  secret?: () => string | undefined;
+  store?: () => WeeklyStore;
+  hasPro?: typeof hasProSubscription;
+  scan?: (job: WeeklyJob) => Promise<void>;
+  now?: () => Date;
+  defer?: (task: () => Promise<void>) => void;
+};
+
+export function indiaWeekStart(now: Date): string {
+  const local = new Date(now.getTime() + 330 * 60_000);
+  const weekday = local.getUTCDay();
+  local.setUTCDate(local.getUTCDate() - (weekday + 6) % 7);
+  return local.toISOString().slice(0, 10);
+}
+
+function authorized(header: string | null, secret: string): boolean {
+  const expected = Buffer.from(`Bearer ${secret}`);
+  const received = Buffer.from(header ?? "");
+  return received.length === expected.length && timingSafeEqual(received, expected);
+}
+
+function safeJobError(error: unknown): string {
+  if (error && typeof error === "object" && "status" in error && error.status === 429) {
+    return "Gemini rate limit or quota exceeded.";
+  }
+  return "Subscription check, Gemini scan, or audit save failed.";
+}
+
+export async function runWeeklyAudit(job: WeeklyJob, dependencies: { execute?: typeof runAudit; probe?: typeof runGeminiProbe; save?: typeof persistAudit } = {}): Promise<void> {
+  if (process.env.AUDIT_PERSISTENCE_MODE === "local") throw new Error("Weekly scans require database persistence.");
+  const execute = dependencies.execute ?? runAudit;
+  const probe = dependencies.probe ?? runGeminiProbe;
+  const save = dependencies.save ?? persistAudit;
+  const report = await execute(
+    { domain: job.domain, buyerPrompt: job.buyer_prompt },
+    { probe, save: (value, owner) => save(value, owner, undefined, job.id) },
+    job.user_id,
+  );
+  if (report.persistence.status !== "saved" || report.auditId !== job.id) throw new Error("Weekly audit could not be saved.");
+}
+
+export function createWeeklyScanHandler(dependencies: Dependencies = {}) {
+  const secret = dependencies.secret ?? (() => process.env.CRON_SECRET?.trim());
+  const storeFactory = dependencies.store ?? (() => new WeeklyScanStore());
+  const hasPro = dependencies.hasPro ?? hasProSubscription;
+  const scan = dependencies.scan ?? runWeeklyAudit;
+  const now = dependencies.now ?? (() => new Date());
+
+  return async function handleWeeklyScan(request: Request): Promise<Response> {
+    const key = secret();
+    if (!key) return Response.json({ error: "Weekly scans are not configured." }, { status: 503 });
+    if (!authorized(request.headers.get("authorization"), key)) return Response.json({ error: "Unauthorized." }, { status: 401 });
+
+    let action = "start";
+    if (request.method === "POST" && request.body) {
+      const reader = request.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let bytes = 0;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          bytes += value.byteLength;
+          if (bytes > 1024) { await reader.cancel().catch(() => {}); return Response.json({ error: "Invalid request." }, { status: 413 }); }
+          chunks.push(value);
+        }
+      } finally { reader.releaseLock(); }
+      if (bytes) {
+        try {
+          const payload: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks)));
+          if (!payload || typeof payload !== "object" || !("action" in payload) || typeof payload.action !== "string") throw new Error();
+          action = payload.action;
+        } catch { return Response.json({ error: "Invalid request." }, { status: 400 }); }
+      }
+    }
+    if (action !== "start" && action !== "drain") return Response.json({ error: "Invalid request." }, { status: 400 });
+
+    const perform = async (): Promise<Response> => {
+      try {
+        const store = storeFactory();
+        const currentTime = now();
+        const run: WeeklyRun | null = action === "start"
+          ? await store.getOrCreateRun(indiaWeekStart(currentTime))
+          : await store.oldestOpenRun();
+        if (!run) return Response.json({ status: "idle", processed: 0 });
+        if (run.status === "completed" || run.status === "partial") return Response.json({ status: run.status, processed: 0 });
+
+        if (run.status === "initializing") {
+          const lease = await store.claimInitialization(run, currentTime);
+          if (!lease) return Response.json({ status: "initializing", processed: 0 });
+          try {
+            const targets = await store.listTargets(currentTime);
+            await store.initialize(run.id, lease, targets, now());
+          } catch {
+            await store.releaseInitialization(run.id, lease).catch(() => {});
+            return Response.json({ error: "Weekly scan initialization failed; it will be retried." }, { status: 503 });
+          }
+        }
+
+        const candidates = await store.candidates(run.id, now());
+        let processed = 0;
+        await Promise.all(candidates.map(async (candidate) => {
+          const job = await store.claimJob(candidate, now());
+          if (!job) return;
+          try {
+            if (!await hasPro(job.user_id)) {
+              await store.finishJob(job, "skipped", "Subscription is no longer eligible.", now());
+            } else if (await store.priorAudit(job, now()) === "saved") {
+              await store.finishJob(job, "completed", null, now());
+            } else {
+              await scan(job);
+              await store.finishJob(job, "completed", null, now());
+            }
+          } catch (error) {
+            await store.finishJob(job, job.attempts >= 3 ? "failed" : "pending", safeJobError(error), now());
+          }
+          processed++;
+        }));
+        await store.finishRunIfDone(run.id, now());
+        return Response.json({ status: "processed", processed });
+      } catch {
+        return Response.json({ error: "Weekly scan service is temporarily unavailable." }, { status: 503 });
+      }
+    };
+
+    if (dependencies.defer) {
+      dependencies.defer(async () => {
+        const result = await perform();
+        if (!result.ok) console.error("Weekly scan execution failed; check the run logs.");
+      });
+      return Response.json({ status: "accepted" }, { status: 202 });
+    }
+    return perform();
+  };
+}

@@ -32,7 +32,7 @@ async function AuditReport({ params }: { params: Promise<{ id: string }> }) {
         <p className="break-words text-lg font-semibold">Prepared for {audit.domain} by CiteFix AI.</p>
         <p className="mt-2 text-sm leading-6 text-[#dfebd7]">Claim this domain to unlock automated weekly monitoring.</p>
         <Link href="/#audit" className="mt-5 inline-flex rounded-lg bg-white px-5 py-3 text-sm font-semibold text-[#214d39]">Get started with CiteFix AI &rarr;</Link>
-        <p className="mt-3 text-xs leading-5 text-[#dfebd7]">Sign in to run audits and view your workspace. Domain claiming and weekly monitoring are coming soon.</p>
+        <p className="mt-3 text-xs leading-5 text-[#dfebd7]">Sign in to run audits and view your workspace. Domain claiming is coming soon; weekly scans require Pro and an active schedule.</p>
       </aside>
       <header className="my-10">
         <p className="text-xs font-semibold tracking-widest text-[#53704e]">EXECUTIVE CITATION REPORT</p>

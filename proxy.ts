@@ -8,6 +8,7 @@ const clerkHandler = clerkMiddleware(async (auth, request) => {
 });
 
 export default function proxy(request: NextRequest, event: NextFetchEvent) {
+  if (request.nextUrl.pathname === "/api/cron/weekly-scan") return NextResponse.next();
   if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || !process.env.CLERK_SECRET_KEY) {
     return NextResponse.next();
   }

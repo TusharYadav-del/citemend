@@ -1,0 +1,2 @@
+﻿[functions.weekly-scan]
+verify_jwt = false
