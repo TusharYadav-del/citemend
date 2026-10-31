@@ -111,7 +111,7 @@ Recovery: Ask Codex to inspect and undo the specific broken change.
 
 Live sign-in is not verified yet: the app reports Clerk setup is required. Create the Clerk application, enable Google and Email, add its keys to `.env.local`, restart the dev server, and verify sign-up before calling authentication fully active.
 Recovery: Ask Codex to inspect and undo the specific broken change.
-## Day 9: User workspaces and audit history (CODE COMPLETE; HOSTED MIGRATION PENDING)
+## Day 9: User workspaces and audit history (COMPLETED)
 
 - [x] Add a forward-only migration for `audits.user_id` and an owner/date index, preserving older rows as unowned.
 - [x] Save the authenticated Clerk user ID with each new audit and verify owner-scoped readback.
@@ -119,7 +119,20 @@ Recovery: Ask Codex to inspect and undo the specific broken change.
 - [x] Keep history reads server-only and filter by the verified Clerk user ID.
 - [x] Pass 27 focused audit tests, including owner persistence, auth rejection, and history query isolation.
 - [x] Verify `npm run lint`, `npm run build`, and local Clerk navigation/auth guards.
-- [ ] Apply `supabase/migrations/002_audit_user_ownership.sql` to the hosted project and confirm a newly saved audit appears in the signed-in user's history.
+- [x] Apply `supabase/migrations/002_audit_user_ownership.sql` to the hosted project and verify the signed-in user's new stripe.com audit appears with three confirmed HTTP 404 links.
 
-The code is ready. Run the migration in Supabase SQL Editor before relying on audit persistence/history; legacy rows remain unowned and are not assigned automatically.
+The user confirmed the hosted migration and live audit-history result. Legacy rows remain unowned and are not assigned to an account automatically.
+Recovery: Ask Codex to inspect and undo the specific broken change.
+
+## Day 10: Public shareable audit reports (COMPLETED)
+
+- [x] Add public /audit/[id] executive reports with the requested CiteFix AI prospect banner.
+- [x] Fetch saved audit summaries and confirmed 404 links by validated UUID using server-only Supabase access; keep account identifiers private and RLS unchanged.
+- [x] Display redirect suggestions, snapshot limitations, partial/mock disclosures, loading, missing-report, and unavailable-report states.
+- [x] Add shareable report links to audit history while preserving Clerk workspace protection.
+- [x] Verify three public lookup tests and all 27 existing audit tests.
+- [x] Run npm run dev; verify anonymous access to hosted audit 9234a138-b3aa-46dd-bf79-b5800876a89d with five saved 404s, invalid/missing reports, mobile overflow, and no browser runtime errors.
+- [x] Verify final npm run lint and npm run build with zero errors.
+
+Report URLs use the existing app host at /audit/[id]. Domain claiming and weekly monitoring remain future work; the banner links to the existing sign-in/audit entry point and states this limitation.
 Recovery: Ask Codex to inspect and undo the specific broken change.

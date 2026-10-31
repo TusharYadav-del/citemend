@@ -1,4 +1,4 @@
-﻿import { Suspense } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
@@ -24,7 +24,7 @@ function AuditCard({ audit }: { audit: UserAuditHistoryItem }) {
         </div>
         <span className="rounded-full border border-[#dae2d4] bg-[#f5f8f0] px-3 py-1 text-xs font-medium text-[#557447]">{audit.status}</span>
       </div>
-      <p className="mt-5 text-sm text-[#68736b]">{brokenLinks.length} confirmed broken link{brokenLinks.length === 1 ? "" : "s"}</p>
+      <p className="mt-4 text-xs text-[#68736b]">Anyone with the report link can view its findings.</p><Link href={`/audit/${audit.id}`} className="mt-2 inline-block text-sm font-medium text-[#53704e] hover:underline">Open shareable report &rarr;</Link><p className="mt-5 text-sm text-[#68736b]">{brokenLinks.length} confirmed broken link{brokenLinks.length === 1 ? "" : "s"}</p>
       {brokenLinks.length > 0 && (
         <details className="mt-4 border-t border-[#edf0e9] pt-4">
           <summary className="cursor-pointer text-sm font-medium">View broken links and redirect suggestions</summary>
