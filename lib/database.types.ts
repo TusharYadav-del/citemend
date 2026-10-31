@@ -2,9 +2,9 @@
   public: {
     Tables: {
       audits: {
-        Row: { id: string; domain: string; status: string; created_at: string };
-        Insert: { id?: string; domain: string; status?: string; created_at?: string };
-        Update: { id?: string; domain?: string; status?: string; created_at?: string };
+        Row: { id: string; user_id: string | null; domain: string; status: string; created_at: string };
+        Insert: { id?: string; user_id?: string | null; domain: string; status?: string; created_at?: string };
+        Update: { id?: string; user_id?: string | null; domain?: string; status?: string; created_at?: string };
         Relationships: [];
       };
       broken_links: {

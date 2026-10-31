@@ -1,7 +1,11 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
 
-const clerkHandler = clerkMiddleware();
+const clerkHandler = clerkMiddleware(async (auth, request) => {
+  if (request.nextUrl.pathname === "/dashboard" || request.nextUrl.pathname.startsWith("/dashboard/")) {
+    await auth.protect();
+  }
+});
 
 export default function proxy(request: NextRequest, event: NextFetchEvent) {
   if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || !process.env.CLERK_SECRET_KEY) {

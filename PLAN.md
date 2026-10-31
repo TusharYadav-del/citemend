@@ -111,3 +111,15 @@ Recovery: Ask Codex to inspect and undo the specific broken change.
 
 Live sign-in is not verified yet: the app reports Clerk setup is required. Create the Clerk application, enable Google and Email, add its keys to `.env.local`, restart the dev server, and verify sign-up before calling authentication fully active.
 Recovery: Ask Codex to inspect and undo the specific broken change.
+## Day 9: User workspaces and audit history (CODE COMPLETE; HOSTED MIGRATION PENDING)
+
+- [x] Add a forward-only migration for `audits.user_id` and an owner/date index, preserving older rows as unowned.
+- [x] Save the authenticated Clerk user ID with each new audit and verify owner-scoped readback.
+- [x] Add a Clerk-protected `/dashboard` page that lists the signed-in user's audit history and broken-link details.
+- [x] Keep history reads server-only and filter by the verified Clerk user ID.
+- [x] Pass 27 focused audit tests, including owner persistence, auth rejection, and history query isolation.
+- [x] Verify `npm run lint`, `npm run build`, and local Clerk navigation/auth guards.
+- [ ] Apply `supabase/migrations/002_audit_user_ownership.sql` to the hosted project and confirm a newly saved audit appears in the signed-in user's history.
+
+The code is ready. Run the migration in Supabase SQL Editor before relying on audit persistence/history; legacy rows remain unowned and are not assigned automatically.
+Recovery: Ask Codex to inspect and undo the specific broken change.

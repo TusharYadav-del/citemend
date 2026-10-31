@@ -22,7 +22,7 @@ function ClerkAuditAccess({ children }: { children: ReactNode }) {
 function ClerkAccountControl() {
   const { isLoaded, isSignedIn } = useAuth();
   if (!isLoaded) return null;
-  return isSignedIn ? <UserButton /> : <SignInButton mode="modal"><button type="button" className="rounded-full bg-[#214d39] px-4 py-2 text-white">Sign in</button></SignInButton>;
+  return isSignedIn ? <><a href="/dashboard" className="text-[#53704e] hover:underline">Audit history</a><UserButton /></> : <SignInButton mode="modal"><button type="button" className="rounded-full bg-[#214d39] px-4 py-2 text-white">Sign in</button></SignInButton>;
 }
 
 export default function AuditDashboard({ liveEnabled, clerkConfigured }: { liveEnabled: boolean; clerkConfigured: boolean }) {

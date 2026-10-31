@@ -2,7 +2,9 @@
 import { afterEach, beforeEach, mock, test } from "node:test";
 import { AuditInputError, extractCitationUrls, runAudit, validateAuditInput, type AuditReport } from "../lib/audit-pipeline";
 import { persistAudit, AuditStorageError } from "../lib/audit-store";
-import { GET, POST } from "../app/api/audit/route";
+import { GET } from "../app/api/audit/route";
+import { createAuditPostHandler } from "../lib/audit-handler";
+import { getUserAuditHistory } from "../lib/audit-history";
 import type { CitationProbeResult } from "../lib/gemini";
 
 const originalEnv = process.env;
@@ -10,6 +12,7 @@ const originalFetch = globalThis.fetch;
 beforeEach(() => { process.env = { ...originalEnv, NODE_ENV: "development", GEMINI_API_KEY: "test-google-key", GROQ_API_KEY: "test-groq-key", GROQ_MODEL: "llama-3.3-70b-versatile", TAVILY_API_KEY: "test-tavily-key", NEXT_PUBLIC_SUPABASE_URL: "https://db.example.com", SUPABASE_SECRET_KEY: "test-server-key" }; });
 afterEach(() => { mock.restoreAll(); globalThis.fetch = originalFetch; process.env = originalEnv; });
 const input = { domain: "example.com", buyerPrompt: "Find the documentation." };
+const POST = createAuditPostHandler({ isConfigured: () => true, getUserId: async () => "user_test_123" });
 const probe: CitationProbeResult = {
   text: "See [setup](https://example.com/docs/setup-old). Also https://other.com/docs/setup and https://example.com.evil.org/docs/setup",
   sources: [{ index: 0, url: "https://example.com/docs/setup-old#part", title: "Old setup" }],
@@ -82,19 +85,21 @@ function apiRequest(body: string, contentType = "application/json") {
   return new Request("http://localhost/api/audit", { method: "POST", headers: { "content-type": contentType }, body });
 }
 
-test("GET remains compatible; POST rejects malformed input and production access", async () => {
+test("GET remains compatible; POST rejects malformed input and supports authenticated production use", async () => {
   assert.deepEqual(await (await GET()).json(), { status: "ok", message: "CiteMind audit API placeholder" });
   assert.equal((await POST(apiRequest("{"))).status, 400);
   assert.equal((await POST(apiRequest("{}"))).status, 400);
   assert.equal((await POST(apiRequest("{}", "text/plain"))).status, 415);
   assert.equal((await POST(apiRequest('"' + "x".repeat(17000) + '"'))).status, 413);
   process.env = { ...process.env, NODE_ENV: "production" };
-  assert.equal((await POST(apiRequest(JSON.stringify(input)))).status, 403);
+  const productionPost = createAuditPostHandler({ isConfigured: () => true, getUserId: async () => "user_test_123", execute: async () => ({ persistence: { status: "saved" as const } } as Awaited<ReturnType<typeof runAudit>>) });
+  assert.equal((await productionPost(apiRequest(JSON.stringify(input)))).status, 201);
 });
 
 test("POST runs real SDK/parser/checker/store code against controlled HTTP fixtures", async () => {
   let insertCount = 0;
   let persistedLinks: unknown;
+  let persistedAudit: Record<string, unknown> | undefined;
   const id = "00000000-0000-4000-8000-000000000005";
   mock.method(globalThis, "fetch", async (value: string | URL, options?: RequestInit) => {
     const url = String(value), method = options?.method ?? "GET";
@@ -102,9 +107,9 @@ test("POST runs real SDK/parser/checker/store code against controlled HTTP fixtu
     if (url.includes("api.groq.com")) return Response.json({ choices: [{ message: { content: probe.text } }] });
     if (url === "https://example.com/sitemap.xml") return new Response('<urlset><url><loc>https://example.com/docs/setup</loc></url></urlset>');
     if (url.startsWith("https://example.com/")) return new Response(null, { status: url.endsWith("setup-old") ? 404 : 200 });
-    if (url.startsWith("https://db.example.com/rest/v1/audits") && method === "POST") { insertCount++; return Response.json({ id, created_at: "2026-10-30T00:00:00Z" }); }
+    if (url.startsWith("https://db.example.com/rest/v1/audits") && method === "POST") { persistedAudit = JSON.parse(String(options?.body)); insertCount++; return Response.json({ id, created_at: "2026-10-30T00:00:00Z" }); }
     if (url.startsWith("https://db.example.com/rest/v1/broken_links")) { persistedLinks = JSON.parse(String(options?.body)); return new Response(null, { status: 201 }); }
-    if (url.startsWith("https://db.example.com/rest/v1/audits") && method === "GET") return Response.json({ id, status: "completed", broken_links: [{ id: "child-id" }] });
+    if (url.startsWith("https://db.example.com/rest/v1/audits") && method === "GET") return Response.json({ id, user_id: "user_test_123", status: "completed", broken_links: [{ id: "child-id" }] });
     if (url.startsWith("https://db.example.com/rest/v1/audits") && method === "PATCH") return new Response(null, { status: 204 });
     throw new Error(`Unexpected fixture request: ${method} ${url}`);
   });
@@ -114,6 +119,7 @@ test("POST runs real SDK/parser/checker/store code against controlled HTTP fixtu
   assert.equal(report.auditId, id);
   assert.equal(report.findings[0].suggestedRedirect, "https://example.com/docs/setup");
   assert.equal(insertCount, 1);
+  assert.equal(persistedAudit?.user_id, "user_test_123");
   assert.deepEqual(persistedLinks, [{ audit_id: id, cited_url: "https://example.com/docs/setup-old", http_status: 404, suggested_redirect: "https://example.com/docs/setup" }]);
 });
 
@@ -140,10 +146,10 @@ test("failed child persistence removes only the new parent and missing credentia
     if (options?.method === "DELETE") { assert.ok(String(value).includes("new-audit")); return new Response(null, { status: 204 }); }
     return Response.json({ id: "new-audit", created_at: "now" });
   });
-  await assert.rejects(persistAudit(report), /partial rows were removed/);
+  await assert.rejects(persistAudit(report, "user_test_123"), /partial rows were removed/);
   assert.deepEqual(methods, ["POST", "POST", "DELETE"]);
   delete process.env.SUPABASE_SECRET_KEY; delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-  await assert.rejects(persistAudit(report), AuditStorageError);
+  await assert.rejects(persistAudit(report, "user_test_123"), AuditStorageError);
   assert.equal(methods.length, 3);
 });
 
@@ -155,6 +161,25 @@ test("path similarity handles typos, and no-404 reports do not invent broken lin
   assert.ok(healthy.findings.every((item) => item.httpStatus === 200 && item.suggestedRedirect === null));
 });
 
+test("audit POST rejects unauthenticated users before provider calls", async () => {
+  let providerCalled = false;
+  const post = createAuditPostHandler({ isConfigured: () => true, getUserId: async () => null, execute: async () => { providerCalled = true; throw new Error("should not run"); } });
+  const response = await post(apiRequest(JSON.stringify(input)));
+  assert.equal(response.status, 401);
+  assert.equal(providerCalled, false);
+});
+
+test("audit history query is scoped to the authenticated Clerk user", async () => {
+  let requestedUrl = "";
+  mock.method(globalThis, "fetch", async (value: string | URL) => {
+    requestedUrl = String(value);
+    return Response.json([]);
+  });
+  assert.deepEqual(await getUserAuditHistory("user_test_123"), []);
+  const query = new URL(requestedUrl).searchParams;
+  assert.equal(query.get("user_id"), "eq.user_test_123");
+  assert.equal(query.get("order"), "created_at.desc");
+});
 // Provider regression checks: Tavily evidence and generated URLs remain distinct.
 import { runCitationProbe as runGroqProbe, CitationProviderError } from "../lib/citation-probe";
 

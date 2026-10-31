@@ -20,7 +20,7 @@ export type AuditReport = {
 export type AuditDependencies = {
   probe: (domain: string, buyerPrompt: string) => Promise<ProbeResult>; sitemap: typeof fetchSitemapUrls; check: typeof checkUrlStatus;
   resolve: (url: string) => Promise<string | null>;
-  save: (report: AuditReport) => Promise<{ id: string; createdAt: string }>;
+  save: (report: AuditReport, userId?: string) => Promise<{ id: string; createdAt: string }>;
 };
 
 export function validateAuditInput(input: unknown): { domain: string; buyerPrompt: string } {
@@ -110,7 +110,7 @@ function similarity(a: string, b: string): number {
   return 0.4 * dice(pathTokens(a), pathTokens(b)) + 0.6 * dice(bigrams(a), bigrams(b));
 }
 
-export async function runAudit(input: unknown, overrides: Partial<AuditDependencies> = {}) {
+export async function runAudit(input: unknown, overrides: Partial<AuditDependencies> = {}, userId?: string) {
   const { domain, buyerPrompt } = validateAuditInput(input);
   const deps: AuditDependencies = { probe: runCitationProbe, sitemap: fetchSitemapUrls, check: checkUrlStatus, resolve: resolveGroundingRedirect, save: persistAudit, ...overrides };
   const probe = await deps.probe(domain, buyerPrompt);
@@ -160,7 +160,7 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
     return { ...report, auditId: null, createdAt: new Date().toISOString(), persistence: { status: "disabled" as const }, suggestionCandidatesPer404: 5 };
   }
   try {
-    const saved = await deps.save(report);
+    const saved = await deps.save(report, userId);
     return { ...report, auditId: saved.id, createdAt: saved.createdAt, persistence: { status: "saved" as const }, suggestionCandidatesPer404: 5 };
   } catch {
     report.status = "partial";
