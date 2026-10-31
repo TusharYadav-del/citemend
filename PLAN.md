@@ -177,16 +177,18 @@ Recovery: Ask Codex to inspect and undo the specific broken change.
 The hosted index migration is verified by successful application. Live query-plan measurements were not collected.
 Recovery: Ask Codex to inspect and undo the specific broken change.
 
-## Day 15: Lemon Squeezy checkout integration (CODE COMPLETE; MERCHANT SETUP PENDING)
+## Day 15: Lemon Squeezy checkout integration (CHECKOUT VERIFIED; WEBHOOK SETUP PENDING)
 
 - [x] Add a Clerk-authenticated checkout endpoint that creates a Lemon Squeezy checkout for the configured Pro variant and passes the authenticated Clerk user ID as checkout custom data.
 - [x] Add the dashboard Pro upgrade button ($39/month) with loading and error feedback.
 - [x] Add a signed, bounded webhook endpoint for subscription created and cancelled events; validate the configured store and product before writing.
 - [x] Add the RLS-enabled subscriptions table migration and matching database types.
-- [x] Add server-only Lemon Squeezy settings to .env.example; no live credentials or values are committed.
-- [x] Verify npm run lint and npm run build; local checkout rejects anonymous requests and the webhook fails closed while unconfigured.
-- [ ] Create/activate the CiteFix Lemon Squeezy merchant store and $39/month Pro product; set the store, product, variant, API key, webhook secret, and public app URL in .env.local.
-- [ ] Apply supabase/migrations/004_lemonsqueezy_subscriptions.sql to the hosted project and configure the production webhook endpoint for subscription_created and subscription_cancelled.
+- [x] Support the LEMONSQUEEZY_* variable names already present in .env.local while retaining the documented LEMON_SQUEEZY_* names.
+- [x] Validate the API key and confirm the configured store, product, and variant relationships through the Lemon Squeezy API.
+- [x] Create a checkout preview successfully; Lemon Squeezy returned a valid checkout session with a $39.00 total.
+- [x] Record the user's confirmation that the subscriptions migration was applied in the Supabase SQL Editor; a direct no-row REST check returned HTTP 401 and could not independently verify the table.
+- [ ] Add a webhook signing secret to .env.local and register the production endpoint for subscription_created and subscription_cancelled.
+- [ ] Set NEXT_PUBLIC_APP_URL to the production app origin before using production checkout.
 
-The code is ready, but real checkout and subscription syncing remain inactive until the merchant setup, secrets, hosted migration, and webhook registration are completed.
+The configured store is Cite_Mend and its published product is CiteMend Pro Tier; the Default variant is a $39/month subscription. Checkout preview succeeded. Subscription syncing remains inactive until webhook signing and registration are completed.
 Recovery: Ask Codex to inspect and undo the specific broken change.

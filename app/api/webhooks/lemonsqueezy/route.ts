@@ -35,7 +35,7 @@ async function readBoundedBody(request: Request): Promise<string | null> {
 }
 
 export async function POST(request: Request) {
-  const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET?.trim();
+  const secret = (process.env.LEMON_SQUEEZY_WEBHOOK_SECRET || process.env.LEMONSQUEEZY_WEBHOOK_SECRET)?.trim();
   if (!secret) return Response.json({ error: "Webhook is not configured." }, { status: 503 });
 
   const rawBody = await readBoundedBody(request);
@@ -59,8 +59,8 @@ export async function POST(request: Request) {
   const subscription = event.data;
   const attributes = subscription?.attributes;
   const subscriptionId = subscription?.id;
-  const storeId = process.env.LEMON_SQUEEZY_STORE_ID?.trim();
-  const productId = process.env.LEMON_SQUEEZY_PRODUCT_ID?.trim();
+  const storeId = (process.env.LEMON_SQUEEZY_STORE_ID || process.env.LEMONSQUEEZY_STORE_ID)?.trim();
+  const productId = (process.env.LEMON_SQUEEZY_PRODUCT_ID || process.env.LEMONSQUEEZY_PRODUCT_ID)?.trim();
   if (!storeId || !productId) return Response.json({ error: "Webhook is not configured." }, { status: 503 });
   if (
     subscription?.type !== "subscriptions" ||
