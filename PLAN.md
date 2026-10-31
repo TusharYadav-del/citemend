@@ -100,7 +100,7 @@ Recovery: Ask Codex to inspect and undo the specific broken change.
 - [x] Verify production homepage/GET 200 and POST 403; preserve authentication boundary.
 - [x] Record docs/WEEK1_READINESS.md and docs/readiness-live-results.json. User-requested save-point 4cbe45d committed and successfully pushed to origin/main.
 
-## Day 8: Clerk authentication integration (CODE COMPLETED; LIVE ACTIVATION PENDING)
+## Day 8: Clerk authentication integration (COMPLETED)
 
 - [x] Install the Clerk Next.js SDK.
 - [x] Add ClerkProvider when server and publishable keys are configured, and integrate the Clerk proxy using the Next.js 16 `proxy.ts` convention.
@@ -109,7 +109,9 @@ Recovery: Ask Codex to inspect and undo the specific broken change.
 - [x] Add placeholder Clerk variables to .env.example; keep real credentials in ignored .env.local.
 - [x] Verify lint, production build, public homepage HTTP 200, and anonymous POST rejection (HTTP 503 while keys are not configured).
 
-Live sign-in is not verified yet: the app reports Clerk setup is required. Create the Clerk application, enable Google and Email, add its keys to `.env.local`, restart the dev server, and verify sign-up before calling authentication fully active.
+- [x] Confirm live authentication through the user-confirmed Day 9 signed-in audit creation and workspace history result.
+
+The earlier activation-pending note is superseded by the recorded Day 9 live authentication confirmation. The Clerk integration and authenticated workspace flow are complete.
 Recovery: Ask Codex to inspect and undo the specific broken change.
 ## Day 9: User workspaces and audit history (COMPLETED)
 
@@ -135,4 +137,26 @@ Recovery: Ask Codex to inspect and undo the specific broken change.
 - [x] Verify final npm run lint and npm run build with zero errors.
 
 Report URLs use the existing app host at /audit/[id]. Domain claiming and weekly monitoring remain future work; the banner links to the existing sign-in/audit entry point and states this limitation.
+Recovery: Ask Codex to inspect and undo the specific broken change.
+
+## Day 1–10 completion review
+
+- [x] Inspect the existing setup, database migrations, mock workflow, sitemap/status checker, audit pipeline, dashboard, testing records, Clerk authentication, owner-scoped history, and public reports.
+- [x] Reconcile Day 8's stale activation status with the user-confirmed Day 9 live signed-in workflow.
+- [x] Preserve the agreed Day 3 mock scope and Groq/Tavily provider replacement.
+- [x] Confirm that Days 1 through 10 are implemented and marked completed within their recorded scopes.
+
+## Day 11: No coding tasks (COMPLETED)
+
+- [x] Mark Day 11 complete as requested by the user; no coding tasks are required.
+
+## Day 12: Founder follow-ups and redirect export (COMPLETED)
+
+- [x] Add a public report control to copy all saved verified 301 redirects in .htaccess, Vercel JSON, or Shopify CSV format.
+- [x] Export only confirmed 404 sources with saved same-domain replacement destinations; exclude unresolved, non-404, and unsafe external redirects.
+- [x] Provide accessible format selection and clipboard success/failure feedback.
+- [x] Pass four redirect-export tests and verify the anonymous report copies all five redirects in each format.
+- [x] Verify npm run lint and npm run build with zero errors.
+- [x] Run npm run dev and commit/push the Day 12 save-point.
+
 Recovery: Ask Codex to inspect and undo the specific broken change.
