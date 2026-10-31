@@ -172,5 +172,21 @@ Recovery: Ask Codex to inspect and undo the specific broken change.
 - [x] Preserve existing owner and foreign-key indexes; no query or schema behavior changes.
 - [x] Verify npm run lint and npm run build with zero errors.
 
-The migration is ready to apply to the hosted Supabase database. This workspace has no connected SQL execution surface, so hosted application and live query-plan measurements are not claimed.
+- [x] Apply the migration in the hosted Supabase SQL Editor; the user confirmed it completed successfully.
+
+The hosted index migration is verified by successful application. Live query-plan measurements were not collected.
+Recovery: Ask Codex to inspect and undo the specific broken change.
+
+## Day 15: Lemon Squeezy checkout integration (CODE COMPLETE; MERCHANT SETUP PENDING)
+
+- [x] Add a Clerk-authenticated checkout endpoint that creates a Lemon Squeezy checkout for the configured Pro variant and passes the authenticated Clerk user ID as checkout custom data.
+- [x] Add the dashboard Pro upgrade button ($39/month) with loading and error feedback.
+- [x] Add a signed, bounded webhook endpoint for subscription created and cancelled events; validate the configured store and product before writing.
+- [x] Add the RLS-enabled subscriptions table migration and matching database types.
+- [x] Add server-only Lemon Squeezy settings to .env.example; no live credentials or values are committed.
+- [x] Verify npm run lint and npm run build; local checkout rejects anonymous requests and the webhook fails closed while unconfigured.
+- [ ] Create/activate the CiteFix Lemon Squeezy merchant store and $39/month Pro product; set the store, product, variant, API key, webhook secret, and public app URL in .env.local.
+- [ ] Apply supabase/migrations/004_lemonsqueezy_subscriptions.sql to the hosted project and configure the production webhook endpoint for subscription_created and subscription_cancelled.
+
+The code is ready, but real checkout and subscription syncing remain inactive until the merchant setup, secrets, hosted migration, and webhook registration are completed.
 Recovery: Ask Codex to inspect and undo the specific broken change.
