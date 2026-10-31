@@ -160,3 +160,17 @@ Recovery: Ask Codex to inspect and undo the specific broken change.
 - [x] Run npm run dev and commit/push the Day 12 save-point.
 
 Recovery: Ask Codex to inspect and undo the specific broken change.
+
+## Day 13: No coding tasks (COMPLETED)
+
+- [x] Mark Day 13 complete as requested by the user; no coding tasks are required.
+
+## Day 14: Week 2 review and audit indexes (COMPLETED)
+
+- [x] Review audit queries and existing indexes: the owner/date index already supports owner-scoped newest-first history; audit UUID lookups use the primary key; broken-link joins use their foreign-key index.
+- [x] Add forward-only migration supabase/migrations/003_audit_domain_lookup_idx.sql for (domain, created_at DESC) domain lookups and recent-audit ordering.
+- [x] Preserve existing owner and foreign-key indexes; no query or schema behavior changes.
+- [x] Verify npm run lint and npm run build with zero errors.
+
+The migration is ready to apply to the hosted Supabase database. This workspace has no connected SQL execution surface, so hosted application and live query-plan measurements are not claimed.
+Recovery: Ask Codex to inspect and undo the specific broken change.
