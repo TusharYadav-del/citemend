@@ -1,6 +1,7 @@
 ﻿"use client";
 
-import { useEffect, useState, useSyncExternalStore, type FormEvent } from "react";
+import { useEffect, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
+import { SignInButton, UserButton, useAuth } from "@clerk/nextjs";
 import { ArrowDown, ArrowRight, ArrowUpRight, Check, CircleCheck, Copy, FileText, Globe2, Link2, Loader2, Search, ShieldCheck, Sparkles, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +12,20 @@ import { citationHealth, normalizeDashboardDomain, parseDashboardReport, redirec
 
 const subscribeToHydration = () => () => {};
 
-export default function AuditDashboard({ liveEnabled }: { liveEnabled: boolean }) {
+function ClerkAuditAccess({ children }: { children: ReactNode }) {
+  const { isLoaded, isSignedIn } = useAuth();
+  if (!isLoaded) return <div role="status" className="py-8 text-center text-sm text-[#68736b]">Checking your sign-in…</div>;
+  if (!isSignedIn) return <div className="rounded-xl border border-[#dce6d1] bg-[#f7f9f3] p-5 text-center"><h3 className="text-sm font-semibold">Sign in to run your audit</h3><p className="mt-2 text-xs leading-5 text-[#68736b]">Create a free account or sign in with your email or Google to use the live audit workspace.</p><SignInButton mode="modal"><button type="button" className="mt-4 rounded-lg bg-[#214d39] px-5 py-3 text-sm font-medium text-white hover:bg-[#153c2a]">Sign in or create an account</button></SignInButton></div>;
+  return children;
+}
+
+function ClerkAccountControl() {
+  const { isLoaded, isSignedIn } = useAuth();
+  if (!isLoaded) return null;
+  return isSignedIn ? <UserButton /> : <SignInButton mode="modal"><button type="button" className="rounded-full bg-[#214d39] px-4 py-2 text-white">Sign in</button></SignInButton>;
+}
+
+export default function AuditDashboard({ liveEnabled, clerkConfigured }: { liveEnabled: boolean; clerkConfigured: boolean }) {
   const hydrated = useSyncExternalStore(subscribeToHydration, () => true, () => false);
   const [domain, setDomain] = useState("");
   const [prompt, setPrompt] = useState("What are the best solutions for my business, and where can I find their pricing and documentation?");
@@ -60,7 +74,7 @@ export default function AuditDashboard({ liveEnabled }: { liveEnabled: boolean }
     <header className="border-b border-[#dfe5dc] bg-[#fcfdf9]/95">
       <div className="mx-auto flex h-20 max-w-6xl items-center justify-between px-5 sm:px-8">
         <a href="#" aria-label="Citemend home" className="flex items-center gap-2.5 text-xl font-bold tracking-tight"><span className="grid size-9 place-items-center rounded-xl bg-[#173f32] text-[#d9f49a]"><Link2 className="size-5 -rotate-45" /></span>citemend<span className="mb-3 size-1.5 rounded-full bg-[#7ba751]" /></a>
-        <nav aria-label="Main navigation" className="flex items-center gap-6 text-sm font-medium"><a href="#how-it-works" className="hidden text-[#657168] hover:text-[#173f32] sm:block">How it works</a><a href="#audit" className="flex items-center gap-2 rounded-full border border-[#d2dacc] bg-white px-4 py-2">Open workspace <ArrowUpRight className="size-3.5" /></a></nav>
+        <nav aria-label="Main navigation" className="flex items-center gap-4 text-sm font-medium"><a href="#how-it-works" className="hidden text-[#657168] hover:text-[#173f32] sm:block">How it works</a><a href="#audit" className="flex items-center gap-2 rounded-full border border-[#d2dacc] bg-white px-4 py-2">Open workspace <ArrowUpRight className="size-3.5" /></a>{clerkConfigured && <ClerkAccountControl />}</nav>
       </div>
     </header>
     <main className="mx-auto max-w-6xl px-5 pb-16 sm:px-8">
@@ -73,12 +87,12 @@ export default function AuditDashboard({ liveEnabled }: { liveEnabled: boolean }
       <section id="audit" aria-labelledby="audit-heading" className="grid scroll-mt-8 gap-5 lg:grid-cols-[1.45fr_1fr]">
         <Card className="gap-0 rounded-2xl bg-white py-0 shadow-[0_8px_30px_-20px_#1d3c2a30] ring-[#dfe5dc]">
           <CardHeader className="border-b border-[#edf0e9] px-6 py-5 sm:px-7"><div className="flex items-center justify-between gap-4"><h2 id="audit-heading" className="text-lg font-semibold tracking-tight">Start with your domain</h2><Badge variant="outline" className="h-6 border-[#dae2d4] bg-[#f5f8f0] text-[10px] text-[#557447]">LIVE AUDIT</Badge></div><p className="mt-1 text-sm text-[#7a837b]">See your site through an AI buyer&apos;s eyes.</p></CardHeader>
-          <CardContent className="px-6 py-6 sm:px-7"><form onSubmit={submit} className="space-y-5" aria-busy={pending}>
+          <CardContent className="px-6 py-6 sm:px-7">{clerkConfigured ? <ClerkAuditAccess><form onSubmit={submit} className="space-y-5" aria-busy={pending}>
             <div><label htmlFor="audit-domain" className="mb-2 block text-xs font-semibold">Your website domain</label><div className="relative"><Globe2 className="pointer-events-none absolute top-3.5 left-3.5 size-4 text-[#8a9587]" /><Input id="audit-domain" name="domain" placeholder="stripe.com" value={domain} onChange={(event) => setDomain(event.target.value)} required maxLength={300} disabled={pending || !hydrated} autoCapitalize="none" autoCorrect="off" spellCheck={false} className="h-11 rounded-lg border-[#dce2d7] bg-[#fcfdfb] pl-10 shadow-none" /></div></div>
             <div><label htmlFor="buyer-prompt" className="mb-2 block text-xs font-semibold">Sample buyer prompt</label><textarea id="buyer-prompt" name="buyerPrompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} required maxLength={4000} disabled={pending || !hydrated} className="min-h-24 w-full resize-y rounded-lg border border-[#dce2d7] bg-[#fcfdfb] px-3.5 py-3 text-sm leading-6 outline-none focus-visible:border-[#648346] focus-visible:ring-2 focus-visible:ring-[#dceacb] disabled:opacity-60" /><p className="mt-1.5 text-[11px] text-[#899084]">Try a question your next customer might ask an AI assistant.</p></div>
             <Button type="submit" disabled={pending || !liveEnabled || !hydrated} className="h-12 w-full gap-2.5 rounded-lg bg-[#214d39] text-sm font-medium text-white hover:bg-[#153c2a]">{pending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}{pending ? "Running your audit..." : "Run AI Audit"}{!pending && <ArrowRight className="ml-auto size-4" />}</Button>
             <p className="flex items-center justify-center gap-1.5 text-[10px] text-[#828d7e]"><ShieldCheck className="size-3" />{liveEnabled ? "Read-only website checks. No changes are made to your site." : "Live audits are available in the local workspace."}</p>
-          </form></CardContent>
+          </form></ClerkAuditAccess> : <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"><h3 className="font-semibold">Clerk setup is required to run audits</h3><p className="mt-2 text-xs leading-5">Create a Clerk application, enable Google and Email sign-in, then add its publishable and secret keys to your ignored .env.local file and restart the dev server.</p></div>}</CardContent>
         </Card>
         <aside id="how-it-works" className="relative overflow-hidden rounded-2xl bg-[#183c2f] px-7 py-7 text-[#e8f1e1] sm:px-8">
           <div className="pointer-events-none absolute -top-12 -right-12 size-48 rounded-full border border-[#365542]" /><div className="pointer-events-none absolute -top-5 -right-5 size-32 rounded-full border border-[#365542]" />

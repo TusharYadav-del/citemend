@@ -1,6 +1,7 @@
 ﻿import { CitationProviderError } from "@/lib/citation-probe";
 import { AuditInputError, runAudit } from "@/lib/audit-pipeline";
 import { AuditStorageError } from "@/lib/audit-store";
+import { auth } from "@clerk/nextjs/server";
 
 
 
@@ -10,8 +11,13 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  // Authentication is not implemented yet. Never expose admin-backed writes publicly.
-  if (process.env.NODE_ENV !== "development") return Response.json({ error: "Audit POST is development-only until authentication is implemented." }, { status: 403 });
+  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || !process.env.CLERK_SECRET_KEY) {
+    return Response.json({ error: "Audit sign-in is not configured. Add the Clerk keys to the server environment." }, { status: 503 });
+  }
+  let userId: string | null;
+  try { userId = (await auth()).userId; }
+  catch { return Response.json({ error: "Authentication is temporarily unavailable." }, { status: 503 }); }
+  if (!userId) return Response.json({ error: "Sign in to run an audit." }, { status: 401 });
   if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get("content-type") ?? "")) return Response.json({ error: "Use Content-Type: application/json." }, { status: 415 });
   let input: unknown;
   try {

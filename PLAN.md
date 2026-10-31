@@ -99,3 +99,15 @@ Recovery: Ask Codex to inspect and undo the specific broken change.
 - [x] Verify live HTTP 201 completed audit 9234a138-b3aa-46dd-bf79-b5800876a89d with 13 citations and five confirmed 404s; independently verify saved rows and RLS denial.
 - [x] Verify production homepage/GET 200 and POST 403; preserve authentication boundary.
 - [x] Record docs/WEEK1_READINESS.md and docs/readiness-live-results.json. User-requested save-point 4cbe45d committed and successfully pushed to origin/main.
+
+## Day 8: Clerk authentication integration (CODE COMPLETED; LIVE ACTIVATION PENDING)
+
+- [x] Install the Clerk Next.js SDK.
+- [x] Add ClerkProvider when server and publishable keys are configured, and integrate the Clerk proxy using the Next.js 16 `proxy.ts` convention.
+- [x] Keep the public landing page visible while gating the audit form behind Clerk sign-in, with SignInButton and UserButton controls.
+- [x] Enforce a Clerk session in POST /api/audit; unauthenticated requests fail closed.
+- [x] Add placeholder Clerk variables to .env.example; keep real credentials in ignored .env.local.
+- [x] Verify lint, production build, public homepage HTTP 200, and anonymous POST rejection (HTTP 503 while keys are not configured).
+
+Live sign-in is not verified yet: the app reports Clerk setup is required. Create the Clerk application, enable Google and Email, add its keys to `.env.local`, restart the dev server, and verify sign-up before calling authentication fully active.
+Recovery: Ask Codex to inspect and undo the specific broken change.
