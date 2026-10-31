@@ -61,5 +61,19 @@ dashboard remained disabled for live submissions and hydrated without errors.
 - This is readiness for Week 2 authentication work. Existing server-side API
   restrictions and row-level security have not been relaxed.
 
-Changes are local for review. Existing unrelated AGENTS.md and script-approval
-settings were preserved; this audit did not create a commit or publish changes.
+## Git save-point and push (completed)
+
+The user requested staging all changes, creating the following commit, and
+pushing it to GitHub. All three commands succeeded in sequence:
+
+```sh
+git add .
+git commit -m "chore: pass all 58 week-1 qa checks, harden ssrf, verify live supabase audit"
+git push origin main
+```
+
+- Commit: [4cbe45d](https://github.com/TusharYadav-del/citemend/commit/4cbe45d)
+- Branch and remote: `main` -> `origin/main`
+- Push confirmed: `6fab391..4cbe45d main -> main`
+- The explicit `git add .` instruction included the existing AGENTS.md and
+  package script-approval settings. Private environment files remained ignored.

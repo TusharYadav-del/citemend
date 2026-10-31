@@ -98,4 +98,4 @@ Recovery: Ask Codex to inspect and undo the specific broken change.
 - [x] Add eight-second SEO budgets, DNS-pinned SSRF protection, SQL-matched database types, and transparent failed/local persistence reports.
 - [x] Verify live HTTP 201 completed audit 9234a138-b3aa-46dd-bf79-b5800876a89d with 13 citations and five confirmed 404s; independently verify saved rows and RLS denial.
 - [x] Verify production homepage/GET 200 and POST 403; preserve authentication boundary.
-- [x] Record docs/WEEK1_READINESS.md and docs/readiness-live-results.json. Keep changes local for review; no commit/push requested for this audit.
+- [x] Record docs/WEEK1_READINESS.md and docs/readiness-live-results.json. User-requested save-point 4cbe45d committed and successfully pushed to origin/main.
