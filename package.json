@@ -11,7 +11,11 @@
     "test:audit": "node --conditions=react-server --import tsx --test tests/audit.test.ts",
     "test:dashboard": "node --import tsx --test tests/dashboard.test.ts",
     "test:ui": "playwright test",
-    "test:security": "node --conditions=react-server --import tsx --test tests/public-http.test.ts"
+    "test:security": "node --conditions=react-server --import tsx --test tests/public-http.test.ts",
+    "dev:simulate-webhooks": "node --conditions=react-server --import tsx scripts/simulate-subscription-webhook.ts",
+    "dev:verify-checkout": "node --env-file=.env.local --conditions=react-server --import tsx scripts/verify-test-checkout.ts",
+    "dev:verify-email": "node --env-file=.env.local --conditions=react-server --import tsx scripts/verify-test-email.ts",
+    "dev:verify-cron": "node --env-file=.env.local --conditions=react-server --import tsx scripts/verify-local-cron.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

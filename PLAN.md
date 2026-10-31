@@ -246,3 +246,15 @@ The configured sender currently uses Resend's sandbox domain and did not appear 
 - [x] Check the local development server. The dashboard redirects signed-out visitors as expected.
 
 The browser suite now checks the current anonymous sign-in gate, responsive layout, dashboard redirect, and protected APIs; all six tests pass. Signed-in audit behavior remains covered by focused tests and needs an authenticated Clerk browser fixture for a future end-to-end browser check. Redirect suggestions are not deployed automatically, so the metric is labeled "Redirects ready."
+
+## Day 20: End-to-end billing and cron testing (COMPLETED LOCALLY; LIVE PRO FLOW PENDING VERCEL)
+
+- [x] Add a development-only Lemon Squeezy test-mode checkout toggle and reject a checkout that is not confirmed as test mode.
+- [x] Create a real test-mode checkout session without submitting a card payment.
+- [x] Add a development webhook simulator covering signed create/cancel/update events, Pro access, one weekly job, and one rendered redirect digest with in-memory writes only.
+- [x] Manually trigger an authenticated weekly `drain`; the hosted queue was idle with zero eligible Pro subscriptions, so no scan or Pro email was sent.
+- [x] Send a rendered test digest to Resend's test delivery address and confirm its `delivered` event; no customer was emailed.
+- [x] Pass all 89 regression tests, six Clerk-aware browser tests, npm run lint, and npm run build with zero errors.
+- [ ] Complete a test-mode payment and verify the hosted subscription, weekly scan, and Pro inbox delivery after Vercel webhook and scheduler deployment.
+
+See docs/DAY20_TESTING.md for repeatable commands and the limits of local verification.

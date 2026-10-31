@@ -20,7 +20,7 @@ export default function CheckoutButton() {
           : "Checkout is temporarily unavailable. Please try again.";
         throw new Error(message);
       }
-      toast.info("Opening secure checkout for CiteMend Pro.");
+      toast.info((result as { testMode?: boolean }).testMode ? "Opening Lemon Squeezy test checkout. No live payment will be charged." : "Opening secure checkout for CiteMend Pro.");
       window.location.assign((result as { checkoutUrl: string }).checkoutUrl);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Checkout is temporarily unavailable. Please try again.";

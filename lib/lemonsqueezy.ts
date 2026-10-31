@@ -1,6 +1,7 @@
 import "server-only";
 
-export async function createLemonSqueezyCheckout(userId: string) {
+export async function createLemonSqueezyCheckout(userId: string, testMode = false) {
+  if (testMode && process.env.NODE_ENV === "production") throw new Error("Test-mode checkout is development-only.");
   const apiKey = (process.env.LEMON_SQUEEZY_API_KEY || process.env.LEMONSQUEEZY_API_KEY)?.trim();
   const storeId = (process.env.LEMON_SQUEEZY_STORE_ID || process.env.LEMONSQUEEZY_STORE_ID)?.trim();
   const productId = (process.env.LEMON_SQUEEZY_PRODUCT_ID || process.env.LEMONSQUEEZY_PRODUCT_ID)?.trim();
@@ -23,6 +24,7 @@ export async function createLemonSqueezyCheckout(userId: string) {
       data: {
         type: "checkouts",
         attributes: {
+          ...(testMode ? { test_mode: true } : {}),
           checkout_data: { custom: { user_id: userId } },
           product_options: {
             enabled_variants: [Number(variantId)],
@@ -46,6 +48,9 @@ export async function createLemonSqueezyCheckout(userId: string) {
   const attributes = (data as Record<string, unknown>).attributes;
   if (!attributes || typeof attributes !== "object") throw new Error("Lemon Squeezy returned an invalid checkout.");
   const checkoutUrl = (attributes as Record<string, unknown>).url;
+  if (testMode && (attributes as Record<string, unknown>).test_mode !== true) {
+    throw new Error("Lemon Squeezy did not create a test-mode checkout.");
+  }
   if (typeof checkoutUrl !== "string") throw new Error("Lemon Squeezy returned an invalid checkout.");
   const parsed = new URL(checkoutUrl);
   if (parsed.protocol !== "https:" || !(parsed.hostname === "lemonsqueezy.com" || parsed.hostname.endsWith(".lemonsqueezy.com"))) {

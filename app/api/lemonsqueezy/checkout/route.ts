@@ -15,8 +15,9 @@ export async function POST() {
   if (!userId) return Response.json({ error: "Sign in before upgrading." }, { status: 401 });
 
   try {
-    const checkoutUrl = await createLemonSqueezyCheckout(userId);
-    return Response.json({ checkoutUrl });
+    const testMode = process.env.NODE_ENV === "development" && process.env.LEMON_SQUEEZY_TEST_MODE === "true";
+    const checkoutUrl = await createLemonSqueezyCheckout(userId, testMode);
+    return Response.json({ checkoutUrl, testMode });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     const status = message.includes("not configured") ? 503 : 502;
