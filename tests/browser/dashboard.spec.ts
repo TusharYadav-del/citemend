@@ -1,159 +1,57 @@
-import { expect, test, type Page } from "@playwright/test";
+﻿import { expect, test, type Page } from "@playwright/test";
 
-const report = {
-  domain: "example.com", buyerPrompt: "Find pricing", generatedText: "Sample answer with citations.", groundingMetadata: null,
-  auditId: "00000000-0000-4000-8000-000000000006", createdAt: "2026-10-30T00:00:00Z", status: "partial",
-  sitemapUrlCount: 24, extractedUrls: [], warnings: ["One status check timed out."],
-  searchGrounding: { status: "available", sources: [] },
-  findings: [
-    { url: "https://example.com/old-pricing", httpStatus: 404, suggestedRedirect: "https://example.com/pricing", error: null },
-    { url: "https://example.com/retired", httpStatus: 404, suggestedRedirect: null, error: null },
-    { url: "https://example.com/docs", httpStatus: 200, suggestedRedirect: null, error: null },
-    { url: "https://example.com/slow", httpStatus: null, suggestedRedirect: null, error: "Timeout" },
-  ],
-};
-async function fill(page: Page) {
-  await page.getByLabel("Your website domain").fill("https://example.com/");
-  await page.getByLabel("Sample buyer prompt").fill("  Find pricing  ");
-}
+const browserErrors = new WeakMap<Page, string[]>();
+test.beforeEach(({ page }) => {
+  const errors: string[] = [];
+  browserErrors.set(page, errors);
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => {
+    if (/hydration|hydrated.*match/i.test(message.text())) errors.push(message.text());
+  });
+});
+test.afterEach(({ page }) => expect(browserErrors.get(page)).toEqual([]));
 
-test("landing is responsive and has no fabricated score before an audit", async ({ page }) => {
+test("public landing shows the sign-in gate without a fabricated audit score", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Catch Dead AI Links Before They Kill Your Organic Traffic.");
   await expect(page.getByTestId("health-score")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Run AI Audit", exact: true })).toBeEnabled();
-  await page.screenshot({ path: "test-results/day6-desktop.png", fullPage: true });
-  await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByRole("button", { name: "Run AI Audit", exact: true })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await page.screenshot({ path: "test-results/day6-mobile.png", fullPage: true });
+  await expect(page.getByRole("heading", { name: "Sign in to run your audit" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in or create an account" })).toBeVisible();
+  await expect(page.getByLabel("Your website domain")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Run AI Audit", exact: true })).toHaveCount(0);
 });
 
-test("submits normalized input, displays real results, and copies the 301 rule", async ({ page, context }) => {
-  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-  await page.route("**/api/redirect-export", route => route.fulfill({ status: 200, json: { content: 'Redirect 301 "/old-pricing" "https://example.com/pricing"' } }));
-  let submitted: unknown;
-  await page.route("**/api/audit", async (route) => { submitted = route.request().postDataJSON(); await route.fulfill({ status: 201, json: report }); });
-  await page.goto("/"); await fill(page);
-  await page.getByRole("button", { name: "Run AI Audit", exact: true }).click();
-  await expect(page.getByTestId("health-score")).toHaveText("33/ 100");
-  expect(submitted).toEqual({ domain: "example.com", buyerPrompt: "Find pricing" });
-  await expect(page.getByText("1 URL check(s) are unresolved and excluded from the health score.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Copy 301 Rule for https://example.com/retired", exact: true })).toBeDisabled();
-  await page.getByRole("button", { name: "Copy 301 Rule for https://example.com/old-pricing", exact: true }).click();
-  await expect(page.getByText("Copied!", { exact: true })).toBeVisible();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('Redirect 301 "/old-pricing" "https://example.com/pricing"');
-  await page.screenshot({ path: "test-results/day6-results.png", fullPage: true });
+test("mobile landing keeps the sign-in gate and navigation within the viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Sign in or create an account" })).toBeVisible();
+  await page.getByRole("link", { name: "Open workspace" }).click();
+  await expect(page).toHaveURL(/#audit$/);
+  await expect(page.getByRole("heading", { name: "Sign in to run your audit" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
-test("loading prevents duplicate audits and failures are shown without a stale report", async ({ page }) => {
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => { release = resolve; });
-  await page.route("**/api/audit", async (route) => { await gate; await route.fulfill({ status: 429, json: { error: "Provider rate limit. Please try again later." } }); });
-  await page.goto("/"); await fill(page);
-  await page.getByRole("button", { name: "Run AI Audit", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Running your audit...", exact: true })).toBeDisabled();
-  await expect(page.getByLabel("Your website domain")).toBeDisabled();
-  release();
-  await expect(page.locator("main").getByRole("alert")).toContainText(/rate limiting/i);
-  await expect(page.getByTestId("health-score")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Run AI Audit", exact: true })).toBeEnabled();
+test("the dashboard redirects anonymous visitors to Clerk sign-in", async ({ request }) => {
+  const response = await request.get("/dashboard", { maxRedirects: 0 });
+  expect(response.status()).toBe(307);
+  expect(response.headers().location).toMatch(/\/sign-in\?/);
+  expect(response.headers().location).toContain("dashboard");
 });
 
-test("empty and unknown checks are not reported as perfect citation health", async ({ page }) => {
-  await page.route("**/api/audit", (route) => route.fulfill({ status: 201, json: { ...report, findings: [], warnings: [] } }));
-  await page.goto("/"); await fill(page);
-  await page.getByRole("button", { name: "Run AI Audit", exact: true }).click();
-  await expect(page.getByTestId("health-score")).toHaveText("—");
-  await expect(page.getByText("No citations matching your domain were found.", { exact: false })).toBeVisible();
+test("anonymous audit creation is rejected before any saved report is produced", async ({ request }) => {
+  const response = await request.post("/api/audit", { data: { domain: "example.com", buyerPrompt: "Find pricing" } });
+  expect(response.status()).toBe(401);
+  expect(await response.json()).toMatchObject({ error: expect.any(String) });
 });
 
-test("healthy reports show the no-404 state and invalid domains do not submit", async ({ page }) => {
-  let requests = 0;
-  await page.route("**/api/audit", (route) => { requests++; return route.fulfill({ status: 201, json: { ...report, status: "completed", warnings: [], findings: [report.findings[2]] } }); });
-  await page.goto("/");
-  await page.getByLabel("Your website domain").fill("example.com/a-page");
-  await page.getByRole("button", { name: "Run AI Audit", exact: true }).click();
-  await expect(page.locator("main").getByRole("alert")).toContainText("Enter a domain");
-  expect(requests).toBe(0);
-  await fill(page);
-  await page.getByRole("button", { name: "Run AI Audit", exact: true }).click();
-  await expect(page.getByTestId("health-score")).toHaveText("100/ 100");
-  await expect(page.getByText("No confirmed 404s in this audit", { exact: true })).toBeVisible();
-  await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
+test("anonymous 301 export and Pro checkout are rejected", async ({ request }) => {
+  const redirect = await request.post("/api/redirect-export", { data: { domain: "example.com", links: [], format: "htaccess" } });
+  expect(redirect.status()).toBe(401);
+  const checkout = await request.post("/api/lemonsqueezy/checkout");
+  expect(checkout.status()).toBe(401);
 });
 
-test("malformed API findings and network errors show a recoverable error state", async ({ page }) => {
-  const crashes: string[] = [];
-  page.on("pageerror", (error) => crashes.push(error.message));
-  await page.route("**/api/audit", (route) => route.fulfill({ status: 201, json: { ...report, findings: [{ url: "bad", httpStatus: "404" }] } }));
-  await page.goto("/"); await fill(page);
-  await page.getByRole("button", { name: "Run AI Audit", exact: true }).click();
-  await expect(page.locator("main").getByRole("alert")).toContainText("unexpected report");
-  await expect(page.getByTestId("health-score")).toHaveCount(0);
-  await page.unroute("**/api/audit");
-  await page.route("**/api/audit", (route) => route.abort("failed"));
-  await page.getByRole("button", { name: "Run AI Audit", exact: true }).click();
-  await expect(page.locator("main").getByRole("alert")).toContainText("Connection lost");
-  await expect(page.getByRole("button", { name: "Run AI Audit", exact: true })).toBeEnabled();
-  expect(crashes).toEqual([]);
-});
-
-test("a stalled audit stops the spinner and explains that the server may still be running", async ({ page }) => {
-  await page.clock.install();
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => { release = resolve; });
-  await page.route("**/api/audit", async (route) => { await gate; await route.abort("aborted").catch(() => {}); });
-  await page.goto("/"); await fill(page);
-  await page.getByRole("button", { name: "Run AI Audit", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Running your audit...", exact: true })).toBeDisabled();
-  await page.clock.fastForward(180_001);
-  await expect(page.locator("main").getByRole("alert")).toContainText("may still be running");
-  await expect(page.getByRole("button", { name: "Run AI Audit", exact: true })).toBeEnabled();
-  release();
-});
-
-const hydrationFailures = new WeakMap<Page, string[]>();
-test.beforeEach(({ page }) => {
-  const failures: string[] = [];
-  hydrationFailures.set(page, failures);
-  page.on("console", (message) => { if (/hydration|hydrated.*match/i.test(message.text())) failures.push(message.text()); });
-  page.on("pageerror", (error) => failures.push(error.message));
-});
-test.afterEach(({ page }) => { expect(hydrationFailures.get(page)).toEqual([]); });
-
-test("unsaved reports remain visible and never claim database success", async ({ page }) => {
-  await page.route("**/api/audit", (route) => route.fulfill({status: 200, json: {...report, auditId: null, persistence: {status: "failed"}, status: "partial", warnings: ["Database save could not be verified."]}}));
-  await page.goto("/"); await fill(page);
-  await page.getByRole("button", {name: "Run AI Audit", exact: true}).click();
-  await expect(page.getByTestId("health-score")).toBeVisible();
-  await expect(page.getByText("Report not saved to history", {exact: false})).toBeVisible();
-  await expect(page.getByText("Saved to your audit history", {exact: false})).toHaveCount(0);
-});
-
-test("empty and private/malformed domains are stopped before the API", async ({ page }) => {
-  let calls=0;
-  await page.route("**/api/audit", (route)=>{ calls++; return route.abort(); });
-  await page.goto("/");
-  await page.getByRole("button", {name: "Run AI Audit", exact: true}).click();
-  expect(await page.getByLabel("Your website domain").evaluate((input: HTMLInputElement)=>input.validity.valueMissing)).toBe(true);
-  for (const domain of ["127.1", "-invalid.com", "a..com"]) {
-    await page.getByLabel("Your website domain").fill(domain);
-    await page.getByRole("button", {name: "Run AI Audit", exact: true}).click();
-    await expect(page.locator("main").getByRole("alert")).toContainText("Enter a domain");
-  }
-  expect(calls).toBe(0);
-});
-
-test("clipboard denial shows a useful fallback instead of a runtime error", async ({ page }) => {
-  await page.route("**/api/redirect-export", route => route.fulfill({ status: 200, json: { content: 'Redirect 301 "/old-pricing" "https://example.com/pricing"' } }));
-  await page.addInitScript(() => { Object.defineProperty(navigator, "clipboard", {value: {writeText: async () => { throw new DOMException("Permission denied", "NotAllowedError"); }}}); });
-  await page.route("**/api/audit", (route) => route.fulfill({status:201,json:report}));
-  await page.goto("/"); await fill(page);
-  await page.getByRole("button", {name:"Run AI Audit",exact:true}).click();
-  await page.getByRole("button", {name:"Copy 301 Rule for https://example.com/old-pricing",exact:true}).click();
-  await expect(page.locator("main").getByRole("alert")).toContainText("Clipboard access is unavailable");
-  await expect(page.getByText("Copied!", {exact:true})).toHaveCount(0);
+test("weekly cron still requires its private bearer token", async ({ request }) => {
+  const response = await request.get("/api/cron/weekly-scan");
+  expect(response.status()).toBe(401);
 });

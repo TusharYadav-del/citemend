@@ -245,4 +245,4 @@ The configured sender currently uses Resend's sandbox domain and did not appear 
 - [x] Verify all 87 unit and regression tests, lint, and production build with zero errors.
 - [x] Check the local development server. The dashboard redirects signed-out visitors as expected.
 
-The existing browser suite assumes an anonymous audit form and therefore its signed-in audit cases cannot run against the current Clerk-protected app without an authenticated fixture. Redirect suggestions are not deployed automatically, so the metric is labeled "Redirects ready."
+The browser suite now checks the current anonymous sign-in gate, responsive layout, dashboard redirect, and protected APIs; all six tests pass. Signed-in audit behavior remains covered by focused tests and needs an authenticated Clerk browser fixture for a future end-to-end browser check. Redirect suggestions are not deployed automatically, so the metric is labeled "Redirects ready."
