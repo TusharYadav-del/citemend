@@ -223,7 +223,7 @@ Recovery: Ask Codex to inspect and undo the specific broken change.
 The hosted migration and extension activation are recorded from the user's confirmation. Production billing webhook setup remains deferred until Vercel deployment as agreed. See docs/WEEKLY_SCANS.md for the remaining activation and verification steps.
 Recovery: Ask Codex to inspect and undo the specific broken change.
 
-## Day 18: Weekly Pro email alerts (IMPLEMENTED; LIVE DELIVERY PENDING VERCEL)
+## Day 18: Weekly Pro email alerts (COMPLETED; PRODUCTION DELIVERY PENDING VERCEL)
 
 - [x] Add Resend-backed HTML and text digests for newly confirmed weekly 404 citations, with verified same-domain 301 suggestions and public report links.
 - [x] Resolve each Pro recipient through their primary Clerk email, escape report content, and use one durable digest per user and weekly run.
@@ -231,6 +231,18 @@ Recovery: Ask Codex to inspect and undo the specific broken change.
 - [x] Keep weekly runs open until digest delivery or skip is recorded; use a stable Resend idempotency key on retries.
 - [x] Document sender verification and deployment settings without claiming Groq/Tavily results came specifically from ChatGPT or Perplexity.
 - [x] Pass all 86 regression tests, npm run lint, and npm run build with zero errors; local cron route still rejects anonymous requests.
-- [ ] Apply migration 006 in hosted Supabase, configure a verified Resend sender and API key, and verify a real Pro alert after Vercel deployment.
+- [x] Apply migration 006 in hosted Supabase; the user confirmed the SQL Editor migration succeeded.
+- [x] Add RESEND_API_KEY and RESEND_FROM_EMAIL to ignored .env.local; the Resend API key authenticated successfully.
+- [ ] Configure a verified custom sender domain for production email and verify a real Pro alert after Vercel deployment.
 
-Production email delivery remains pending until the Resend account and deployed weekly scheduler are configured.
+The configured sender currently uses Resend's sandbox domain and did not appear among the account's verified domains. No email was sent during this check. Production email delivery remains pending until a verified sender and the deployed weekly scheduler are configured.
+
+## Day 19: Dashboard polish and UI enhancements (COMPLETED)
+
+- [x] Install the shadcn Sonner component and show accessible toast feedback for 301 copy, Pro upgrade prompts, checkout handoff, and failures.
+- [x] Add responsive dashboard cards for total saved scans, current 404s from each domain's latest scan, and redirects ready to apply.
+- [x] Add a dashboard loading skeleton while the owner-scoped history loads.
+- [x] Verify all 87 unit and regression tests, lint, and production build with zero errors.
+- [x] Check the local development server. The dashboard redirects signed-out visitors as expected.
+
+The existing browser suite assumes an anonymous audit form and therefore its signed-in audit cases cannot run against the current Clerk-protected app without an authenticated fixture. Redirect suggestions are not deployed automatically, so the metric is labeled "Redirects ready."

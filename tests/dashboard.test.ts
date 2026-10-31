@@ -1,6 +1,8 @@
 ﻿import assert from "node:assert/strict";
 import { test } from "node:test";
 import { citationHealth, normalizeDashboardDomain, redirectRule } from "../lib/audit-dashboard";
+import { historyMetrics } from "../lib/history-metrics";
+import type { UserAuditHistoryItem } from "../lib/audit-history";
 const finding = (httpStatus: number | null) => ({ url: "https://example.com/page", httpStatus, error: null, suggestedRedirect: null });
 test("citation health excludes unknowns and returns no score without evidence", () => {
   assert.deepEqual(citationHealth([finding(200), finding(404), finding(500), finding(null)]), { score: 33, verified: 3, healthy: 1, unknown: 1 });
@@ -26,4 +28,18 @@ test("accepts explicit unsaved reports and rejects contradictory persistence sta
   assert.equal(parseDashboardReport(report).auditId, null);
   assert.throws(() => parseDashboardReport({...report, persistence: {status: "saved"}}));
   assert.throws(() => parseDashboardReport({...report, auditId: "pretend-id"}));
+});
+
+test("history cards count current 404s and ready redirects from each domain's latest scan", () => {
+  const audit = (id: string, domain: string, date: string, links: UserAuditHistoryItem["broken_links"]): UserAuditHistoryItem => ({ id, domain, created_at: date, status: "completed", broken_links: links });
+  const oldLink = { id: "old", cited_url: "https://example.com/old", http_status: 404, suggested_redirect: null };
+  const currentLink = { id: "current", cited_url: "https://example.com/current", http_status: 404, suggested_redirect: "https://example.com/new" };
+  const unresolved = { id: "unresolved", cited_url: "https://example.com/unresolved", http_status: 404, suggested_redirect: null };
+  const healthy = { id: "healthy", cited_url: "https://example.com/healthy", http_status: 200, suggested_redirect: null };
+  assert.deepEqual(historyMetrics([
+    audit("older", "example.com", "2026-01-01T00:00:00Z", [oldLink]),
+    audit("other", "other.com", "2026-01-03T00:00:00Z", [unresolved]),
+    audit("latest", "example.com", "2026-01-02T00:00:00Z", [currentLink, healthy]),
+  ]), { totalScans: 3, active404s: 2, redirectsReady: 1 });
+  assert.deepEqual(historyMetrics([]), { totalScans: 0, active404s: 0, redirectsReady: 0 });
 });

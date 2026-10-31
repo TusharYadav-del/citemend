@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { citationHealth, normalizeDashboardDomain, parseDashboardReport, type DashboardReport } from "@/lib/audit-dashboard";
 import UpgradeModal from "@/components/upgrade-modal";
+import { toast } from "sonner";
 
 const subscribeToHydration = () => () => {};
 
@@ -56,7 +57,7 @@ export default function AuditDashboard({ liveEnabled, clerkConfigured }: { liveE
     try {
       const response = await fetch("/api/audit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ domain: cleanDomain, buyerPrompt: prompt.trim() }), signal: controller.signal });
       const data = await response.json().catch(() => null);
-      if (response.status === 403 && data?.code === "PRO_REQUIRED") { setUpgrade(true); return; }
+      if (response.status === 403 && data?.code === "PRO_REQUIRED") { setUpgrade(true); toast.info("Upgrade to Pro to copy 301 redirects."); return; }
       if (!response.ok) throw new Error(response.status === 429 && data?.code !== "AUDIT_IN_PROGRESS" ? "The AI provider is rate limiting requests. Wait a moment before trying again." : typeof data?.error === "string" ? data.error : "The audit could not finish. Please try again.");
       setReport(parseDashboardReport(data));
     } catch (cause) {
@@ -78,7 +79,8 @@ export default function AuditDashboard({ liveEnabled, clerkConfigured }: { liveE
       try { await navigator.clipboard.writeText(data.content); }
       catch { throw new Error("Clipboard access is unavailable. Please allow clipboard access and try again."); }
       setCopied(url);
-    } catch (cause) { setCopyError(cause instanceof Error ? cause.message : "Could not copy the redirect."); }
+      toast.success("301 rule copied to clipboard.");
+    } catch (cause) { const message = cause instanceof Error ? cause.message : "Could not copy the redirect."; setCopyError(message); toast.error(message); }
   }
   const health = report ? citationHealth(report.findings) : null;
   const broken = report?.findings.filter((finding) => finding.httpStatus === 404) ?? [];

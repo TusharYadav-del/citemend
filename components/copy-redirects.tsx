@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import type { RedirectExportFormat } from "@/lib/redirect-export";
 import UpgradeModal from "@/components/upgrade-modal";
 
@@ -35,14 +36,18 @@ export default function CopyRedirects({
       const data: { content?: string; error?: string; code?: string } = await response.json();
       if (response.status === 401 || response.status === 403) {
         setUpgrade(response.status === 401 ? "signed-out" : "signed-in");
+        toast.info("Upgrade to Pro to copy 301 redirects.");
         return;
       }
       if (!response.ok || typeof data.content !== "string") throw new Error(data.error || "Redirect export is temporarily unavailable.");
       try { await navigator.clipboard.writeText(data.content); }
       catch { throw new Error("Clipboard access is unavailable. Please allow clipboard access and try again."); }
       setMessage("Redirects copied to clipboard.");
+      toast.success("301 redirects copied to clipboard.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not copy redirects. Please try again.");
+      const message = error instanceof Error ? error.message : "Could not copy redirects. Please try again.";
+      setMessage(message);
+      toast.error(message);
     } finally { setPending(false); }
   }
 

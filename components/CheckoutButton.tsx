@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 
 export default function CheckoutButton() {
   const [pending, setPending] = useState(false);
@@ -19,9 +20,12 @@ export default function CheckoutButton() {
           : "Checkout is temporarily unavailable. Please try again.";
         throw new Error(message);
       }
+      toast.info("Opening secure checkout for CiteMend Pro.");
       window.location.assign((result as { checkoutUrl: string }).checkoutUrl);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Checkout is temporarily unavailable. Please try again.");
+      const message = cause instanceof Error ? cause.message : "Checkout is temporarily unavailable. Please try again.";
+      setError(message);
+      toast.error(message);
       setPending(false);
     }
   }
