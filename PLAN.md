@@ -312,3 +312,14 @@ Rules can take up to five seconds to update at an edge location. No live hostnam
 - [ ] Replace the development Clerk keys with production instance keys in Vercel Production and verify browser sign-in. An anonymous `/dashboard` request currently receives Clerk's `protect-rewrite` 404 with the development keys.
 
 The current Lemon Squeezy configuration remains in test mode. The production webhook signing secret and verified Resend sender are still pending as recorded in Days 15, 18, and 20. The weekly scheduler is also pending from Day 17. These integrations should be verified after their production credentials and external configuration are ready.
+
+## Day 26: Product Hunt and launch copy (KIT COMPLETED; PRODUCT HUNT DRAFT PENDING)
+
+- [x] Prepare Product Hunt name, tagline, short description, maker comment, topics, and pricing notes in `docs/DAY26_LAUNCH_KIT.md`.
+- [x] Create a 240 × 240 thumbnail, two 1270 × 760 gallery assets, and a real public homepage screenshot in `docs/launch-assets/`.
+- [x] Draft a five-post X thread, LinkedIn post, and candid Show HN submission using the Citemend name.
+- [x] Source the 51% figure to G2 with its exact B2B software-buyer and "more often than Google" scope; distinguish early Gemini prototyping from the active Groq/Tavily pipeline.
+- [x] Keep launch claims aligned with the current Cloudflare route, weekly scheduler, Resend sender, and production Clerk limitations.
+- [ ] Save an unpublished Product Hunt product draft. The old `/upcoming` URL returns 404; the current flow is Submit > New Product > Create Draft. The account browser was unavailable from this workspace, so the maker must save the prepared draft and share its URL for verification.
+- [x] Verify five X posts fit the character limit, the Product Hunt image sizes, `npm run lint`, and `npm run build` with zero errors.
+- [x] Save the launch kit in Git and confirm a clean working tree.
