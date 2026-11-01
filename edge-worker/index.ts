@@ -1,6 +1,8 @@
 export interface WorkerEnv {
   REDIRECTS: KVNamespace;
   ORIGIN_URL?: string;
+  SUPABASE_URL?: string;
+  SUPABASE_ANON_KEY?: string;
 }
 
 type RedirectRule = { active: boolean; destination: string };
@@ -38,6 +40,31 @@ function destinationFor(value: string | null, source: URL): URL | null {
   }
 }
 
+async function activeRule(url: URL, env: WorkerEnv): Promise<string | null> {
+  if (env.SUPABASE_URL || env.SUPABASE_ANON_KEY) {
+    if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return null;
+    const project = new URL(env.SUPABASE_URL);
+    if (project.protocol !== "https:") return null;
+    const api = new URL("/rest/v1/redirect_rules", project);
+    api.searchParams.set("select", "destination");
+    api.searchParams.set("source_host", `eq.${url.hostname.toLowerCase()}`);
+    api.searchParams.set("source_path", `eq.${url.pathname}`);
+    api.searchParams.set("active", "eq.true");
+    api.searchParams.set("limit", "1");
+    const response = await fetch(api, {
+      headers: { apikey: env.SUPABASE_ANON_KEY, Accept: "application/json" },
+      cf: { cacheEverything: true, cacheTtl: 5 },
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!response.ok) return null;
+    const rows: unknown = await response.json();
+    if (!Array.isArray(rows) || rows.length !== 1 || !rows[0] || typeof rows[0] !== "object") return null;
+    const destination = (rows[0] as { destination?: unknown }).destination;
+    return typeof destination === "string" ? JSON.stringify({ active: true, destination }) : null;
+  }
+  return env.REDIRECTS.get(redirectKey(url));
+}
+
 export default {
   async fetch(request, env): Promise<Response> {
     const url = new URL(request.url);
@@ -48,7 +75,7 @@ export default {
 
     let value: string | null;
     try {
-      value = await env.REDIRECTS.get(redirectKey(url));
+      value = await activeRule(url, env);
     } catch {
       return originResponse;
     }

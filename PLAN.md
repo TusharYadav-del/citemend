@@ -279,3 +279,14 @@ No Cloudflare Worker implementation or deployment was started on Day 21.
 - [x] Complete Wrangler OAuth, create the hosted `citemend-redirects` KV namespace, and bind it as `REDIRECTS`.
 
 See `edge-worker/README.md` for local verification and account setup. The Worker is not deployed to a Cloudflare zone yet.
+
+## Day 23: Supabase-backed edge redirects (COMPLETED; ZONE ROUTE PENDING)
+
+- [x] Add the `redirect_rules` table with owner-only writes, anonymous read access limited to active routing columns, and a unique hostname/path key. The user confirmed migration 007 succeeded in the hosted SQL Editor.
+- [x] Add a Pro-only dashboard action to publish verified same-domain 301 suggestions and allow owners to disable them.
+- [x] Make the Worker query active rules through Supabase REST using its low-privilege public key. Use a five-second edge cache and fail open without using stale KV data when Supabase is unavailable.
+- [x] Set `SUPABASE_URL` and `SUPABASE_ANON_KEY` as Cloudflare Worker secrets; upload the Worker code with no zone route attached.
+- [x] Verify hosted anonymous REST lookup returns HTTP 200 and denies the private owner column with HTTP 401. A temporary hosted rule produced a local Worker 301, then a 404 after deactivation; the rule was removed.
+- [x] Pass Worker tests and TypeScript, all existing regression and browser tests, root lint, and production build.
+
+Rules can take up to five seconds to update at an edge location. No live hostname is routed through this Worker yet; domain control must be verified before attaching a customer zone route.

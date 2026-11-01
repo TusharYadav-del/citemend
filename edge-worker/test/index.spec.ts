@@ -72,6 +72,43 @@ describe("edge redirect interceptor", () => {
 		expect((await worker.fetch(new IncomingRequest(source), env, createExecutionContext())).status).toBe(404);
 	});
 
+	it("reads active redirect rules from Supabase REST when configured", async () => {
+		const { env, get } = setup(404);
+		env.SUPABASE_URL = "https://database.supabase.co";
+		env.SUPABASE_ANON_KEY = "test-publishable-key";
+		const fetchMock = vi.fn(async (input: Request | URL, init?: RequestInit) => {
+			if (String(input).includes("/rest/v1/redirect_rules")) {
+				const api = new URL(String(input));
+				expect(api.searchParams.get("source_host")).toBe("eq.example.com");
+				expect(api.searchParams.get("source_path")).toBe("eq./old");
+				expect(api.searchParams.get("active")).toBe("eq.true");
+				expect(init?.headers).toMatchObject({ apikey: "test-publishable-key" });
+				expect(init?.headers).not.toHaveProperty("Authorization");
+				return Response.json([{ destination: "https://example.com/new" }]);
+			}
+			return new Response("origin", { status: 404 });
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		expect((await worker.fetch(new IncomingRequest(source), env, createExecutionContext())).status).toBe(301);
+		expect(get).not.toHaveBeenCalled();
+	});
+
+	it("does not use stale KV data when Supabase returns no active rule or errors", async () => {
+		const { env, get } = setup(404);
+		env.SUPABASE_URL = "https://database.supabase.co";
+		env.SUPABASE_ANON_KEY = "test-publishable-key";
+		vi.stubGlobal("fetch", vi.fn(async (input: Request | URL) => String(input).includes("/rest/v1/redirect_rules")
+			? Response.json([])
+			: new Response("origin", { status: 404 })));
+		expect((await worker.fetch(new IncomingRequest(source), env, createExecutionContext())).status).toBe(404);
+		expect(get).not.toHaveBeenCalled();
+		vi.stubGlobal("fetch", vi.fn(async (input: Request | URL) => String(input).includes("/rest/v1/redirect_rules")
+			? new Response("unavailable", { status: 503 })
+			: new Response("origin", { status: 404 })));
+		expect((await worker.fetch(new IncomingRequest(source), env, createExecutionContext())).status).toBe(404);
+		expect(get).not.toHaveBeenCalled();
+	});
+
 	it("matches only the named AI referrer hosts", () => {
 		for (const host of ["chatgpt.com", "perplexity.ai", "claude.ai", "gemini.google.com", "www.chatgpt.com"]) {
 			expect(isAiReferrer(`https://${host}/answer`)).toBe(true);

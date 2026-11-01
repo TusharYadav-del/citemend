@@ -8,6 +8,8 @@ import CheckoutButton from "@/components/CheckoutButton";
 import WeeklyMonitoring from "@/components/weekly-monitoring";
 import { hasProSubscription } from "@/lib/subscription";
 import { historyMetrics } from "@/lib/history-metrics";
+import { createServerDatabase } from "@/lib/supabase-server";
+import PublishRedirect from "@/components/publish-redirect";
 
 function HistoryLoading() {
   return <main className="mx-auto w-full max-w-5xl px-5 py-10 sm:px-8 sm:py-14" role="status" aria-label="Loading your audit history"><div className="h-8 w-52 animate-pulse rounded-lg bg-[#e9eee4]" /><div className="mt-8 grid gap-4 sm:grid-cols-3">{[0, 1, 2].map((item) => <div key={item} className="h-32 animate-pulse rounded-2xl bg-[#f1f4ed]" />)}</div><div className="mt-8 h-36 animate-pulse rounded-2xl bg-[#f1f4ed]" /><span className="sr-only">Loading your audit history...</span></main>;
@@ -27,7 +29,12 @@ function HistoryUnavailable() {
   return <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"><h2 className="font-semibold">Audit history is not ready</h2><p className="mt-2 text-sm leading-6">Apply `supabase/migrations/002_audit_user_ownership.sql` in the Supabase SQL Editor, then reload this page.</p></div>;
 }
 
-function AuditCard({ audit }: { audit: UserAuditHistoryItem }) {
+function ruleKey(value: string): string | null {
+  try { const url = new URL(value); return `${url.hostname.toLowerCase()}:${url.pathname}`; }
+  catch { return null; }
+}
+
+function AuditCard({ audit, isPro, activeRules }: { audit: UserAuditHistoryItem; isPro: boolean | null; activeRules: Set<string> }) {
   const brokenLinks = audit.broken_links ?? [];
   return (
     <article className="rounded-2xl border border-[#dfe5dc] bg-white p-5 shadow-sm sm:p-6">
@@ -47,6 +54,7 @@ function AuditCard({ audit }: { audit: UserAuditHistoryItem }) {
               <li key={link.id} className="rounded-lg bg-[#f7f8f4] p-3 text-xs">
                 <p className="break-all font-medium">{link.cited_url} <span className="text-red-700">HTTP {link.http_status}</span></p>
                 {link.suggested_redirect && <p className="mt-2 break-all text-[#456936]">Suggested destination: {link.suggested_redirect}</p>}
+                {link.http_status === 404 && link.suggested_redirect && ruleKey(link.cited_url) && <PublishRedirect linkId={link.id} initiallyActive={activeRules.has(ruleKey(link.cited_url)!)} isPro={isPro} />}
               </li>
             ))}
           </ul>
@@ -67,6 +75,12 @@ async function UserAuditHistory() {
   try { audits = await getUserAuditHistory(userId); }
   catch { return <HistoryUnavailable />; }
 
+  let activeRules = new Set<string>();
+  try {
+    const { data, error } = await createServerDatabase().from("redirect_rules").select("source_host,source_path").eq("user_id", userId).eq("active", true);
+    if (!error) activeRules = new Set((data ?? []).map((rule) => `${rule.source_host}:${rule.source_path}`));
+  } catch {}
+
   return (
     <main className="mx-auto w-full max-w-5xl px-5 py-10 sm:px-8 sm:py-14">
       <header className="mb-10 flex flex-wrap items-center justify-between gap-4 border-b border-[#dfe5dc] pb-6">
@@ -75,8 +89,9 @@ async function UserAuditHistory() {
       </header>
       <MetricCards audits={audits} />
       <WeeklyMonitoring isPro={isPro} />
+      <p className="mb-6 rounded-xl border border-[#dfe5dc] bg-[#f7f8f4] p-4 text-xs leading-5 text-[#68736b]">Pro users can publish or disable verified 301 suggestions below. Rules become active when the Cloudflare Worker is attached to the domain; edge lookups can retain a change for up to five seconds.</p>
       <p className="mb-6 rounded-xl border border-[#dfe5dc] bg-[#f7f8f4] p-4 text-xs leading-5 text-[#68736b]">Audits created before account ownership was enabled have no associated user and are not assigned to an account automatically.</p>
-      {audits.length ? <div className="space-y-4">{audits.map((audit) => <AuditCard key={audit.id} audit={audit} />)}</div> : <section className="rounded-2xl border border-dashed border-[#d6dfce] px-6 py-14 text-center"><h2 className="text-base font-semibold">No audits saved yet</h2><p className="mt-2 text-sm text-[#85907e]">Run an audit and it will appear here.</p><Link href="/#audit" className="mt-5 inline-flex rounded-lg bg-[#214d39] px-5 py-3 text-sm font-medium text-white">Run an audit</Link></section>}
+      {audits.length ? <div className="space-y-4">{audits.map((audit) => <AuditCard key={audit.id} audit={audit} isPro={isPro} activeRules={activeRules} />)}</div> : <section className="rounded-2xl border border-dashed border-[#d6dfce] px-6 py-14 text-center"><h2 className="text-base font-semibold">No audits saved yet</h2><p className="mt-2 text-sm text-[#85907e]">Run an audit and it will appear here.</p><Link href="/#audit" className="mt-5 inline-flex rounded-lg bg-[#214d39] px-5 py-3 text-sm font-medium text-white">Run an audit</Link></section>}
     </main>
   );
 }
