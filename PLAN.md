@@ -299,14 +299,15 @@ Rules can take up to five seconds to update at an edge location. No live hostnam
 - [x] Show clearly labeled founding-customer placeholders without inventing endorsements, and compare CiteFix Pro at $39/month with Ahrefs Brand Radar's $199/month AI Visibility Index while noting Ahrefs Custom Prompts starts at $50/month.
 - [x] Verify a live local preview for `example.com`, desktop/mobile layout, 94 regression tests, seven browser tests, lint, and production build.
 
-## Day 25: Vercel production deployment (DEPLOYED; INTEGRATION CHECKS PENDING)
+## Day 25: Vercel production deployment (DEPLOYED; LIVE AUTH PENDING)
 
-- [x] Create and link the Vercel `citefix` project to this repository; set the Next.js framework preset and Node.js 24.x.
+- [x] Create and link the Vercel project to this repository; correct its name to `citemend`, and set the Next.js framework preset and Node.js 24.x.
 - [x] Configure all existing application variables from the ignored `.env.local` in Vercel Production without committing their values. Set `NEXT_PUBLIC_APP_URL` to the stable production origin.
-- [x] Deploy and verify the production build is Ready at https://citefix-three.vercel.app. Disable Vercel Authentication so the public site is reachable.
+- [x] Deploy and verify the production build is Ready; move the public origin to https://citemend.vercel.app. Disable Vercel Authentication so the public site is reachable.
 - [x] Verify the anonymous homepage and read-only preview return HTTP 200; the audit and cron APIs reject unauthenticated requests.
 - [x] Run local lint and production build with zero errors.
-- [ ] Connect the GitHub repository in Vercel Settings > Git. `vercel git connect` currently reports that the Vercel account cannot access `TusharYadav-del/citemend`; GitHub app authorization is needed before `main` pushes can auto-deploy.
+- [x] Connect the GitHub repository in Vercel Settings > Git. After the user authorized the app, Vercel CLI confirmed `TusharYadav-del/citemend` is connected.
+- [ ] Verify a new `main` push triggers a Ready production deployment.
 - [ ] Replace the development Clerk keys with production instance keys in Vercel Production and verify browser sign-in. An anonymous `/dashboard` request currently receives Clerk's `protect-rewrite` 404 with the development keys.
 
 The current Lemon Squeezy configuration remains in test mode. The production webhook signing secret and verified Resend sender are still pending as recorded in Days 15, 18, and 20. The weekly scheduler is also pending from Day 17. These integrations should be verified after their production credentials and external configuration are ready.
