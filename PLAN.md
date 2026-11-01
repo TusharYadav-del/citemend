@@ -323,3 +323,11 @@ The current Lemon Squeezy configuration remains in test mode. The production web
 - [ ] Save an unpublished Product Hunt product draft. The old `/upcoming` URL returns 404; the current flow is Submit > New Product > Create Draft. The account browser was unavailable from this workspace, so the maker must save the prepared draft and share its URL for verification.
 - [x] Verify five X posts fit the character limit, the Product Hunt image sizes, `npm run lint`, and `npm run build` with zero errors.
 - [x] Save the launch kit in Git and confirm a clean working tree.
+
+## Closed Pro design-partner beta (CODE COMPLETE; HOSTED ACTIVATION PENDING)
+
+- [x] Require a signed-in Clerk account and its primary email for beta requests. Grant 30 days of Pro only to `BETA_INVITED_EMAILS`; keep other accounts in `pending_beta` without Pro quota.
+- [x] Store invited, pending, and expired beta states in `subscriptions` alongside paid Lemon Squeezy rows. Keep paid subscriptions untouched and preserve checkout when live billing is explicitly enabled.
+- [x] Enforce beta expiry in server Pro checks and weekly target selection; persist `expired` without deleting accounts or records. Show active, pending, expired, and free states in the upgrade UI.
+- [x] Verify invited, waitlisted, paid, non-renewal, and expiration paths with automated tests; pass lint and production build.
+- [ ] Apply `supabase/migrations/008_design_partner_beta.sql` in the hosted Supabase SQL Editor and set `BETA_INVITED_EMAILS` in Vercel Production. Production Clerk keys and browser sign-in verification remain pending from Day 25.

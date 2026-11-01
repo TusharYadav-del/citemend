@@ -1,7 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { createServerDatabase } from "./supabase-server";
-import { grantsProAccess } from "./subscription";
+import { grantsProAccess, isMissingBetaColumns } from "./subscription";
 import { validateAuditInput } from "./audit-pipeline";
 import type { Database } from "./database.types";
 import type { DigestLink } from "./email";
@@ -51,12 +51,39 @@ export class WeeklyScanStore {
     const fallbackPrompt = process.env.WEEKLY_SCAN_PROMPT?.trim() || DEFAULT_WEEKLY_PROMPT;
     validateAuditInput({ domain: "example.com", buyerPrompt: fallbackPrompt });
     const users = new Set<string>();
+    const betaDomains: WeeklyTarget[] = [];
     for (let offset = 0; ; offset += PAGE_SIZE) {
-      const { data, error } = await this.db.from("subscriptions")
-        .select("id,user_id,status,cancelled,ends_at").order("id", { ascending: true }).range(offset, offset + PAGE_SIZE - 1);
-      if (error) throw new Error("Could not read subscriptions.");
-      for (const row of data ?? []) if (grantsProAccess(row, now.getTime())) users.add(row.user_id);
-      if (!data || data.length < PAGE_SIZE) break;
+      const current = await this.db.from("subscriptions")
+        .select("id,user_id,status,cancelled,ends_at,plan,current_period_end,domain").order("id", { ascending: true }).range(offset, offset + PAGE_SIZE - 1);
+      let rows;
+      if (isMissingBetaColumns(current.error)) {
+        const legacy = await this.db.from("subscriptions")
+          .select("id,user_id,status,cancelled,ends_at").order("id", { ascending: true }).range(offset, offset + PAGE_SIZE - 1);
+        if (legacy.error) throw new Error("Could not read subscriptions.");
+        rows = legacy.data ?? [];
+      } else {
+        if (current.error) throw new Error("Could not read subscriptions.");
+        rows = current.data ?? [];
+      }
+      for (const row of rows) {
+        if (!grantsProAccess(row, now.getTime())) {
+          if ("plan" in row && row.plan === "pro_beta" && row.status === "active" && "current_period_end" in row && typeof row.current_period_end === "string" && Date.parse(row.current_period_end) <= now.getTime()) {
+            const { error } = await this.db.from("subscriptions").update({ status: "expired", updated_at: now.toISOString() })
+              .eq("id", row.id).eq("plan", "pro_beta").eq("status", "active").lte("current_period_end", now.toISOString());
+            if (error) throw new Error("Could not expire beta subscription.");
+          }
+          continue;
+        }
+        users.add(row.user_id);
+        if (!("plan" in row) || row.plan !== "pro_beta" || !("domain" in row) || typeof row.domain !== "string") continue;
+        try {
+          const input = validateAuditInput({ domain: row.domain, buyerPrompt: fallbackPrompt });
+          betaDomains.push({ user_id: row.user_id, domain: input.domain, buyer_prompt: input.buyerPrompt });
+        } catch {
+          // An invalid historic beta domain is excluded from scheduled scans.
+        }
+      }
+      if (rows.length < PAGE_SIZE) break;
     }
     if (!users.size) return [];
     const targets = new Map<string, WeeklyTarget>();
@@ -78,6 +105,10 @@ export class WeeklyScanStore {
         }
       }
       if (!data || data.length < PAGE_SIZE) break;
+    }
+    for (const target of betaDomains) {
+      const key = JSON.stringify([target.user_id, target.domain]);
+      if (!targets.has(key)) targets.set(key, target);
     }
     return [...targets.values()];
   }

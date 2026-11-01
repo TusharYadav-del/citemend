@@ -1,5 +1,22 @@
 import "server-only";
 
+export function isBillingEnabled(): boolean {
+  return Boolean(process.env.LEMONSQUEEZY_CHECKOUT_URL?.trim())
+    || process.env.LEMONSQUEEZY_LIVE_BILLING_ENABLED === "true"
+    || (process.env.NODE_ENV === "development" && process.env.LEMON_SQUEEZY_TEST_MODE === "true");
+}
+
+export function configuredCheckoutUrl(userId: string): string | null {
+  const raw = process.env.LEMONSQUEEZY_CHECKOUT_URL?.trim();
+  if (!raw) return null;
+  const url = new URL(raw);
+  if (url.protocol !== "https:" || !(url.hostname === "lemonsqueezy.com" || url.hostname.endsWith(".lemonsqueezy.com"))) {
+    throw new Error("Lemon Squeezy checkout URL is invalid.");
+  }
+  url.searchParams.set("checkout[custom][user_id]", userId);
+  return url.href;
+}
+
 export async function createLemonSqueezyCheckout(userId: string, testMode = false) {
   if (testMode && process.env.NODE_ENV === "production") throw new Error("Test-mode checkout is development-only.");
   const apiKey = (process.env.LEMON_SQUEEZY_API_KEY || process.env.LEMONSQUEEZY_API_KEY)?.trim();
