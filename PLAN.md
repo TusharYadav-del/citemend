@@ -324,10 +324,11 @@ The current Lemon Squeezy configuration remains in test mode. The production web
 - [x] Verify five X posts fit the character limit, the Product Hunt image sizes, `npm run lint`, and `npm run build` with zero errors.
 - [x] Save the launch kit in Git and confirm a clean working tree.
 
-## Closed Pro design-partner beta (CODE COMPLETE; HOSTED ACTIVATION PENDING)
+## Closed Pro design-partner beta (HOSTED CONFIGURATION COMPLETE; LIVE SIGN-IN PENDING)
 
 - [x] Require a signed-in Clerk account and its primary email for beta requests. Grant 30 days of Pro only to `BETA_INVITED_EMAILS`; keep other accounts in `pending_beta` without Pro quota.
 - [x] Store invited, pending, and expired beta states in `subscriptions` alongside paid Lemon Squeezy rows. Keep paid subscriptions untouched and preserve checkout when live billing is explicitly enabled.
 - [x] Enforce beta expiry in server Pro checks and weekly target selection; persist `expired` without deleting accounts or records. Show active, pending, expired, and free states in the upgrade UI.
 - [x] Verify invited, waitlisted, paid, non-renewal, and expiration paths with automated tests; pass lint and production build.
-- [ ] Apply `supabase/migrations/008_design_partner_beta.sql` in the hosted Supabase SQL Editor and set `BETA_INVITED_EMAILS` in Vercel Production. Production Clerk keys and browser sign-in verification remain pending from Day 25.
+- [x] Apply `supabase/migrations/008_design_partner_beta.sql` in the hosted Supabase SQL Editor and set `BETA_INVITED_EMAILS` in Vercel Production (user confirmed both on 2026-11-02).
+- [ ] Verify an invited account and a non-invited account in the production browser after the production Clerk keys are configured (Day 25 prerequisite).
