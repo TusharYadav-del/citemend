@@ -258,3 +258,13 @@ The browser suite now checks the current anonymous sign-in gate, responsive layo
 - [ ] Complete a test-mode payment and verify the hosted subscription, weekly scan, and Pro inbox delivery after Vercel webhook and scheduler deployment.
 
 See docs/DAY20_TESTING.md for repeatable commands and the limits of local verification.
+
+## Day 21: Week 3 retro and Cloudflare Worker preparation (COMPLETED)
+
+- [x] Review Week 3 billing, Pro gating, weekly scans, email delivery, and public report paths without changing completed features.
+- [x] Check `app/` and `lib/` for unused imports, console warnings, debug statements, and unfinished placeholders; keep the intentional generic cron error log.
+- [x] Remove an untracked temporary live-probe script left from an earlier verification.
+- [x] Record code integrity findings, pending deployment checks, and a scoped Cloudflare 404 listener architecture in docs/WEEK3_RETRO.md.
+- [x] Verify lint, TypeScript, regression tests, browser tests, and the production build with zero errors.
+
+No Cloudflare Worker implementation or deployment was started on Day 21.
