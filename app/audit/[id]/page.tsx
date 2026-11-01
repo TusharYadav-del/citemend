@@ -7,7 +7,7 @@ import { getPublicAudit } from "@/lib/public-audit";
 import CopyRedirects from "@/components/copy-redirects";
 
 export const metadata: Metadata = {
-  title: "Citation audit report | CiteFix AI",
+  title: "Citation audit report | Citemend AI",
   description: "A shareable report of saved broken AI citations and suggested redirects.",
   robots: { index: false, follow: false },
 };
@@ -29,9 +29,9 @@ async function AuditReport({ params }: { params: Promise<{ id: string }> }) {
   return (
     <>
       <aside className="rounded-2xl bg-[#214d39] p-6 text-white sm:p-8">
-        <p className="break-words text-lg font-semibold">Prepared for {audit.domain} by CiteFix AI.</p>
+        <p className="break-words text-lg font-semibold">Prepared for {audit.domain} by Citemend AI.</p>
         <p className="mt-2 text-sm leading-6 text-[#dfebd7]">Claim this domain to unlock automated weekly monitoring.</p>
-        <Link href="/#audit" className="mt-5 inline-flex rounded-lg bg-white px-5 py-3 text-sm font-semibold text-[#214d39]">Get started with CiteFix AI &rarr;</Link>
+        <Link href="/#audit" className="mt-5 inline-flex rounded-lg bg-white px-5 py-3 text-sm font-semibold text-[#214d39]">Get started with Citemend AI &rarr;</Link>
         <p className="mt-3 text-xs leading-5 text-[#dfebd7]">Sign in to run audits and view your workspace. Domain claiming is coming soon; weekly scans require Pro and an active schedule.</p>
       </aside>
       <header className="my-10">

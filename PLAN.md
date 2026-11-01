@@ -128,7 +128,7 @@ Recovery: Ask Codex to inspect and undo the specific broken change.
 
 ## Day 10: Public shareable audit reports (COMPLETED)
 
-- [x] Add public /audit/[id] executive reports with the requested CiteFix AI prospect banner.
+- [x] Add public /audit/[id] executive reports with the requested Citemend AI prospect banner.
 - [x] Fetch saved audit summaries and confirmed 404 links by validated UUID using server-only Supabase access; keep account identifiers private and RLS unchanged.
 - [x] Display redirect suggestions, snapshot limitations, partial/mock disclosures, loading, missing-report, and unavailable-report states.
 - [x] Add shareable report links to audit history while preserving Clerk workspace protection.
@@ -296,10 +296,10 @@ Rules can take up to five seconds to update at an edge location. No live hostnam
 - [x] Redesign the homepage with a live domain preview widget, stronger citation-recovery copy, founder-focused sections, a comparison, FAQ, and the requested BITS Pilani maker badge.
 - [x] Add a public read-only preview of homepage and default sitemap HTTP status without bypassing Clerk protection or the one-saved-audit free limit. Clearly distinguish this preview from the full AI citation audit.
 - [x] Keep the existing signed-in audit workspace and report flow intact; carry a previewed domain into the protected form.
-- [x] Show clearly labeled founding-customer placeholders without inventing endorsements, and compare CiteFix Pro at $39/month with Ahrefs Brand Radar's $199/month AI Visibility Index while noting Ahrefs Custom Prompts starts at $50/month.
+- [x] Show clearly labeled founding-customer placeholders without inventing endorsements, and compare Citemend Pro at $39/month with Ahrefs Brand Radar's $199/month AI Visibility Index while noting Ahrefs Custom Prompts starts at $50/month.
 - [x] Verify a live local preview for `example.com`, desktop/mobile layout, 94 regression tests, seven browser tests, lint, and production build.
 
-## Day 25: Vercel production deployment (DEPLOYED; LIVE AUTH PENDING)
+## Day 25: Vercel production deployment (COMPLETED; LIVE AUTH PENDING)
 
 - [x] Create and link the Vercel project to this repository; correct its name to `citemend`, and set the Next.js framework preset and Node.js 24.x.
 - [x] Configure all existing application variables from the ignored `.env.local` in Vercel Production without committing their values. Set `NEXT_PUBLIC_APP_URL` to the stable production origin.
@@ -307,7 +307,8 @@ Rules can take up to five seconds to update at an edge location. No live hostnam
 - [x] Verify the anonymous homepage and read-only preview return HTTP 200; the audit and cron APIs reject unauthenticated requests.
 - [x] Run local lint and production build with zero errors.
 - [x] Connect the GitHub repository in Vercel Settings > Git. After the user authorized the app, Vercel CLI confirmed `TusharYadav-del/citemend` is connected.
-- [ ] Verify a new `main` push triggers a Ready production deployment.
+- [x] Verify a new `main` push triggers a Ready production deployment under `citemend` and that https://citemend.vercel.app serves HTTP 200.
+- [x] Align the app, report, weekly email, tests, and plan with the Citemend name.
 - [ ] Replace the development Clerk keys with production instance keys in Vercel Production and verify browser sign-in. An anonymous `/dashboard` request currently receives Clerk's `protect-rewrite` 404 with the development keys.
 
 The current Lemon Squeezy configuration remains in test mode. The production webhook signing secret and verified Resend sender are still pending as recorded in Days 15, 18, and 20. The weekly scheduler is also pending from Day 17. These integrations should be verified after their production credentials and external configuration are ready.

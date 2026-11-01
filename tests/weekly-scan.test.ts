@@ -389,13 +389,13 @@ test("weekly digest renders escaped 404 details and only verified same-domain 30
   const message = renderWeeklyDigest([
     { domain: "example.com", cited_url: "https://example.com/old?x=<script>", suggested_redirect: "https://example.com/new", audit_id: "audit-1" },
     { domain: "example.com", cited_url: "https://example.com/missing", suggested_redirect: "https://attacker.test/steal", audit_id: "audit-1" },
-  ], "https://citefix.io");
+  ], "https://citemend.vercel.app");
   assert.match(message.html, /&lt;script&gt;/);
   assert.doesNotMatch(message.html, /<script>/);
   assert.match(message.text, /Redirect 301 "\/old" "https:\/\/example.com\/new"/);
   assert.match(message.text, /No verified replacement/);
   assert.doesNotMatch(message.text, /attacker\.test/);
-  assert.match(message.html, /https:\/\/citefix\.io\/audit\/audit-1/);
+  assert.match(message.html, /https:\/\/citemend\.vercel\.app\/audit\/audit-1/);
 });
 
 test("a completed weekly scan sends one account digest and records its provider ID", async () => {
