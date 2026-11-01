@@ -44,10 +44,9 @@ origin's 200. The test origin is only a fixture. Run `npm test -- --run` and
 
 ## Account setup before deployment
 
-The checked-in KV ID is an isolated **local-development ID**, not a hosted
-Cloudflare namespace. After Wrangler OAuth succeeds, create a real KV
-namespace and update the binding in `wrangler.jsonc`, then run
-`npm run cf-typegen`. A production Worker Route also needs a hostname in a
+The `REDIRECTS` binding points to the hosted `citemend-redirects` KV namespace.
+Local `wrangler dev` still uses isolated local KV data by default. A production
+Worker Route also needs a hostname in a
 Cloudflare zone with proxied DNS and an existing origin. Keep `ORIGIN_URL` in
 the ignored `.dev.vars` for local tests; in a zone route, `fetch(request)`
 forwards to that hostname's origin. No zone route or Worker is deployed by

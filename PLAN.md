@@ -269,13 +269,13 @@ See docs/DAY20_TESTING.md for repeatable commands and the limits of local verifi
 
 No Cloudflare Worker implementation or deployment was started on Day 21.
 
-## Day 22: Cloudflare Worker edge 404 interceptor (LOCAL IMPLEMENTATION COMPLETE)
+## Day 22: Cloudflare Worker edge 404 interceptor (COMPLETED)
 
 - [x] Initialize a standalone TypeScript Cloudflare Worker with Wrangler and a local KV binding.
 - [x] Forward requests to the origin and use an active KV rule to return a 301 when the origin responds 404 or the request has a ChatGPT, Perplexity, Claude, or Gemini referrer.
 - [x] Pass through requests without a valid rule; restrict destinations to HTTPS on the same hostname and fail open on KV errors.
 - [x] Verify local `wrangler dev` on port 8787 with seeded KV redirects, plus Worker tests and TypeScript checks.
 - [x] Keep the independent Worker types out of the Next.js type check; pass root lint and production build with zero errors.
-- [ ] Complete Wrangler OAuth and replace the local KV binding ID with a hosted Cloudflare KV namespace ID.
+- [x] Complete Wrangler OAuth, create the hosted `citemend-redirects` KV namespace, and bind it as `REDIRECTS`.
 
 See `edge-worker/README.md` for local verification and account setup. The Worker is not deployed to a Cloudflare zone yet.

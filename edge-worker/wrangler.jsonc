@@ -8,8 +8,7 @@
 	"main": "index.ts",
 	"compatibility_date": "2026-10-23",
 	"kv_namespaces": [
-		// Local development ID. Replace with a real namespace ID after Cloudflare login, before deployment.
-		{ "binding": "REDIRECTS", "id": "00000000000000000000000000000000" }
+		{ "binding": "REDIRECTS", "id": "f22e84d48be243fbbe690b68b2de177d" }
 	],
 	"workers_dev": false,
 	"observability": {
