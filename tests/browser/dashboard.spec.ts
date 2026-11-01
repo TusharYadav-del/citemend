@@ -13,12 +13,29 @@ test.afterEach(({ page }) => expect(browserErrors.get(page)).toEqual([]));
 
 test("public landing shows the sign-in gate without a fabricated audit score", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Catch Dead AI Links Before They Kill Your Organic Traffic.");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("AI sent them to your site. Did they hit a dead end?");
+  await expect(page.getByLabel("Domain for free preview")).toBeVisible();
   await expect(page.getByTestId("health-score")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Sign in to run your audit" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign in or create an account" })).toBeVisible();
   await expect(page.getByLabel("Your website domain")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Run AI Audit", exact: true })).toHaveCount(0);
+});
+
+test("free preview shows real check types and hands the domain to the protected audit", async ({ page }) => {
+  await page.route("**/api/preview", async (route) => route.fulfill({
+    status: 200, contentType: "application/json",
+    body: JSON.stringify({ domain: "example.com", homepageStatus: 200, sitemapStatus: 404, previewOnly: true }),
+  }));
+  await page.goto("/");
+  await page.getByLabel("Domain for free preview").fill("example.com");
+  await page.getByRole("button", { name: "Preview my site" }).click();
+  await expect(page.getByText("Quick check for example.com")).toBeVisible();
+  await expect(page.getByText("Homepage: Reachable · HTTP 200")).toBeVisible();
+  await expect(page.getByText("Default sitemap: Needs review · HTTP 404")).toBeVisible();
+  await page.getByRole("link", { name: "Continue to the full AI audit" }).click();
+  await expect(page).toHaveURL(/#audit$/);
+  await expect(page.getByRole("heading", { name: "Sign in to run your audit" })).toBeVisible();
 });
 
 test("mobile landing keeps the sign-in gate and navigation within the viewport", async ({ page }) => {

@@ -27,7 +27,7 @@ function ClerkAccountControl() {
   return isSignedIn ? <><a href="/dashboard" className="text-[#53704e] hover:underline">Audit history</a><UserButton /></> : <SignInButton mode="modal"><button type="button" className="rounded-full bg-[#214d39] px-4 py-2 text-white">Sign in</button></SignInButton>;
 }
 
-export default function AuditDashboard({ liveEnabled, clerkConfigured }: { liveEnabled: boolean; clerkConfigured: boolean }) {
+export default function AuditDashboard({ liveEnabled, clerkConfigured, embedded = false }: { liveEnabled: boolean; clerkConfigured: boolean; embedded?: boolean }) {
   const hydrated = useSyncExternalStore(subscribeToHydration, () => true, () => false);
   const [domain, setDomain] = useState("");
   const [prompt, setPrompt] = useState("What are the best solutions for my business, and where can I find their pricing and documentation?");
@@ -37,6 +37,14 @@ export default function AuditDashboard({ liveEnabled, clerkConfigured }: { liveE
   const [copied, setCopied] = useState<string | null>(null);
   const [copyError, setCopyError] = useState<string | null>(null);
   const [upgrade, setUpgrade] = useState(false);
+  useEffect(() => {
+    function usePreviewDomain(event: Event) {
+      const value = (event as CustomEvent<unknown>).detail;
+      if (typeof value === "string") setDomain(value);
+    }
+    window.addEventListener("citemend:preview-domain", usePreviewDomain);
+    return () => window.removeEventListener("citemend:preview-domain", usePreviewDomain);
+  }, []);
   useEffect(() => {
     if (!copied) return;
     const timer = setTimeout(() => setCopied(null), 2500);
@@ -86,20 +94,20 @@ export default function AuditDashboard({ liveEnabled, clerkConfigured }: { liveE
   const broken = report?.findings.filter((finding) => finding.httpStatus === 404) ?? [];
   const ready = broken.filter((finding) => finding.suggestedRedirect).length;
 
-  return <div className="audit-workspace min-h-screen bg-[#f7f8f4] text-[#182c25]">
+  return <div className={`audit-workspace bg-[#f7f8f4] text-[#182c25] ${embedded ? "py-14 sm:py-20" : "min-h-screen"}`}>
     <a href="#audit" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-white focus:p-4">Skip to audit form</a>
-    <header className="border-b border-[#dfe5dc] bg-[#fcfdf9]/95">
+    {!embedded && <header className="border-b border-[#dfe5dc] bg-[#fcfdf9]/95">
       <div className="mx-auto flex h-20 max-w-6xl items-center justify-between px-5 sm:px-8">
         <a href="#" aria-label="Citemend home" className="flex items-center gap-2.5 text-xl font-bold tracking-tight"><span className="grid size-9 place-items-center rounded-xl bg-[#173f32] text-[#d9f49a]"><Link2 className="size-5 -rotate-45" /></span>citemend<span className="mb-3 size-1.5 rounded-full bg-[#7ba751]" /></a>
         <nav aria-label="Main navigation" className="flex items-center gap-4 text-sm font-medium"><a href="#how-it-works" className="hidden text-[#657168] hover:text-[#173f32] sm:block">How it works</a><a href="#audit" className="flex items-center gap-2 rounded-full border border-[#d2dacc] bg-white px-4 py-2">Open workspace <ArrowUpRight className="size-3.5" /></a>{clerkConfigured && <ClerkAccountControl />}</nav>
       </div>
-    </header>
+    </header>}
     <main className="mx-auto max-w-6xl px-5 pb-16 sm:px-8">
-      <section className="relative pt-14 pb-10 sm:pt-20 sm:pb-14">
+      {!embedded && <section className="relative pt-14 pb-10 sm:pt-20 sm:pb-14">
         <div className="mb-6 flex items-center gap-2 text-[11px] font-semibold tracking-[.18em] text-[#53704e]"><span className="size-1.5 rounded-full bg-[#719758]" /> AI CITATION INTELLIGENCE <span className="mx-2 h-px w-8 bg-[#b9c8ae]" /></div>
         <h1 className="max-w-4xl text-[clamp(2.35rem,5.3vw,4.2rem)] leading-[1.06] font-semibold tracking-[-.055em]">Catch Dead AI Links Before They Kill Your <span className="text-[#658848]">Organic Traffic.</span></h1>
         <div className="mt-6 flex flex-wrap items-end justify-between gap-5"><p className="max-w-xl text-base leading-7 text-[#68736b]">AI is recommending your business. Make sure it sends people somewhere that works. Find broken citations and turn dead ends into the right next step.</p><a href="#audit" className="flex items-center gap-2 pb-1 text-sm font-medium">Find your dead ends <ArrowDown className="size-4" /></a></div>
-      </section>
+      </section>}
 
       <section id="audit" aria-labelledby="audit-heading" className="grid scroll-mt-8 gap-5 lg:grid-cols-[1.45fr_1fr]">
         <Card className="gap-0 rounded-2xl bg-white py-0 shadow-[0_8px_30px_-20px_#1d3c2a30] ring-[#dfe5dc]">
@@ -111,7 +119,7 @@ export default function AuditDashboard({ liveEnabled, clerkConfigured }: { liveE
             <p className="flex items-center justify-center gap-1.5 text-[10px] text-[#828d7e]"><ShieldCheck className="size-3" />{liveEnabled ? "Read-only website checks. No changes are made to your site." : "Live audits are available in the local workspace."}</p>
           </form></ClerkAuditAccess> : <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"><h3 className="font-semibold">Clerk setup is required to run audits</h3><p className="mt-2 text-xs leading-5">Create a Clerk application, enable Google and Email sign-in, then add its publishable and secret keys to your ignored .env.local file and restart the dev server.</p></div>}</CardContent>
         </Card>
-        <aside id="how-it-works" className="relative overflow-hidden rounded-2xl bg-[#183c2f] px-7 py-7 text-[#e8f1e1] sm:px-8">
+        <aside id={embedded ? undefined : "how-it-works"} className="relative overflow-hidden rounded-2xl bg-[#183c2f] px-7 py-7 text-[#e8f1e1] sm:px-8">
           <div className="pointer-events-none absolute -top-12 -right-12 size-48 rounded-full border border-[#365542]" /><div className="pointer-events-none absolute -top-5 -right-5 size-32 rounded-full border border-[#365542]" />
           <p className="relative text-[10px] font-medium tracking-[.2em] text-[#b8cf9e]">FROM MENTION TO DESTINATION</p><h2 className="relative mt-3 max-w-56 text-2xl leading-tight font-medium tracking-tight">Close the gap between AI visibility and real visits.</h2>
           <ol className="relative mt-8 space-y-6">{[{ icon: Search, title: "Discover the citations", detail: "Research how AI answers your buyer prompt." }, { icon: Link2, title: "Check the destination", detail: "Verify the HTTP status of your cited URLs." }, { icon: ArrowUpRight, title: "Find the way forward", detail: "Match 404s to verified live sitemap pages." }].map((step, index) => <li key={step.title} className="flex gap-4"><span className="grid size-8 shrink-0 place-items-center rounded-full border border-[#49624b] bg-[#244635] text-[#cde5aa]"><step.icon className="size-3.5" /></span><div><p className="text-xs font-medium"><span className="mr-2 text-[#82977c]">0{index + 1}</span>{step.title}</p><p className="mt-1 text-[11px] leading-5 text-[#a5b6a1]">{step.detail}</p></div></li>)}</ol>
@@ -141,7 +149,7 @@ export default function AuditDashboard({ liveEnabled, clerkConfigured }: { liveE
           <details className="rounded-xl border border-[#dfe5dc] bg-white px-5 py-4"><summary className="cursor-pointer text-xs font-medium">View AI answer & audit details</summary><p className="mt-4 text-xs leading-6 whitespace-pre-wrap text-[#687461]">{report.generatedText}</p><p className="mt-4 break-all text-[10px] text-[#8b9584]">Audit ID: {report.auditId ?? "Not saved"}</p></details>
         </div>}
       </section>
-      <footer className="mt-14 flex flex-wrap items-center justify-between gap-3 border-t border-[#dfe5dc] pt-6 text-[10px] text-[#929b8b]"><p>citemend <span className="mx-2">/</span> Keep every AI mention moving forward.</p><p>Discover. Verify. Recover.</p></footer>
+      {!embedded && <footer className="mt-14 flex flex-wrap items-center justify-between gap-3 border-t border-[#dfe5dc] pt-6 text-[10px] text-[#929b8b]"><p>citemend <span className="mx-2">/</span> Keep every AI mention moving forward.</p><p>Discover. Verify. Recover.</p></footer>}
     </main>
     {upgrade && <UpgradeModal onClose={() => setUpgrade(false)} />}
   </div>;

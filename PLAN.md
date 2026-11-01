@@ -290,3 +290,11 @@ See `edge-worker/README.md` for local verification and account setup. The Worker
 - [x] Pass Worker tests and TypeScript, all existing regression and browser tests, root lint, and production build.
 
 Rules can take up to five seconds to update at an edge location. No live hostname is routed through this Worker yet; domain control must be verified before attaching a customer zone route.
+
+## Day 24: High-converting landing page and free preview (COMPLETED)
+
+- [x] Redesign the homepage with a live domain preview widget, stronger citation-recovery copy, founder-focused sections, a comparison, FAQ, and the requested BITS Pilani maker badge.
+- [x] Add a public read-only preview of homepage and default sitemap HTTP status without bypassing Clerk protection or the one-saved-audit free limit. Clearly distinguish this preview from the full AI citation audit.
+- [x] Keep the existing signed-in audit workspace and report flow intact; carry a previewed domain into the protected form.
+- [x] Show clearly labeled founding-customer placeholders without inventing endorsements, and compare CiteFix Pro at $39/month with Ahrefs Brand Radar's $199/month AI Visibility Index while noting Ahrefs Custom Prompts starts at $50/month.
+- [x] Verify a live local preview for `example.com`, desktop/mobile layout, 94 regression tests, seven browser tests, lint, and production build.
