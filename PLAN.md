@@ -332,3 +332,17 @@ The current Lemon Squeezy configuration remains in test mode. The production web
 - [x] Verify invited, waitlisted, paid, non-renewal, and expiration paths with automated tests; pass lint and production build.
 - [x] Apply `supabase/migrations/008_design_partner_beta.sql` in the hosted Supabase SQL Editor and set `BETA_INVITED_EMAILS` in Vercel Production (user confirmed both on 2026-11-02).
 - [ ] Verify an invited account and a non-invited account in the production browser after the production Clerk keys are configured (Day 25 prerequisite).
+
+
+## Day 28: Batch 1 retro and transition to Phase 2 (COMPLETED; HISTORICAL DASHBOARD REVIEW LIMITED)
+
+- [x] Read project instructions and inspect the existing application, routing, API budgets, billing, persistence, and regression coverage.
+- [x] Review available production Vercel request/runtime evidence, aggregate Supabase audit/queue health, and Lemon Squeezy orders/subscriptions through read-only CLI/API checks; document retention and dashboard-access limits without claiming a complete launch-weekend review.
+- [x] Fix the reproducible public-preview request-body edge case: bound streamed uploads to 500 bytes, handle interrupted/invalid uploads, and return HTTP 408 after a five-second body-read timeout.
+- [x] Pass all 103 root unit/integration tests, including interrupted, oversized, stalled, and invalid UTF-8 preview uploads.
+- [x] Verify npm run lint and npm run build with zero errors.
+- [x] Record the four-week retrospective, observed traffic limits, and existing Phase 2 activation handoff in docs/DAY28_RETRO.md; do not start Phase 2 features.
+
+Day 28's stabilization and retrospective scope is complete. Historical Vercel logs beyond retention, Web Analytics, Supabase server logs, and authenticated dashboard UI review remain unverified. Production Clerk, billing webhook, scheduler, sender-domain, and Worker-route activation retain their earlier recorded status. Day 27 was not present in this plan and is not marked complete by this task.
+
+Recovery: Ask Codex to inspect and undo the specific broken change.
