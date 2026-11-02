@@ -451,3 +451,15 @@ Hosted database role permissions are verified. Production Vercel secret values r
 - [x] Apply migration 011 in the hosted Supabase SQL Editor (user confirmed success).
 
 The existing redirect table was extended rather than replaced to avoid breaking Day 23 data and access policies. The user confirmed the hosted migration succeeded. Day 37's `/api/pixel/resolve` endpoint is not part of this day.
+
+
+## Day 37: High-speed edge resolution API (`/api/pixel/resolve`) (COMPLETED)
+
+- [x] Add a Web API-based `POST` and `OPTIONS` handler with wildcard CORS headers and bounded JSON input. The route uses edge-compatible Web APIs; this Next.js app has `cacheComponents` enabled, which rejects an explicit route `runtime = "edge"` setting.
+- [x] Validate the reported domain, full URL, broken path, and browser origin; only return same-domain HTTPS redirect destinations.
+- [x] Resolve existing active rules, record telemetry and recovered-hit counts, and create a threshold-qualified semantic rule from `generateUrlEmbedding()` plus `match_sitemap_url` when a saved audit supplies the existing owner required by `redirect_rules`.
+- [x] Log unresolved 404 events and keep telemetry server-only through the existing `service_role` database client.
+- [x] Verify `npm run lint`, `npm run build`, and `git diff --check`. The build used a temporary output directory because OneDrive blocked deletion in `.next`; temporary config and generated output were removed.
+- [x] Run `npm run dev`; verify OPTIONS returns 204 with wildcard CORS and an invalid JSON-shaped POST returns a JSON 400 with wildcard CORS in 41 ms after startup.
+
+A valid DB-backed hit was not sent from this local environment because `.env.local` contains live Supabase and Gemini credentials; doing so could write real 404 telemetry or create an active redirect. The local latency check covers request validation, not the external embedding/database resolution path. The route's `runtime` remains Next.js's default Node runtime due to the app-wide Cache Components constraint, while its handler and imports use edge-compatible APIs.
