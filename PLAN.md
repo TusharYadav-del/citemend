@@ -439,3 +439,15 @@ The citation probe remains the configured Groq/Tavily pipeline from earlier proj
 - [x] Verify `git diff --check` with no errors.
 
 Hosted database role permissions are verified. Production Vercel secret values remain concealed by the platform, so only their configured presence—not the values themselves—was checked. `maxDuration` is set in source; Vercel's deployment inspection does not expose per-route limits.
+
+
+## Day 36: Telemetry & live redirect database tables (CODE COMPLETE; HOSTED SQL APPLY PENDING)
+
+- [x] Add forward migration `011_live_pixel_telemetry.sql`; migration number 003 is already used by an earlier audit index migration.
+- [x] Extend the existing `redirect_rules` table with the live-pixel domain, destination, confidence, active, and recovered-hit columns while preserving its existing owner and Worker schema; synchronize compatibility columns and enforce unique `(domain, source_path)`.
+- [x] Create indexed `ai_404_events` telemetry with server-only `service_role` access and row-level security enabled.
+- [x] Update Supabase database types; legacy redirect confidence stays null because no measured confidence exists for those rows.
+- [x] Verify `npm run lint`, `npm run build`, and `git diff --check` successfully.
+- [ ] Apply migration 011 in the hosted Supabase SQL Editor and verify the resulting schema and service-role permissions. This environment has no authenticated Supabase dashboard session or CLI/database credentials.
+
+The existing redirect table was extended rather than replaced to avoid breaking Day 23 data and access policies. Day 37's `/api/pixel/resolve` endpoint is not part of this day.
