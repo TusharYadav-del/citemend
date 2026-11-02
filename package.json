@@ -15,7 +15,8 @@
     "dev:simulate-webhooks": "node --conditions=react-server --import tsx scripts/simulate-subscription-webhook.ts",
     "dev:verify-checkout": "node --env-file=.env.local --conditions=react-server --import tsx scripts/verify-test-checkout.ts",
     "dev:verify-email": "node --env-file=.env.local --conditions=react-server --import tsx scripts/verify-test-email.ts",
-    "dev:verify-cron": "node --env-file=.env.local --conditions=react-server --import tsx scripts/verify-local-cron.ts"
+    "dev:verify-cron": "node --env-file=.env.local --conditions=react-server --import tsx scripts/verify-local-cron.ts",
+    "dev:index-sitemap": "node --env-file=.env.local --conditions=react-server --import tsx scripts/index-domain-sitemap.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

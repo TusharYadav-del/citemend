@@ -9,7 +9,8 @@ import type { CitationProbeResult } from "../lib/gemini";
 
 const originalEnv = process.env;
 const originalFetch = globalThis.fetch;
-beforeEach(() => { process.env = { ...originalEnv, NODE_ENV: "development", GEMINI_API_KEY: "test-google-key", GROQ_API_KEY: "test-groq-key", GROQ_MODEL: "llama-3.3-70b-versatile", TAVILY_API_KEY: "test-tavily-key", NEXT_PUBLIC_SUPABASE_URL: "https://db.example.com", SUPABASE_SECRET_KEY: "test-server-key" }; });
+// Legacy pipeline fixtures exercise lexical matching; configured embeddings have dedicated semantic tests.
+beforeEach(() => { process.env = { ...originalEnv, NODE_ENV: "development", GEMINI_API_KEY: "", GROQ_API_KEY: "test-groq-key", GROQ_MODEL: "llama-3.3-70b-versatile", TAVILY_API_KEY: "test-tavily-key", NEXT_PUBLIC_SUPABASE_URL: "https://db.example.com", SUPABASE_SECRET_KEY: "test-server-key" }; });
 afterEach(() => { mock.restoreAll(); globalThis.fetch = originalFetch; process.env = originalEnv; });
 const input = { domain: "example.com", buyerPrompt: "Find the documentation." };
 const POST = createAuditPostHandler({ isConfigured: () => true, getUserId: async () => "user_test_123", hasPro: async () => true });

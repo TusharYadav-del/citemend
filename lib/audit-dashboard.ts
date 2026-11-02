@@ -39,6 +39,11 @@ export function parseDashboardReport(value: unknown): DashboardReport {
     const finding = entry as Record<string, unknown>;
     if (!httpUrl(finding.url) || !(finding.httpStatus === null || typeof finding.httpStatus === "number" && Number.isInteger(finding.httpStatus) && finding.httpStatus >= 100 && finding.httpStatus <= 599) || !(finding.suggestedRedirect === null || httpUrl(finding.suggestedRedirect)) || !(finding.error === null || typeof finding.error === "string")) return fail();
   }
+  for (const entry of report.findings) {
+    const finding = entry as Record<string, unknown>;
+    if (finding.matchConfidence !== undefined && (typeof finding.matchConfidence !== "number" || !Number.isInteger(finding.matchConfidence)
+      || finding.matchConfidence < 0 || finding.matchConfidence > 100 || finding.httpStatus !== 404 || !finding.suggestedRedirect)) return fail();
+  }
   if (report.searchGrounding !== undefined && (!report.searchGrounding || typeof report.searchGrounding !== "object" || !["available", "unavailable", "not_configured"].includes(String((report.searchGrounding as Record<string, unknown>).status)))) return fail();
   if (report.persistence !== undefined && (!report.persistence || typeof report.persistence !== "object" || !["saved", "failed", "disabled"].includes(String((report.persistence as Record<string, unknown>).status)))) return fail();
   if (report.persistence) {

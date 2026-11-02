@@ -348,13 +348,29 @@ Day 28's stabilization and retrospective scope is complete. Historical Vercel lo
 Recovery: Ask Codex to inspect and undo the specific broken change.
 
 
-## Day 29: pgvector sitemap schema (CODE COMPLETE; HOSTED ACTIVATION PENDING)
+## Day 29: pgvector sitemap schema (COMPLETED)
 
 - [x] Add forward migration 009_pgvector_sitemaps.sql without colliding with existing migration 002.
 - [x] Enable vector, add the 768-dimensional sitemap_pages table and domain/URL uniqueness, and provide a bounded cosine RPC with domain/model isolation.
 - [x] Restrict the table and RPC to server-side service-role access; keep existing tables and features unchanged.
 - [x] Execute the migration in local PostgreSQL with pgvector and verify cosine ordering, threshold/count filtering, domain/model isolation, and public access denial.
 - [x] Verify npm run lint and npm run build with zero errors.
-- [ ] Apply the migration to the existing hosted Citemend Supabase project and verify REST/RPC access.
+- [x] Apply migration 009 in the hosted SQL Editor (user confirmed success); independently verify server HTTP 200, public HTTP 401, 200 stored sitemap vectors, and a live cosine RPC match.
 
-Dashboard automation cannot initialize and no management token or database connection is configured. SQL Editor application was requested; this record does not claim the hosted extension is active.
+The user applied the SQL in the existing project. Hosted server access, public denial, vector storage, and cosine matching were independently verified after application. The existing 002 migration was preserved.
+
+
+## Day 30: Gemini sitemap embeddings and semantic redirects (COMPLETED; SIGNED-IN BROWSER CHECK PENDING)
+
+- [x] Add server-only generateUrlEmbedding and bounded batch embedding with 768-dimensional validation, normalization, query/document task types, and provider timeouts.
+- [x] Use supported gemini-embedding-001 by default because text-embedding-004 was retired; verify a real 768-dimensional response with the existing local key and document the explicit model setting.
+- [x] Add indexDomainSitemap, deterministic core-page priority and a 200-URL cap, batches of 20, seven-day model-aware caching, and domain/URL upserts.
+- [x] Connect semantic candidates to the existing authenticated audit pipeline, verify current sitemap membership, exact hostname, non-self target and live 2xx status, and preserve the existing matcher on failure or low similarity.
+- [x] Display the measured Match Confidence percentage for semantic suggestions with a similarity explanation; never invent a fixed 94% score or attach it to lexical fallback.
+- [x] Add the manual dev:index-sitemap command and docs/SEMANTIC_MATCHING.md, including activation, model lifecycle, limits, and confidence semantics.
+- [x] Pass all 112 unit/integration tests, npm run lint, and npm run build with zero errors.
+- [x] Store and read back 200 real supabase.com embeddings; exercise the hosted cosine RPC and live HTTP checks: pricing-old returned 404 and matched the live pricing page at a measured 76%.
+- [x] Run npm run dev on port 3000 and pass all seven existing browser regressions.
+- [ ] Confirm a signed-in browser audit result with the user's authenticated session.
+
+The existing Groq/Tavily citation probe, saved report schema, authentication, quotas, and Pro controls remain in use. Live Gemini access and hosted sitemap storage/RPC were verified after the user applied migration 009. The user approved gemini-embedding-001. The controlled authenticated route fixture verifies a 0.94 similarity becomes 94%; this is not a claimed live score. Confidence is returned with the current audit and is not added to historic saved reports. The live verification used a controlled broken citation with real sitemap discovery, Gemini vectors, hosted matching, and live HTTP checks, and did not create a hosted audit. See docs/day30-live-results.json. The existing browser tests cover anonymous workflows; authenticated browser confirmation remains separate.

@@ -146,3 +146,10 @@ export async function checkUrlStatus(url: string): Promise<number> {
   }
   return status;
 }
+
+
+/** Server-only semantic sitemap indexing; keeps existing discovery/status APIs intact. */
+export async function indexDomainSitemap(domain: string, options: import("./sitemap-embeddings").SitemapIndexOptions = {}) {
+  const semantic = await import("./sitemap-embeddings");
+  return semantic.indexDomainSitemap(domain, options);
+}

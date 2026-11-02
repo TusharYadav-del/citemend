@@ -7,9 +7,10 @@ import { runCitationProbe, type CitationProbeResult } from "./citation-probe";
 type ProbeResult = CitationProbeResult | GeminiProbeResult;
 import { fetchSitemapUrls, checkUrlStatus } from "./seo";
 import { persistAudit } from "./audit-store";
+import { matchSitemapUrls, SEMANTIC_MATCH_THRESHOLD } from "./sitemap-embeddings";
 
 export class AuditInputError extends Error {}
-export type AuditFinding = { url: string; httpStatus: number | null; error: string | null; suggestedRedirect: string | null };
+export type AuditFinding = { url: string; httpStatus: number | null; error: string | null; suggestedRedirect: string | null; matchConfidence?: number };
 export type AuditReport = {
   domain: string; buyerPrompt: string; generatedText: string;
   groundingMetadata: GeminiProbeResult["groundingMetadata"];
@@ -19,6 +20,7 @@ export type AuditReport = {
 };
 export type AuditDependencies = {
   probe: (domain: string, buyerPrompt: string) => Promise<ProbeResult>; sitemap: typeof fetchSitemapUrls; check: typeof checkUrlStatus;
+  semantic: typeof matchSitemapUrls | null;
   resolve: (url: string) => Promise<string | null>;
   save: (report: AuditReport, userId?: string) => Promise<{ id: string; createdAt: string }>;
 };
@@ -112,7 +114,7 @@ function similarity(a: string, b: string): number {
 
 export async function runAudit(input: unknown, overrides: Partial<AuditDependencies> = {}, userId?: string) {
   const { domain, buyerPrompt } = validateAuditInput(input);
-  const deps: AuditDependencies = { probe: runCitationProbe, sitemap: fetchSitemapUrls, check: checkUrlStatus, resolve: resolveGroundingRedirect, save: persistAudit, ...overrides };
+  const deps: AuditDependencies = { probe: runCitationProbe, sitemap: fetchSitemapUrls, check: checkUrlStatus, resolve: resolveGroundingRedirect, save: persistAudit, semantic: process.env.GEMINI_API_KEY ? matchSitemapUrls : null, ...overrides };
   const probe = await deps.probe(domain, buyerPrompt);
   const extracted = extractCitationUrls(probe);
   if (extracted.length > 100) throw new AuditInputError("The generated response contains more than 100 citation URLs; narrow the buyer prompt.");
@@ -129,7 +131,7 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
   try { sitemap = [...new Set((await deps.sitemap(domain)).map(normalizedUrl).filter((url): url is string => !!url && inDomain(url, domain)))]; }
   catch { warnings.push("Sitemap discovery failed; redirect suggestions may be unavailable."); }
   const statusCache = new Map<string, Promise<number | null>>();
-  const checkDeadline = Date.now() + 30_000;
+  let checkDeadline = Date.now() + 30_000;
   function status(url: string) {
     if (!statusCache.has(url)) statusCache.set(url, Date.now() >= checkDeadline ? Promise.resolve(null) : deps.check(url).catch(() => null));
     return statusCache.get(url)!;
@@ -138,8 +140,31 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
     const httpStatus = await status(url);
     return { url, httpStatus, error: httpStatus === null ? "HTTP status check failed or timed out." : null, suggestedRedirect: null };
   });
-  // Rank first; only verified 2xx destinations may be suggested. Reuse status checks.
-  for (const finding of findings.filter((item) => item.httpStatus === 404)) {
+  const broken = findings.filter(item => item.httpStatus === 404);
+  let semanticMatches = new Map<string, { url: string; similarity: number }[]>();
+  if (broken.length && sitemap.length && deps.semantic) {
+    try { semanticMatches = await deps.semantic(domain, broken.map(item => item.url), sitemap); }
+    catch { warnings.push("Semantic matching was unavailable; redirect suggestions use URL spelling similarity without a confidence score."); }
+    // Provider/storage work must not consume the live destination-check budget.
+    checkDeadline = Date.now() + 30_000;
+  }
+  // Semantic candidates are suggestions only until a live 2xx response is verified.
+  for (const finding of broken) {
+    for (const candidate of semanticMatches.get(finding.url) ?? []) {
+      const url = normalizedUrl(candidate.url);
+      if (!url || !sitemap.includes(url) || new URL(url).hostname !== new URL(finding.url).hostname
+        || new URL(url).pathname === new URL(finding.url).pathname || !Number.isFinite(candidate.similarity)
+        || candidate.similarity < SEMANTIC_MATCH_THRESHOLD || candidate.similarity > 1) continue;
+      const code = await status(url);
+      if (code !== null && code >= 200 && code < 300) {
+        finding.suggestedRedirect = url;
+        finding.matchConfidence = Math.round(candidate.similarity * 100);
+        break;
+      }
+    }
+  }
+  // Preserve lexical matching when semantic search is unavailable or inconclusive.
+  for (const finding of broken.filter(item => !item.suggestedRedirect)) {
     const ranked = sitemap.filter((url) => url !== finding.url)
       .map((url) => ({ url, score: similarity(finding.url, url) }))
       .filter((candidate) => candidate.score > 0)

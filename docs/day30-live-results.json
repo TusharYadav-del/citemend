@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-02",
+  "timezone": "Asia/Kolkata",
+  "model": "gemini-embedding-001",
+  "domain": "supabase.com",
+  "sitemapUrlsDiscovered": 3762,
+  "storedPages": 200,
+  "sampleVectorDimensions": 768,
+  "tableAccess": {
+    "serverHttpStatus": 200,
+    "publicHttpStatus": 401
+  },
+  "indexResume": {
+    "previouslyCached": 120,
+    "newlyIndexed": 80
+  },
+  "verification": {
+    "citationInputControlled": true,
+    "embeddingProviderLive": true,
+    "cosineRpcHosted": true,
+    "httpChecksLive": true,
+    "hostedAuditCreated": false,
+    "finding": {
+      "url": "https://supabase.com/pricing-old",
+      "httpStatus": 404,
+      "suggestedRedirect": "https://supabase.com/pricing",
+      "matchConfidence": 76
+    }
+  },
+  "signedInBrowserVerified": false
+}
