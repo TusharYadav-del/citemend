@@ -404,3 +404,14 @@ The requested gemini-2.5-flash returned HTTP 404 for this key. The approved mode
 - [ ] Confirm the complete click-through in the user's own signed-in browser on a newly saved qualifying audit. An authenticated production session was not impersonated or manufactured for testing.
 
 Backend extraction and Gemini generation were verified live separately from the controlled UI fixtures. Migration 010 is applied and its owner/public access behavior is verified. Existing audits without saved citation-gap evidence remain unchanged; run a new audit to capture that evidence. See docs/CITATION_CAPSULES.md.
+
+
+## Day 33: Auto-generating the 5 best buyer prompts per domain (COMPLETED; LIVE GENERATION CHECK PENDING)
+
+- [x] Add authenticated POST `/api/prompts/suggest`; safely fetch bounded homepage HTML with DNS-pinned public connections, validate redirects, and extract title, description, H1, and H2 metadata using Cheerio.
+- [x] Generate exactly five category-focused, brand-free buyer prompts plus one brand-specific pricing/features prompt with Gemini; validate model output and support the requested `gemini-2.5-flash` model with the documented `gemini-3.6-flash` fallback.
+- [x] Add the Auto-Generate Buyer Prompts action and six selectable/editable prompt pills to the shared audit workspace used from the homepage and dashboard workflow.
+- [x] Verify `npm run lint`, a successful production build, and `git diff --check` with no errors. A final repeat build was blocked before compilation because Windows denied unlinking a generated `.next/static` reparse point.
+- [ ] Verify live generation in an authenticated browser session; no user session was impersonated, and interactive domain/model timing was not measured.
+
+The prompt endpoint uses the existing signed-in audit boundary and homepage SSRF defenses. Set `GEMINI_PROMPT_MODEL` and optionally `GEMINI_PROMPT_FALLBACK_MODEL` in the server environment if the project key supports different models. The audit still runs only after the user selects/edits a prompt and submits.

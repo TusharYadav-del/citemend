@@ -32,6 +32,8 @@ export default function AuditDashboard({ liveEnabled, clerkConfigured, embedded 
   const hydrated = useSyncExternalStore(subscribeToHydration, () => true, () => false);
   const [domain, setDomain] = useState("");
   const [prompt, setPrompt] = useState("What are the best solutions for my business, and where can I find their pricing and documentation?");
+  const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
+  const [suggesting, setSuggesting] = useState(false);
   const [pending, setPending] = useState(false);
   const [report, setReport] = useState<DashboardReport | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +74,25 @@ export default function AuditDashboard({ liveEnabled, clerkConfigured, embedded 
     } catch (cause) {
       setError(controller.signal.aborted ? "The request took too long. It may still be running; wait a moment before starting another audit." : cause instanceof TypeError ? "Connection lost. Please check your connection and try again." : cause instanceof Error ? cause.message : "Connection lost. Please check your connection and try again.");
     } finally { clearTimeout(timeout); setPending(false); }
+  }
+  async function autoGeneratePrompts() {
+    if (suggesting || pending || !hydrated) return;
+    setError(null);
+    let cleanDomain: string;
+    try { cleanDomain = normalizeDashboardDomain(domain); }
+    catch { setError("Enter a domain such as stripe.com. Leave out page paths, ports, and query strings."); return; }
+    setSuggesting(true);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20_000);
+    try {
+      const response = await fetch("/api/prompts/suggest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ domain: cleanDomain }), signal: controller.signal });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !Array.isArray(data?.prompts) || data.prompts.length !== 6 || !data.prompts.every((item: unknown) => typeof item === "string")) throw new Error(typeof data?.error === "string" ? data.error : "Could not generate buyer prompts. Please try again.");
+      setSuggestedPrompts(data.prompts);
+      setPrompt(data.prompts[0]);
+    } catch (cause) {
+      setError(controller.signal.aborted ? "Prompt generation took too long. Please try again." : cause instanceof TypeError ? "Connection lost. Please check your connection and try again." : cause instanceof Error ? cause.message : "Could not generate buyer prompts. Please try again.");
+    } finally { clearTimeout(timeout); setSuggesting(false); }
   }
   async function copyRule(url: string, destination: string) {
     setCopyError(null);
@@ -115,8 +136,8 @@ export default function AuditDashboard({ liveEnabled, clerkConfigured, embedded 
           <CardHeader className="border-b border-[#edf0e9] px-6 py-5 sm:px-7"><div className="flex items-center justify-between gap-4"><h2 id="audit-heading" className="text-lg font-semibold tracking-tight">Start with your domain</h2><Badge variant="outline" className="h-6 border-[#dae2d4] bg-[#f5f8f0] text-[10px] text-[#557447]">LIVE AUDIT</Badge></div><p className="mt-1 text-sm text-[#7a837b]">See your site through an AI buyer&apos;s eyes.</p></CardHeader>
           <CardContent className="px-6 py-6 sm:px-7">{clerkConfigured ? <ClerkAuditAccess><form onSubmit={submit} className="space-y-5" aria-busy={pending}>
             <div><label htmlFor="audit-domain" className="mb-2 block text-xs font-semibold">Your website domain</label><div className="relative"><Globe2 className="pointer-events-none absolute top-3.5 left-3.5 size-4 text-[#8a9587]" /><Input id="audit-domain" name="domain" placeholder="stripe.com" value={domain} onChange={(event) => setDomain(event.target.value)} required maxLength={300} disabled={pending || !hydrated} autoCapitalize="none" autoCorrect="off" spellCheck={false} className="h-11 rounded-lg border-[#dce2d7] bg-[#fcfdfb] pl-10 shadow-none" /></div></div>
-            <div><label htmlFor="buyer-prompt" className="mb-2 block text-xs font-semibold">Sample buyer prompt</label><textarea id="buyer-prompt" name="buyerPrompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} required maxLength={4000} disabled={pending || !hydrated} className="min-h-24 w-full resize-y rounded-lg border border-[#dce2d7] bg-[#fcfdfb] px-3.5 py-3 text-sm leading-6 outline-none focus-visible:border-[#648346] focus-visible:ring-2 focus-visible:ring-[#dceacb] disabled:opacity-60" /><p className="mt-1.5 text-[11px] text-[#899084]">Try a question your next customer might ask an AI assistant.</p></div>
-            <Button type="submit" disabled={pending || !liveEnabled || !hydrated} className="h-12 w-full gap-2.5 rounded-lg bg-[#214d39] text-sm font-medium text-white hover:bg-[#153c2a]">{pending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}{pending ? "Running your audit..." : "Run AI Audit"}{!pending && <ArrowRight className="ml-auto size-4" />}</Button>
+            <div><label htmlFor="buyer-prompt" className="mb-2 block text-xs font-semibold">Sample buyer prompt</label><textarea id="buyer-prompt" name="buyerPrompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} required maxLength={4000} disabled={pending || !hydrated} className="min-h-24 w-full resize-y rounded-lg border border-[#dce2d7] bg-[#fcfdfb] px-3.5 py-3 text-sm leading-6 outline-none focus-visible:border-[#648346] focus-visible:ring-2 focus-visible:ring-[#dceacb] disabled:opacity-60" /><div className="mt-2 flex flex-wrap items-center justify-between gap-2"><p className="text-[11px] text-[#899084]">Try a question your next customer might ask an AI assistant.</p><Button type="button" variant="outline" onClick={autoGeneratePrompts} disabled={pending || suggesting || !liveEnabled || !hydrated} className="h-9 gap-2 rounded-lg border-[#cbd8c5] text-xs">{suggesting ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}{suggesting ? "Reading site & generating..." : "Auto-Generate Buyer Prompts"}</Button></div>{suggestedPrompts.length > 0 && <div className="mt-4" aria-label="Editable suggested buyer prompts"><p className="mb-2 text-[11px] font-semibold text-[#627268]">Choose a prompt to audit, or edit it above</p><div className="flex flex-wrap gap-2">{suggestedPrompts.map((item, index) => <button key={`${index}-${item}`} type="button" onClick={() => setPrompt(item)} aria-pressed={prompt === item} className={`rounded-full border px-3 py-2 text-left text-xs leading-5 transition-colors ${prompt === item ? "border-[#557c43] bg-[#eaf3e3] text-[#244b31]" : "border-[#dce2d7] bg-white text-[#46574a] hover:border-[#9aad90]"}`}>{item}</button>)}</div></div>}</div>
+            <Button type="submit" disabled={pending || suggesting || !liveEnabled || !hydrated} className="h-12 w-full gap-2.5 rounded-lg bg-[#214d39] text-sm font-medium text-white hover:bg-[#153c2a]">{pending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}{pending ? "Running your audit..." : "Run AI Audit"}{!pending && <ArrowRight className="ml-auto size-4" />}</Button>
             <p className="flex items-center justify-center gap-1.5 text-[10px] text-[#828d7e]"><ShieldCheck className="size-3" />{liveEnabled ? "Read-only website checks. No changes are made to your site." : "Live audits are available in the local workspace."}</p>
           </form></ClerkAuditAccess> : <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"><h3 className="font-semibold">Clerk setup is required to run audits</h3><p className="mt-2 text-xs leading-5">Create a Clerk application, enable Google and Email sign-in, then add its publishable and secret keys to your ignored .env.local file and restart the dev server.</p></div>}</CardContent>
         </Card>
