@@ -92,7 +92,7 @@ async function UserAuditHistory() {
     <main className="mx-auto w-full max-w-5xl px-5 py-10 sm:px-8 sm:py-14">
       <header className="mb-10 flex flex-wrap items-center justify-between gap-4 border-b border-[#dfe5dc] pb-6">
         <div><Link href="/" className="text-sm font-medium text-[#53704e] hover:underline">&larr; Back to Citemend</Link><p className="mt-4 text-[10px] font-semibold tracking-[.18em] text-[#53704e]">YOUR WORKSPACE</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Audit history</h1><p className="mt-2 text-sm text-[#68736b]">Your saved audits, sorted from newest to oldest.</p></div>
-        <div className="flex items-center gap-3"><CheckoutButton /><UserButton /></div>
+        <div className="flex items-center gap-3"><Link href="/dashboard/pixel" className="rounded-lg border border-[#dfe5dc] px-3 py-2 text-sm font-medium text-[#36583f] hover:bg-[#f7f8f4]">Pixel &amp; traffic</Link><CheckoutButton /><UserButton /></div>
       </header>
       <MetricCards audits={audits} />
       <WeeklyMonitoring isPro={isPro} />

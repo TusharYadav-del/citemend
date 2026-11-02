@@ -472,3 +472,15 @@ A valid DB-backed hit was not sent from this local environment because `.env.loc
 - [x] Show a compact redirect toast, POST the page/referrer information to `/api/pixel/resolve` on the script host, and navigate only to a same-domain HTTPS destination returned by the resolver.
 - [x] Verify JavaScript syntax, `npm run lint`, `npm run build`, and `git diff --check`.
 - [x] Run `npm run dev` and verify `/citefix-pixel.js` serves HTTP 200 as JavaScript, byte-for-byte matching the 1,493-byte public asset.
+
+
+## Day 39: Recovered traffic & pixel setup dashboard (COMPLETED; SIGNED-IN SIMULATION CHECK PENDING)
+
+- [x] Add `/dashboard/pixel` behind Clerk authentication and link it from the audit dashboard navigation.
+- [x] Add Shopify, WordPress, Next.js, and Webflow/Framer installation tabs with the user's latest audited domain prefilled in the one-line script snippet and a copy action.
+- [x] Show owner-scoped redirect rules, domain telemetry, AI source badges, recovered-hit totals, editable same-domain HTTPS targets, and active/inactive controls; preserve the existing Pro requirement for publishing or editing redirects.
+- [x] Add a simulation button that sends a ChatGPT-referrer POST to `/api/pixel/resolve` using an existing active rule and refreshes the event table/counter. Permit this dashboard-origin request only for a signed-in user with an audit for that domain.
+- [x] Pass `npm run lint`, `npm run build`, and `git diff --check`; run `npm run dev` and verify the page redirects anonymous users to Clerk while the dashboard API returns 401 without a session.
+- [ ] Click the simulation with the user's signed-in session and verify the resulting event and recovered-hit increment. No authenticated browser session was available, and simulating writes a real test event and increments a rule's counter.
+
+Pixel activity refreshes every 30 seconds. The test button deliberately uses the first active rule and creates a real ChatGPT-attributed test event; it is disabled until an active rule exists. A successful resolver check confirms the endpoint and telemetry path, but does not independently prove the script is installed on the customer's site.

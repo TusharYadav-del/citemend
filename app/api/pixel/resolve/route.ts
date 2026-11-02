@@ -1,3 +1,4 @@
+import { auth } from "@clerk/nextjs/server";
 import { createServerDatabase } from "@/lib/supabase-server";
 import { generateUrlEmbedding, urlEmbeddingModel } from "@/lib/gemini";
 import { normalizeDashboardDomain } from "@/lib/audit-dashboard";
@@ -156,8 +157,18 @@ export async function POST(request: Request) {
   if (origin) {
     try {
       const parsedOrigin = new URL(origin);
-      if (!["http:", "https:"].includes(parsedOrigin.protocol) || parsedOrigin.hostname.toLowerCase() !== domain || parsedOrigin.port) {
+      if (!["http:", "https:"].includes(parsedOrigin.protocol)) {
         return json({ error: "The request origin does not match the supplied domain." }, 403);
+      }
+      const customerOrigin = parsedOrigin.hostname.toLowerCase() === domain && !parsedOrigin.port;
+      const appOrigin = new URL(request.url).origin;
+      if (!customerOrigin && parsedOrigin.origin !== appOrigin) return json({ error: "The request origin does not match the supplied domain." }, 403);
+      if (!customerOrigin) {
+        const { userId } = await auth();
+        if (!userId) return json({ error: "Sign in to test a pixel for this domain." }, 401);
+        const ownership = await createServerDatabase().from("audits").select("id").eq("user_id", userId).eq("domain", domain).limit(1).maybeSingle();
+        if (ownership.error) return json({ error: "Domain ownership could not be verified." }, 503);
+        if (!ownership.data) return json({ error: "This domain is not associated with your account." }, 403);
       }
     } catch {
       return json({ error: "The request origin is invalid." }, 403);
