@@ -532,13 +532,14 @@ Only preflight requests were used for the concurrency check; no production telem
 The Shopify helper targets Admin GraphQL API `2026-10`: the prompt's `2025-01` API version has been retired. See [Shopify API version schedule](https://shopify.dev/docs/api/usage/versioning). A custom app needs the `write_online_store_navigation` access scope to create redirects.
 
 
-## Day 44: One-click Shopify redirect sync (COMPLETED; HOSTED/STORE CHECK PENDING)
+## Day 44: One-click Shopify redirect sync (COMPLETED; SHOPIFY STORE CHECK PENDING)
 
 - [x] Add migration `014_shopify_redirect_sync.sql` for `redirect_rules.synced_to_cms`.
 - [x] Add authenticated, same-origin Shopify connect and sync routes. Connection verifies store identity, checks account domain ownership, encrypts the token before upsert, and never returns the token.
 - [x] Add owner-scoped redirect syncing with bounded batches, active-rule checks, already-synced skips, per-rule results, and successful-sync status updates.
 - [x] Add the Shopify connection/sync modal to `/dashboard/pixel`, with token entry, reconnect, custom-app scope guidance, and one-click sync for active approved rules.
 - [x] Pass `npm run lint`, production build (using a temporary build output after OneDrive blocked `.next` cleanup), `git diff --check`, and local unauthenticated API checks (401).
-- [ ] Apply migration 014 in hosted Supabase and verify a real connect/sync against a merchant development store. No Shopify store/token was supplied in this session; enter the credential directly in the signed-in dashboard after applying the migration.
+- [x] Apply migration 014 in hosted Supabase (user confirmed success).
+- [ ] Verify a real connect/sync against a merchant development store. No Shopify store/token was supplied in this session; enter the credential directly in the signed-in dashboard to verify.
 
 Only active, owner-approved redirects are published to Shopify. Creating a URL redirect requires the `write_online_store_navigation` scope. The backend uses Shopify Admin GraphQL API `2026-10`; see the official [versioning schedule](https://shopify.dev/docs/api/usage/versioning).
