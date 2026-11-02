@@ -532,7 +532,7 @@ Only preflight requests were used for the concurrency check; no production telem
 The Shopify helper targets Admin GraphQL API `2026-10`: the prompt's `2025-01` API version has been retired. See [Shopify API version schedule](https://shopify.dev/docs/api/usage/versioning). A custom app needs the `write_online_store_navigation` access scope to create redirects.
 
 
-## Day 44: One-click Shopify redirect sync (CODE COMPLETE; HOSTED/STORE CHECK PENDING)
+## Day 44: One-click Shopify redirect sync (COMPLETED; HOSTED/STORE CHECK PENDING)
 
 - [x] Add migration `014_shopify_redirect_sync.sql` for `redirect_rules.synced_to_cms`.
 - [x] Add authenticated, same-origin Shopify connect and sync routes. Connection verifies store identity, checks account domain ownership, encrypts the token before upsert, and never returns the token.
