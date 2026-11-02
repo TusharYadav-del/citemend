@@ -553,3 +553,14 @@ Only active, owner-approved redirects are published to Shopify. Creating a URL r
 - [x] Verify `npm run lint` and `npm run build` with zero errors.
 
 No third-party setup is required for downloading files. Import behavior should be reviewed against the destination platform's current requirements before applying redirects.
+
+
+## Day 46: Automated `llms.txt` generator (COMPLETED)
+
+- [x] Add an authenticated POST route that accepts an audited domain, reads its 30 most recently updated sitemap pages, and fetches homepage title/description using DNS-pinned public HTTP with redirect and response-size limits.
+- [x] Use `gemini-2.5-flash` to categorize supplied canonical pages and write concise descriptions; validate every model-selected URL against the supplied same-domain HTTPS sitemap evidence.
+- [x] Include saved confirmed 404 paths and only their safe same-domain HTTPS replacements in the deprecated-path section; do not invent replacement URLs.
+- [x] Add dashboard domain selection, previews for `llms.txt` and `llms-full.txt`, download controls, and `/public` placement instructions.
+- [x] Verify `npm run lint` and `npm run build` with zero errors; verify unauthenticated API access is rejected.
+
+End-to-end generation and downloaded-file inspection require a signed-in Clerk dashboard session, a domain with stored sitemap evidence, and configured Gemini access; those interactive steps were not available in this run.

@@ -14,6 +14,7 @@ import type { CitationGap } from "@/lib/citation-gap";
 import CitationGapPanel from "@/components/citation-gap-panel";
 import PublishRedirect from "@/components/publish-redirect";
 import RedirectExportDrawer from "@/components/RedirectExportDrawer";
+import LlmsTxtGenerator from "@/components/LlmsTxtGenerator";
 
 function HistoryLoading() {
   return <main className="mx-auto w-full max-w-5xl px-5 py-10 sm:px-8 sm:py-14" role="status" aria-label="Loading your audit history"><div className="h-8 w-52 animate-pulse rounded-lg bg-[#e9eee4]" /><div className="mt-8 grid gap-4 sm:grid-cols-3">{[0, 1, 2].map((item) => <div key={item} className="h-32 animate-pulse rounded-2xl bg-[#f1f4ed]" />)}</div><div className="mt-8 h-36 animate-pulse rounded-2xl bg-[#f1f4ed]" /><span className="sr-only">Loading your audit history...</span></main>;
@@ -101,6 +102,7 @@ async function UserAuditHistory() {
       </header>
       <MetricCards audits={audits} />
       <WeeklyMonitoring isPro={isPro} />
+      <LlmsTxtGenerator domains={[...new Set(audits.map((audit) => audit.domain))]} />
       <p className="mb-6 rounded-xl border border-[#dfe5dc] bg-[#f7f8f4] p-4 text-xs leading-5 text-[#68736b]">Pro users can publish or disable verified 301 suggestions below. Rules become active when the Cloudflare Worker is attached to the domain; edge lookups can retain a change for up to five seconds.</p>
       <p className="mb-6 rounded-xl border border-[#dfe5dc] bg-[#f7f8f4] p-4 text-xs leading-5 text-[#68736b]">Audits created before account ownership was enabled have no associated user and are not assigned to an account automatically.</p>
       {audits.length ? <div className="space-y-4">{audits.map((audit) => <AuditCard key={audit.id} audit={audit} gap={gaps.get(audit.id)} isPro={isPro} activeRules={activeRules} />)}</div> : <section className="rounded-2xl border border-dashed border-[#d6dfce] px-6 py-14 text-center"><h2 className="text-base font-semibold">No audits saved yet</h2><p className="mt-2 text-sm text-[#85907e]">Run an audit and it will appear here.</p><Link href="/#audit" className="mt-5 inline-flex rounded-lg bg-[#214d39] px-5 py-3 text-sm font-medium text-white">Run an audit</Link></section>}
