@@ -496,3 +496,13 @@ Pixel activity refreshes every 30 seconds. The test button deliberately uses the
 - [x] Apply migration 012 in hosted Supabase (user confirmed success).
 
 The user will test live Slack webhook delivery later by saving the URL in `/dashboard/pixel` and selecting **Send Test Alert**.
+
+
+## Day 41: Interactive landing-page sandbox demo (COMPLETED)
+
+- [x] Add an interactive split-screen ChatGPT-style recommendation and simulated broken-link experience immediately below the homepage hero.
+- [x] Add an accessible recovery switch and clickable simulated link; show dead-end behavior when off and semantic recovery to `acme.io/pricing` when on, including sample similarity, timing, and Slack alert status.
+- [x] Keep the demo self-contained: it makes no external requests and labels its performance and match values as illustrative.
+- [x] Verify `npm run lint`, `npm run build`, `git diff --check`, and local homepage HTTP 200 with the demo present.
+
+The browser access host was unavailable, so the switch was not clicked through in Chrome during this run.

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ArrowRight, ArrowUpRight, Check, CircleHelp, Link2, Radar, ScanSearch, ShieldCheck, Sparkles } from "lucide-react";
 import AuditDashboard from "@/components/audit-dashboard";
 import LandingPreview from "@/components/landing-preview";
+import LiveInterceptorDemo from "@/components/LiveInterceptorDemo";
 
 export const metadata: Metadata = {
   title: "Citemend AI | Find and Fix Broken AI Citations",
@@ -39,6 +40,8 @@ export default function Home() {
         <div className="relative"><LandingPreview /><p className="mt-4 text-center text-xs text-[#9fb4a6]">See a real result before you create an account.</p></div>
       </section>
     </div>
+
+    <LiveInterceptorDemo />
 
     <section aria-label="Founding customer proof" className="border-b border-[#dce5d6] bg-white px-5 py-7 sm:px-8"><div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-5"><div><p className="text-xs font-bold uppercase tracking-[.17em] text-[#6b8864]">Built for founders</p><p className="mt-1 text-sm font-semibold text-[#263e31]">Modern D2C &amp; SaaS brands deserve working AI referrals.</p></div><div className="flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-wide text-[#688065]"><span className="rounded-full border border-[#dce7d8] px-3 py-2">D2C commerce</span><span className="rounded-full border border-[#dce7d8] px-3 py-2">SaaS teams</span><span className="rounded-full border border-[#dce7d8] px-3 py-2">Founding partner stories coming soon</span></div></div></section>
 
