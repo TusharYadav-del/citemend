@@ -463,3 +463,12 @@ The existing redirect table was extended rather than replaced to avoid breaking 
 - [x] Run `npm run dev`; verify OPTIONS returns 204 with wildcard CORS and an invalid JSON-shaped POST returns a JSON 400 with wildcard CORS in 41 ms after startup.
 
 A valid DB-backed hit was not sent from this local environment because `.env.local` contains live Supabase and Gemini credentials; doing so could write real 404 telemetry or create an active redirect. The local latency check covers request validation, not the external embedding/database resolution path. The route's `runtime` remains Next.js's default Node runtime due to the app-wide Cache Components constraint, while its handler and imports use edge-compatible APIs.
+
+
+## Day 38: Embeddable 1-line recovery script (`public/citefix-pixel.js`) (COMPLETED)
+
+- [x] Add a zero-dependency vanilla JavaScript pixel under 1.5 KB (1,493 bytes) that reads its script `data-domain` or falls back to the current hostname.
+- [x] Detect 404 pages using the page title, `window.CITEFIX_IS_404`, or the ChatGPT UTM plus `[data-citefix-404]` marker; support `data-catch-all="true"` and the requested AI referrers/UTM sources.
+- [x] Show a compact redirect toast, POST the page/referrer information to `/api/pixel/resolve` on the script host, and navigate only to a same-domain HTTPS destination returned by the resolver.
+- [x] Verify JavaScript syntax, `npm run lint`, `npm run build`, and `git diff --check`.
+- [x] Run `npm run dev` and verify `/citefix-pixel.js` serves HTTP 200 as JavaScript, byte-for-byte matching the 1,493-byte public asset.
