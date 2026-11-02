@@ -484,3 +484,13 @@ A valid DB-backed hit was not sent from this local environment because `.env.loc
 - [ ] Click the simulation with the user's signed-in session and verify the resulting event and recovered-hit increment. No authenticated browser session was available, and simulating writes a real test event and increments a rule's counter.
 
 Pixel activity refreshes every 30 seconds. The test button deliberately uses the first active rule and creates a real ChatGPT-attributed test event; it is disabled until an active rule exists. A successful resolver check confirms the endpoint and telemetry path, but does not independently prove the script is installed on the customer's site.
+
+
+## Day 40: Instant Slack & Discord webhook alerts (CODE COMPLETE; HOSTED SETUP CHECK PENDING)
+
+- [x] Add migration `012_audit_webhook_url.sql` and update database types for the per-audit webhook setting.
+- [x] Add a server-only notifier that validates Slack/Discord HTTPS webhook URLs, formats provider-specific alerts, and sends with a timeout.
+- [x] Add authenticated dashboard actions to save/remove a webhook and send a test alert without returning the secret URL to the browser.
+- [x] Schedule alerts after successful AI-referrer redirects so webhook delivery does not delay visitor recovery.
+- [x] Verify `npm run lint`, `npm run build`, and `git diff --check`.
+- [ ] Apply migration 012 in hosted Supabase and verify delivery to a real Slack/Discord webhook. The connected browser access host was unavailable, and no webhook URL was provided in this session; paste it into the signed-in dashboard after applying the migration.

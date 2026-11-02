@@ -1,8 +1,10 @@
 import { auth } from "@clerk/nextjs/server";
+import { after } from "next/server";
 import { createServerDatabase } from "@/lib/supabase-server";
 import { generateUrlEmbedding, urlEmbeddingModel } from "@/lib/gemini";
 import { normalizeDashboardDomain } from "@/lib/audit-dashboard";
 import { urlPathKeywords } from "@/lib/url-keywords";
+import { isAlertableAIReferrer, sendWebhookAlert } from "@/lib/webhook-notify";
 
 export const maxDuration = 20;
 
@@ -136,6 +138,25 @@ async function incrementRecoveredHit(db: ReturnType<typeof createServerDatabase>
   throw new Error("Could not increment the recovered-hit counter after concurrent updates.");
 }
 
+function queueRecoveryWebhook(userId: string, domain: string, brokenPath: string, referrer: string, targetUrl: string, confidence: number | null) {
+  const source = parseReferrer(referrer);
+  if (!source || !isAlertableAIReferrer(source)) return;
+  const targetPath = new URL(targetUrl).pathname;
+  after(async () => {
+    try {
+      const db = createServerDatabase();
+      const { data: audit, error } = await db.from("audits").select("webhook_url")
+        .eq("user_id", userId).eq("domain", domain).not("webhook_url", "is", null)
+        .order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (error || !audit?.webhook_url) return;
+      await sendWebhookAlert(audit.webhook_url, { source, brokenPath, targetPath, confidence });
+    } catch {
+      // Notifications are best-effort and must never delay a recovered redirect.
+      console.error("Pixel recovery webhook delivery failed.");
+    }
+  });
+}
+
 export async function OPTIONS() {
   return new Response(null, { status: 204, headers: corsHeaders() });
 }
@@ -182,7 +203,7 @@ export async function POST(request: Request) {
 
   try {
     const { data: rule, error: ruleError } = await db.from("redirect_rules")
-      .select("id,target_url,hits_recovered")
+      .select("id,user_id,target_url,confidence,hits_recovered")
       .eq("domain", domain).eq("source_path", body.brokenPath).eq("is_active", true).maybeSingle();
     if (ruleError) throw ruleError;
 
@@ -197,6 +218,7 @@ export async function POST(request: Request) {
         incrementRecoveredHit(db, rule.id, rule.hits_recovered),
         recordEvent(db, body, domain, target, request),
       ]);
+      queueRecoveryWebhook(rule.user_id, domain, body.brokenPath, body.referrer, target, rule.confidence);
       return json({ redirectUrl: target });
     }
 
@@ -239,12 +261,12 @@ export async function POST(request: Request) {
       confidence: match!.similarity,
       is_active: true,
       hits_recovered: 1,
-    }).select("id,target_url,hits_recovered").single();
+    }).select("id,user_id,target_url,confidence,hits_recovered").single();
 
     if (insertError) {
       // A simultaneous first visit may have inserted the unique domain/path rule.
       const { data: concurrentRule, error: concurrentError } = await db.from("redirect_rules")
-        .select("id,target_url,hits_recovered").eq("domain", domain).eq("source_path", body.brokenPath).eq("is_active", true).maybeSingle();
+        .select("id,user_id,target_url,confidence,hits_recovered").eq("domain", domain).eq("source_path", body.brokenPath).eq("is_active", true).maybeSingle();
       if (concurrentError) throw concurrentError;
       const concurrentTarget = concurrentRule && safeTarget(concurrentRule.target_url, domain, body.brokenPath);
       if (!concurrentRule || !concurrentTarget) throw insertError;
@@ -252,10 +274,12 @@ export async function POST(request: Request) {
         incrementRecoveredHit(db, concurrentRule.id, concurrentRule.hits_recovered),
         recordEvent(db, body, domain, concurrentTarget, request),
       ]);
+      queueRecoveryWebhook(concurrentRule.user_id, domain, body.brokenPath, body.referrer, concurrentTarget, concurrentRule.confidence);
       return json({ redirectUrl: concurrentTarget });
     }
 
     await recordEvent(db, body, domain, created.target_url, request);
+    queueRecoveryWebhook(created.user_id, domain, body.brokenPath, body.referrer, target, created.confidence);
     return json({ redirectUrl: target });
   } catch {
     await recordEvent(db, body, domain, null, request).catch(() => undefined);

@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type Rule = { id: string; source_path: string; target_url: string; confidence: number | null; is_active: boolean; hits_recovered: number; created_at: string };
 type PixelEvent = { id: string; broken_path: string; ai_referrer: string; redirected_to: string | null; created_at: string };
-type PixelData = { domain: string; domains: string[]; rules: Rule[]; events: PixelEvent[] };
+type PixelData = { domain: string; domains: string[]; rules: Rule[]; events: PixelEvent[]; webhookConfigured: boolean };
 type Platform = "shopify" | "wordpress" | "nextjs" | "sitebuilder";
 type PixelDashboardProps = { initialData: PixelData; appOrigin: string; initialError?: string };
 
@@ -47,6 +47,7 @@ export default function PixelDashboard({ initialData, appOrigin, initialError = 
   const [platform, setPlatform] = useState<Platform>("shopify");
   const [copied, setCopied] = useState(false);
   const [busyAction, setBusyAction] = useState("");
+  const [webhookDraft, setWebhookDraft] = useState("");
   const [targets, setTargets] = useState<Record<string, string>>(() => Object.fromEntries(initialData.rules.map(rule => [rule.id, rule.target_url])));
 
   const load = useCallback(async (domain?: string, quiet = false) => {
@@ -133,6 +134,47 @@ export default function PixelDashboard({ initialData, appOrigin, initialError = 
     }
   }
 
+  async function saveWebhook(remove = false) {
+    if (!data.domain) return;
+    setBusyAction("webhook-save");
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/pixel/dashboard", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "saveWebhook", domain: data.domain, webhookUrl: remove ? "" : webhookDraft.trim() }),
+      });
+      if (!response.ok) throw await responseError(response);
+      setWebhookDraft("");
+      setNotice(remove ? "Webhook removed." : "Webhook saved privately.");
+      await load(data.domain, true);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Webhook settings could not be saved.");
+    } finally {
+      setBusyAction("");
+    }
+  }
+
+  async function sendTestAlert() {
+    if (!data.domain || !data.webhookConfigured) return;
+    setBusyAction("webhook-test");
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/pixel/dashboard", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain: data.domain }),
+      });
+      if (!response.ok) throw await responseError(response);
+      const result = await response.json() as { provider?: string };
+      setNotice(`Test alert sent to ${result.provider === "discord" ? "Discord" : "Slack"}.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Test alert could not be delivered.");
+    } finally {
+      setBusyAction("");
+    }
+  }
+
   const rows = useMemo(() => {
     const merged = new Map<string, { path: string; event?: PixelEvent; rule?: Rule }>();
     for (const event of data.events) {
@@ -185,6 +227,19 @@ export default function PixelDashboard({ initialData, appOrigin, initialError = 
             <pre className="min-w-0 flex-1 overflow-x-auto rounded-xl bg-[#172c24] p-4 text-xs leading-6 text-[#e6f0e7]"><code>{snippet}</code></pre>
             <button type="button" onClick={() => void copySnippet()} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#214d39] px-4 text-sm font-medium text-white hover:bg-[#183e2d] disabled:opacity-50" disabled={!snippet}>{copied ? <Check className="size-4" /> : <Copy className="size-4" />}{copied ? "Copied" : "Copy Snippet"}</button>
           </div>
+        </>}
+      </section>
+
+      <section className="mb-8 rounded-2xl border border-[#dfe5dc] bg-white p-5 shadow-sm sm:p-6">
+        <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-[.12em] text-[#557447]">Team notifications</p><h2 className="mt-2 text-xl font-semibold text-[#182c25]">Slack &amp; Discord alerts</h2><p className="mt-1 text-sm leading-6 text-[#68736b]">Get a message when an AI referral is recovered. Webhook credentials stay on the server and are never returned to this page.</p></div>
+        {!data.domain ? <p className="rounded-xl border border-dashed border-[#d6dfce] p-4 text-sm text-[#68736b]">Run an audit first to associate an alert destination with a domain.</p> : <>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <input type="url" autoComplete="off" spellCheck={false} aria-label="Slack or Discord incoming webhook URL" value={webhookDraft} onChange={event => setWebhookDraft(event.target.value)} placeholder={data.webhookConfigured ? "Webhook saved privately — paste a new URL to replace it" : "https://hooks.slack.com/services/... or https://discord.com/api/webhooks/..."} className="h-10 min-w-0 flex-1 rounded-lg border border-[#dfe5dc] px-3 text-sm text-[#182c25] placeholder:text-[#899189]" />
+            <button type="button" onClick={() => void saveWebhook()} disabled={!webhookDraft.trim() || busyAction === "webhook-save"} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#214d39] px-4 text-sm font-medium text-white hover:bg-[#183e2d] disabled:opacity-50">{busyAction === "webhook-save" ? <LoaderCircle className="size-4 animate-spin" /> : null}Save Webhook</button>
+            <button type="button" onClick={() => void sendTestAlert()} disabled={!data.webhookConfigured || busyAction === "webhook-test"} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#dfe5dc] px-4 text-sm font-medium text-[#36583f] hover:bg-[#f7f8f4] disabled:opacity-50">{busyAction === "webhook-test" ? <LoaderCircle className="size-4 animate-spin" /> : <Sparkles className="size-4" />}Send Test Alert</button>
+            {data.webhookConfigured && <button type="button" onClick={() => void saveWebhook(true)} disabled={busyAction === "webhook-save"} className="h-10 rounded-lg px-3 text-sm text-[#68736b] hover:bg-[#f7f8f4] disabled:opacity-50">Remove</button>}
+          </div>
+          {data.webhookConfigured && <p className="mt-3 text-xs text-[#557447]">A Slack or Discord webhook is configured for {data.domain}.</p>}
         </>}
       </section>
 

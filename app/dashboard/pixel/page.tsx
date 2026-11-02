@@ -15,7 +15,7 @@ async function PixelDashboardPage() {
   let appOrigin = process.env.NEXT_PUBLIC_APP_URL?.trim() || `${requestProtocol}://${requestHost}`;
   try { appOrigin = new URL(appOrigin).origin; } catch { appOrigin = "https://citemend.vercel.app"; }
 
-  let initialData = { domain: "", domains: [] as string[], rules: [] as { id: string; source_path: string; target_url: string; confidence: number | null; is_active: boolean; hits_recovered: number; created_at: string }[], events: [] as { id: string; broken_path: string; ai_referrer: string; redirected_to: string | null; created_at: string }[] };
+  let initialData = { domain: "", domains: [] as string[], rules: [] as { id: string; source_path: string; target_url: string; confidence: number | null; is_active: boolean; hits_recovered: number; created_at: string }[], events: [] as { id: string; broken_path: string; ai_referrer: string; redirected_to: string | null; created_at: string }[], webhookConfigured: false };
   let initialError = "";
   try {
     const db = createServerDatabase();
@@ -25,14 +25,16 @@ async function PixelDashboardPage() {
     const domains = [...new Set((audits ?? []).map(audit => audit.domain))];
     const domain = domains[0] ?? "";
     if (domain) {
-      const [rules, events] = await Promise.all([
+      const [rules, events, webhook] = await Promise.all([
         db.from("redirect_rules").select("id,source_path,target_url,confidence,is_active,hits_recovered,created_at")
           .eq("user_id", userId).eq("domain", domain).order("created_at", { ascending: false }).limit(200),
         db.from("ai_404_events").select("id,broken_path,ai_referrer,redirected_to,created_at")
           .eq("domain", domain).order("created_at", { ascending: false }).limit(100),
+        db.from("audits").select("id").eq("user_id", userId).eq("domain", domain).not("webhook_url", "is", null)
+          .order("created_at", { ascending: false }).limit(1).maybeSingle(),
       ]);
-      if (rules.error || events.error) throw rules.error ?? events.error;
-      initialData = { domain, domains, rules: rules.data ?? [], events: events.data ?? [] };
+      if (rules.error || events.error || webhook.error) throw rules.error ?? events.error ?? webhook.error;
+      initialData = { domain, domains, rules: rules.data ?? [], events: events.data ?? [], webhookConfigured: Boolean(webhook.data) };
     } else {
       initialData = { ...initialData, domains };
     }
