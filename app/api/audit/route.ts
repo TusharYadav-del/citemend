@@ -6,6 +6,6 @@ export async function GET() {
 }
 
 // Allow bounded sitemap embedding and live candidate verification to finish on Vercel.
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 export const POST = createAuditPostHandler();

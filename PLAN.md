@@ -427,3 +427,13 @@ The prompt endpoint uses the existing signed-in audit boundary and homepage SSRF
 - [ ] Verify the complete five-prompt run and progress transitions in a signed-in local browser. Node 26's built-in test runner could not start in this environment (`uv_os_get_passwd returned ENOMEM`); no live audit was created.
 
 The citation probe remains the configured Groq/Tavily pipeline from earlier project decisions; the progress UI names those providers. Semantic pgvector matching is still gated by the existing Gemini embeddings configuration, with lexical verified redirect suggestions retained as fallback. The report stores the first prompt in the existing `buyer_prompt` column for history compatibility and includes all prompts in the live combined response.
+
+
+## Day 35: Week 5 production push & database cleanup (DEPLOYMENT PENDING)
+
+- [x] Set the audit and capsule API route execution limits to 60 seconds; `npm run lint` and the production build pass.
+- [ ] Push the verified Day 35 change to `main` and confirm Vercel's deployment reaches Ready.
+- [x] Verify all eight core production variable names are present and `NEXT_PUBLIC_APP_URL` matches the production origin. Vercel masks 11 secrets, so their values were not inspected. Model overrides, the Lemon Squeezy webhook secret, the old-audit prompt override, and capsule signing override are absent; these are optional/defaulted or remain activation-pending from their earlier day entries.
+- [x] Verify hosted Supabase `match_sitemap_url`: the server secret key returned HTTP 200, while the publishable key was denied with HTTP 401.
+
+Hosted database role permissions are verified. Production Vercel secret values remain concealed by the platform, so only their configured presence—not the values themselves—was checked.
