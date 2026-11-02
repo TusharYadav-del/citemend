@@ -113,3 +113,9 @@ and valid FAQPage/Product script using the approved gemini-3.6-flash fallback.
 See day31-live-capsule.json for the generated draft and a bounded source summary.
 It is a manual API scenario, not proof that an audit actually ranked that source
 above Citemend. The existing citation probe remains unchanged.
+
+
+Final checks: all 128 unit/integration tests passed; all 13 browser scenarios
+passed (eight app cases and five isolated real-component cases). Lint and the
+production build passed with zero errors. The complete signed-in live browser
+click-through remains a separate manual check on a newly saved qualifying audit.

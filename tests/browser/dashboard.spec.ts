@@ -72,3 +72,10 @@ test("weekly cron still requires its private bearer token", async ({ request }) 
   const response = await request.get("/api/cron/weekly-scan");
   expect(response.status()).toBe(401);
 });
+
+
+test("anonymous capsule generation is rejected",async({request})=>{
+  const response=await request.post("/api/capsule",{data:{domain:"example.com",buyerPrompt:"Compare pricing",competitorUrl:"https://competitor.test/pricing"}});
+  expect(response.status()).toBe(401);
+  expect(await response.json()).toMatchObject({code:"SIGN_IN_REQUIRED"});
+});

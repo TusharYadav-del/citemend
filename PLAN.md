@@ -390,3 +390,17 @@ The existing Groq/Tavily citation probe, saved report schema, authentication, qu
 - [x] Pass all 128 unit/integration tests, npm run lint, and npm run build with zero errors.
 
 The requested gemini-2.5-flash returned HTTP 404 for this key. The approved models are explicit and configurable; no provider identity is hidden. The live competitor URL was supplied manually for verification and is not a claimed ranking result.
+
+
+## Day 32: Citation Capsule dialog and one-click copy (COMPLETED; SIGNED-IN LIVE CHECK PENDING)
+
+- [x] Install shadcn Dialog, Tabs, and Textarea and implement components/CitationCapsuleModal.tsx.
+- [x] Show the requested Win This Citation action for recorded answer-text gaps in fresh reports, the owner's dashboard, and owner-authenticated shareable reports.
+- [x] Add amber structural insights, an 80-word sandboxed/CSP-restricted HTML preview, selectable HTML, and JSON-LD tabs with copy feedback.
+- [x] Recheck Pro access on the server for every JSON-LD copy, show only a generic blurred preview to free accounts, and reuse the existing upgrade/sign-in flow. Active beta grants retain their existing Pro semantics.
+- [x] Handle loading, cancellation, provider failure/retry, expired sessions/tokens, clipboard denial, keyboard dismissal, and responsive wrapping.
+- [x] Keep prompts and saved competitor evidence private to their owner; do not fabricate capsule actions for historical audits without evidence.
+- [x] Verify all 13 browser scenarios (eight real-app cases and five isolated real-component cases with controlled auth/API responses), all 128 unit/integration tests, npm run lint, and npm run build with zero errors.
+- [ ] Confirm the complete click-through in the user's own signed-in browser on a newly saved qualifying audit. An authenticated production session was not impersonated or manufactured for testing.
+
+Backend extraction and Gemini generation were verified live separately from the controlled UI fixtures. Migration 010 is applied and its owner/public access behavior is verified. Existing audits without saved citation-gap evidence remain unchanged; run a new audit to capture that evidence. See docs/CITATION_CAPSULES.md.

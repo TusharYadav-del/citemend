@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { getPublicAudit } from "@/lib/public-audit";
+import SavedCitationGaps from "@/components/saved-citation-gaps";
 import CopyRedirects from "@/components/copy-redirects";
 
 export const metadata: Metadata = {
@@ -50,6 +51,7 @@ async function AuditReport({ params }: { params: Promise<{ id: string }> }) {
         <p className="mt-3 text-sm leading-6 text-[#68736b]">Broken citation destinations can interrupt a prospect&apos;s journey. Review each suggested destination before configuring a redirect.</p>
         {audit.broken_links.length ? <ol className="mt-6 space-y-4">{audit.broken_links.map((link, index) => <li key={link.id} className="rounded-xl border border-[#e5e9e0] bg-[#f7f8f4] p-5"><h3 className="text-sm font-semibold">Citation {index + 1} <span className="ml-2 text-red-700">HTTP 404</span></h3><p className="mt-3 break-all text-sm">{link.cited_url}</p><p className="mt-4 text-xs font-semibold text-[#53704e]">Suggested destination</p><p className="mt-2 break-all text-sm">{link.suggested_redirect ?? "No verified replacement saved. Review this destination manually."}</p></li>)}</ol> : <p className="mt-6 rounded-xl bg-[#f1f6eb] p-5 text-sm leading-6">No confirmed HTTP 404 links were saved for this audit. This does not establish that every page or citation is healthy.</p>}
       </section>
+      <SavedCitationGaps auditId={audit.id} domain={audit.domain} />
       <CopyRedirects domain={audit.domain} links={audit.broken_links} />
       <footer className="mt-8 space-y-2 text-xs leading-5 text-[#68736b]"><p>This is a saved snapshot, not a live status check. Only the audit summary and saved 404 findings are available; total citations and health scores were not stored.</p><p>Anyone with this report link can view it.</p></footer>
     </>

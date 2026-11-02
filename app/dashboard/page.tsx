@@ -9,6 +9,9 @@ import WeeklyMonitoring from "@/components/weekly-monitoring";
 import { hasProSubscription } from "@/lib/subscription";
 import { historyMetrics } from "@/lib/history-metrics";
 import { createServerDatabase } from "@/lib/supabase-server";
+import { getAuditCitationGaps } from "@/lib/citation-gap-store";
+import type { CitationGap } from "@/lib/citation-gap";
+import CitationGapPanel from "@/components/citation-gap-panel";
 import PublishRedirect from "@/components/publish-redirect";
 
 function HistoryLoading() {
@@ -34,7 +37,7 @@ function ruleKey(value: string): string | null {
   catch { return null; }
 }
 
-function AuditCard({ audit, isPro, activeRules }: { audit: UserAuditHistoryItem; isPro: boolean | null; activeRules: Set<string> }) {
+function AuditCard({ audit, isPro, activeRules, gap }: { gap?: CitationGap; audit: UserAuditHistoryItem; isPro: boolean | null; activeRules: Set<string> }) {
   const brokenLinks = audit.broken_links ?? [];
   return (
     <article className="rounded-2xl border border-[#dfe5dc] bg-white p-5 shadow-sm sm:p-6">
@@ -60,6 +63,7 @@ function AuditCard({ audit, isPro, activeRules }: { audit: UserAuditHistoryItem;
           </ul>
         </details>
       )}
+      {gap && <CitationGapPanel domain={audit.domain} gap={gap} />}
     </article>
   );
 }
@@ -74,6 +78,9 @@ async function UserAuditHistory() {
   let audits: UserAuditHistoryItem[];
   try { audits = await getUserAuditHistory(userId); }
   catch { return <HistoryUnavailable />; }
+
+  let gaps = new Map<string, CitationGap>();
+  try { gaps = await getAuditCitationGaps(userId); } catch {}
 
   let activeRules = new Set<string>();
   try {
@@ -91,7 +98,7 @@ async function UserAuditHistory() {
       <WeeklyMonitoring isPro={isPro} />
       <p className="mb-6 rounded-xl border border-[#dfe5dc] bg-[#f7f8f4] p-4 text-xs leading-5 text-[#68736b]">Pro users can publish or disable verified 301 suggestions below. Rules become active when the Cloudflare Worker is attached to the domain; edge lookups can retain a change for up to five seconds.</p>
       <p className="mb-6 rounded-xl border border-[#dfe5dc] bg-[#f7f8f4] p-4 text-xs leading-5 text-[#68736b]">Audits created before account ownership was enabled have no associated user and are not assigned to an account automatically.</p>
-      {audits.length ? <div className="space-y-4">{audits.map((audit) => <AuditCard key={audit.id} audit={audit} isPro={isPro} activeRules={activeRules} />)}</div> : <section className="rounded-2xl border border-dashed border-[#d6dfce] px-6 py-14 text-center"><h2 className="text-base font-semibold">No audits saved yet</h2><p className="mt-2 text-sm text-[#85907e]">Run an audit and it will appear here.</p><Link href="/#audit" className="mt-5 inline-flex rounded-lg bg-[#214d39] px-5 py-3 text-sm font-medium text-white">Run an audit</Link></section>}
+      {audits.length ? <div className="space-y-4">{audits.map((audit) => <AuditCard key={audit.id} audit={audit} gap={gaps.get(audit.id)} isPro={isPro} activeRules={activeRules} />)}</div> : <section className="rounded-2xl border border-dashed border-[#d6dfce] px-6 py-14 text-center"><h2 className="text-base font-semibold">No audits saved yet</h2><p className="mt-2 text-sm text-[#85907e]">Run an audit and it will appear here.</p><Link href="/#audit" className="mt-5 inline-flex rounded-lg bg-[#214d39] px-5 py-3 text-sm font-medium text-white">Run an audit</Link></section>}
     </main>
   );
 }
