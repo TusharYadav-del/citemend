@@ -14,11 +14,18 @@ const URL_REDIRECT_CREATE = `#graphql
     }
   }
 `;
+const VERIFY_SHOP = `#graphql
+  query VerifyCiteFixShop {
+    shop { name myshopifyDomain }
+  }
+`;
 
 export type ShopifyRedirect = { id: string; path: string; target: string };
+export type ShopifyConnectionDetails = { name: string; myshopifyDomain: string };
 
 type ShopifyGraphQLResponse = {
   data?: {
+    shop?: ShopifyConnectionDetails;
     urlRedirectCreate?: {
       urlRedirect: ShopifyRedirect | null;
       userErrors: Array<{ field: string[] | null; message: string }>;
@@ -72,6 +79,46 @@ function validateShopSubdomain(shopSubdomain: string): string {
   return normalized;
 }
 
+async function shopifyGraphQL<T>(shopSubdomain: string, accessToken: string, query: string, variables?: Record<string, unknown>): Promise<T> {
+  const shop = validateShopSubdomain(shopSubdomain);
+  if (typeof accessToken !== "string" || accessToken.length < 8 || accessToken.length > 4096 || /\s/.test(accessToken)) {
+    throw new Error("Provide a valid Shopify Admin API access token.");
+  }
+  const response = await fetch(`https://${shop}/admin/api/${SHOPIFY_ADMIN_API_VERSION}/graphql.json`, {
+    method: "POST",
+    redirect: "error",
+    cache: "no-store",
+    signal: AbortSignal.timeout(GRAPHQL_TIMEOUT_MS),
+    headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": accessToken },
+    body: JSON.stringify({ query, ...(variables ? { variables } : {}) }),
+  });
+
+  let result: ShopifyGraphQLResponse;
+  try {
+    result = await response.json() as ShopifyGraphQLResponse;
+  } catch {
+    throw new Error(`Shopify returned an invalid GraphQL response (HTTP ${response.status}).`);
+  }
+  if (!response.ok) throw new Error(`Shopify Admin API request failed (HTTP ${response.status}).`);
+  if (result.errors?.length) {
+    throw new Error(result.errors.map(error => error.message).filter(Boolean).join("; ").slice(0, 1000) || "Shopify GraphQL request failed.");
+  }
+  return result as T;
+}
+
+/** Validate a merchant-provided token with a minimal Admin GraphQL shop query. */
+export async function verifyShopifyConnection(shopSubdomain: string, accessToken: string): Promise<ShopifyConnectionDetails> {
+  const result = await shopifyGraphQL<ShopifyGraphQLResponse>(shopSubdomain, accessToken, VERIFY_SHOP);
+  const details = result.data?.shop;
+  if (!details || typeof details.name !== "string" || typeof details.myshopifyDomain !== "string") {
+    throw new Error("Shopify did not return a valid store identity.");
+  }
+  if (details.myshopifyDomain.toLowerCase() !== validateShopSubdomain(shopSubdomain)) {
+    throw new Error("The access token belongs to a different Shopify store.");
+  }
+  return details;
+}
+
 function validatePath(path: string, name: string): string {
   if (typeof path !== "string" || path.length < 2 || path.length > 2048 || !path.startsWith("/")
       || path.startsWith("//") || path.includes("\\") || /[\u0000-\u001f\u007f#]/.test(path)) {
@@ -90,33 +137,10 @@ export async function createShopifyRedirect(
   sourcePath: string,
   targetPath: string,
 ): Promise<ShopifyRedirect> {
-  const shop = validateShopSubdomain(shopSubdomain);
   const source = validatePath(sourcePath, "Source path");
   const target = validatePath(targetPath, "Target path");
   if (source === target) throw new Error("Source and target paths must be different.");
-  if (typeof accessToken !== "string" || accessToken.length < 8 || accessToken.length > 4096 || /\s/.test(accessToken)) {
-    throw new Error("Provide a valid Shopify Admin API access token.");
-  }
-
-  const response = await fetch(`https://${shop}/admin/api/${SHOPIFY_ADMIN_API_VERSION}/graphql.json`, {
-    method: "POST",
-    redirect: "error",
-    cache: "no-store",
-    signal: AbortSignal.timeout(GRAPHQL_TIMEOUT_MS),
-    headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": accessToken },
-    body: JSON.stringify({ query: URL_REDIRECT_CREATE, variables: { urlRedirect: { path: source, target } } }),
-  });
-
-  let result: ShopifyGraphQLResponse;
-  try {
-    result = await response.json() as ShopifyGraphQLResponse;
-  } catch {
-    throw new Error(`Shopify returned an invalid GraphQL response (HTTP ${response.status}).`);
-  }
-  if (!response.ok) throw new Error(`Shopify Admin API request failed (HTTP ${response.status}).`);
-  if (result.errors?.length) {
-    throw new Error(result.errors.map(error => error.message).filter(Boolean).join("; ").slice(0, 1000) || "Shopify GraphQL request failed.");
-  }
+  const result = await shopifyGraphQL<ShopifyGraphQLResponse>(shopSubdomain, accessToken, URL_REDIRECT_CREATE, { urlRedirect: { path: source, target } });
 
   const payload = result.data?.urlRedirectCreate;
   if (!payload) throw new Error("Shopify did not return a URL redirect result.");

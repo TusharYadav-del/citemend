@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Check, Copy, ExternalLink, LoaderCircle, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ShopifySyncModal from "@/components/ShopifySyncModal";
 
 type Rule = { id: string; source_path: string; target_url: string; confidence: number | null; is_active: boolean; hits_recovered: number; created_at: string };
 type PixelEvent = { id: string; broken_path: string; ai_referrer: string; redirected_to: string | null; created_at: string };
@@ -199,7 +200,9 @@ export default function PixelDashboard({ initialData, appOrigin, initialError = 
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[#182c25]">Turn AI 404s into recovered visits</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#68736b]">Install the lightweight pixel, then monitor AI referrals and the redirects recovering your visitors.</p>
         </div>
-        {data.domains.length > 1 && <label className="grid gap-1 text-xs font-medium text-[#68736b]">Domain<select className="h-10 min-w-52 rounded-lg border border-[#dfe5dc] bg-white px-3 text-sm text-[#182c25]" value={data.domain} onChange={event => void load(event.target.value)}>{data.domains.map(domain => <option key={domain}>{domain}</option>)}</select></label>}
+        <div className="flex flex-wrap items-center gap-3">{data.domains.length > 1 && <label className="grid gap-1 text-xs font-medium text-[#68736b]">Domain<select className="h-10 min-w-52 rounded-lg border border-[#dfe5dc] bg-white px-3 text-sm text-[#182c25]" value={data.domain} onChange={event => void load(event.target.value)}>{data.domains.map(domain => <option key={domain}>{domain}</option>)}</select></label>}
+          <ShopifySyncModal domain={data.domain} redirectRules={activeRules.map(rule => ({ id: rule.id, sourcePath: rule.source_path }))} onSynced={() => void load(data.domain, true)} />
+        </div>
       </header>
 
       {error && <div role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div>}
