@@ -19,6 +19,12 @@
         Update: { id?: string; user_id?: string | null; domain?: string; buyer_prompt?: string | null; webhook_url?: string | null; status?: string; created_at?: string };
         Relationships: [];
       };
+      cms_connections: {
+        Row: { id: string; user_id: string; domain: string; platform: "shopify" | "wordpress" | "vercel"; shop_subdomain: string | null; access_token: string; created_at: string };
+        Insert: { id?: string; user_id: string; domain: string; platform: "shopify" | "wordpress" | "vercel"; shop_subdomain?: string | null; access_token: string; created_at?: string };
+        Update: { id?: string; user_id?: string; domain?: string; platform?: "shopify" | "wordpress" | "vercel"; shop_subdomain?: string | null; access_token?: string; created_at?: string };
+        Relationships: [];
+      };
       broken_links: {
         Row: { id: string; audit_id: string; cited_url: string; http_status: number; suggested_redirect: string | null; created_at: string };
         Insert: { id?: string; audit_id: string; cited_url: string; http_status: number; suggested_redirect?: string | null; created_at?: string };

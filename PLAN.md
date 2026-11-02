@@ -518,3 +518,15 @@ The browser access host was unavailable, so the switch was not clicked through i
 - [x] Run 20 concurrent read-only production OPTIONS requests: 20/20 returned the expected CORS response in 1.39 seconds total.
 
 Only preflight requests were used for the concurrency check; no production telemetry or redirect rules were written.
+
+
+## Day 43: CMS integration schema & Shopify redirect helper (CODE COMPLETE; HOSTED SETUP PENDING)
+
+- [x] Add forward migration `013_cms_integrations.sql`; migration `004` is already assigned to Lemon Squeezy subscriptions.
+- [x] Restrict `cms_connections` to trusted server-role database access with RLS enabled; store the `access_token` field as an authenticated AES-256-GCM envelope rather than plaintext.
+- [x] Add server-only token encrypt/decrypt helpers and a validated `urlRedirectCreate` GraphQL helper, including the required `write_online_store_navigation` scope note.
+- [x] Update database types and document the required private `SHOPIFY_TOKEN_ENCRYPTION_KEY` environment variable.
+- [x] Pass `npm run lint`, `npm run build`, and `git diff --check`; run `npm run dev` and verify the homepage returns HTTP 200.
+- [ ] Apply migration 013 in hosted Supabase and configure a private 32-byte encryption key before storing any merchant token. Dashboard browser access is unavailable in this environment; the SQL is ready in `supabase/migrations/013_cms_integrations.sql`.
+
+The Shopify helper targets Admin GraphQL API `2026-10`: the prompt's `2025-01` API version has been retired. See [Shopify API version schedule](https://shopify.dev/docs/api/usage/versioning). A custom app needs the `write_online_store_navigation` access scope to create redirects.
