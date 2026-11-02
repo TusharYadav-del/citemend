@@ -415,3 +415,15 @@ Backend extraction and Gemini generation were verified live separately from the 
 - [ ] Verify live generation in an authenticated browser session; no user session was impersonated, and interactive domain/model timing was not measured.
 
 The prompt endpoint uses the existing signed-in audit boundary and homepage SSRF defenses. Set `GEMINI_PROMPT_MODEL` and optionally `GEMINI_PROMPT_FALLBACK_MODEL` in the server environment if the project key supports different models. The audit still runs only after the user selects/edits a prompt and submits.
+
+
+## Day 34: Multi-prompt parallel execution & progress bar UI (COMPLETED; LIVE SIGNED-IN CHECK PENDING)
+
+- [x] Extend the existing authenticated `/api/audit` flow to accept one legacy prompt or up to five buyer prompts, preserving free-audit reservation, Pro access, persistence, and provider error handling.
+- [x] Run sitemap discovery and all citation probes concurrently; tolerate individual prompt failures, merge/deduplicate citations, verify target URLs with bounded parallel HTTP checks, and retain existing semantic/lexical redirect verification.
+- [x] Return the combined buyer prompts and a 0–100 verified AI visibility/link health score in the combined report.
+- [x] Add the shadcn-style Progress primitive and animated four-stage audit progress panel; allow selection of up to five generated prompts and display the combined results in the existing report view.
+- [x] Verify `npm run lint`, `npm run build`, and `git diff --check` successfully. The build used a temporary output directory because OneDrive intermittently locks `.next/static`; generated build output and temporary config changes were removed.
+- [ ] Verify the complete five-prompt run and progress transitions in a signed-in local browser. Node 26's built-in test runner could not start in this environment (`uv_os_get_passwd returned ENOMEM`); no live audit was created.
+
+The citation probe remains the configured Groq/Tavily pipeline from earlier project decisions; the progress UI names those providers. Semantic pgvector matching is still gated by the existing Gemini embeddings configuration, with lexical verified redirect suggestions retained as fallback. The report stores the first prompt in the existing `buyer_prompt` column for history compatibility and includes all prompts in the live combined response.

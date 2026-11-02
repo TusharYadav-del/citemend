@@ -35,6 +35,8 @@ export function parseDashboardReport(value: unknown): DashboardReport {
     try { const url = new URL(value); return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password; } catch { return false; }
   }
   if (!(typeof report.auditId === "string" && !!report.auditId || report.auditId === null && report.persistence && typeof report.persistence === "object" && ["failed", "disabled"].includes(String((report.persistence as Record<string, unknown>).status))) || typeof report.domain !== "string" || typeof report.generatedText !== "string" || !["completed", "partial"].includes(String(report.status)) || typeof report.sitemapUrlCount !== "number" || !Number.isInteger(report.sitemapUrlCount) || report.sitemapUrlCount < 0 || !Array.isArray(report.warnings) || !report.warnings.every((warning) => typeof warning === "string") || !Array.isArray(report.findings)) return fail();
+  if (report.visibilityScore !== undefined && (typeof report.visibilityScore !== "number" || !Number.isInteger(report.visibilityScore) || report.visibilityScore < 0 || report.visibilityScore > 100)) return fail();
+  if (report.buyerPrompts !== undefined && (!Array.isArray(report.buyerPrompts) || report.buyerPrompts.length < 1 || report.buyerPrompts.length > 5 || !report.buyerPrompts.every((prompt) => typeof prompt === "string" && prompt.trim().length > 0 && prompt.length <= 4000))) return fail();
   for (const entry of report.findings) {
     if (!entry || typeof entry !== "object") return fail();
     const finding = entry as Record<string, unknown>;
