@@ -1,6 +1,12 @@
 ﻿export type Database = {
   public: {
     Tables: {
+      audit_citation_gaps: {
+        Row: { audit_id: string; user_id: string; domain: string; buyer_prompt: string; provider: string; competitor_urls: string[]; created_at: string };
+        Insert: { audit_id: string; user_id: string; domain: string; buyer_prompt: string; provider: string; competitor_urls: string[]; created_at?: string };
+        Update: { audit_id?: string; user_id?: string; domain?: string; buyer_prompt?: string; provider?: string; competitor_urls?: string[]; created_at?: string };
+        Relationships: [];
+      };
       sitemap_pages: {
         Row: { id: string; domain: string; url: string; page_title: string; embedding: string; embedding_model: string; updated_at: string };
         Insert: { id?: string; domain: string; url: string; page_title: string; embedding: string; embedding_model?: string; updated_at?: string };

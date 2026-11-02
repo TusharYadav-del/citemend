@@ -374,3 +374,19 @@ The user applied the SQL in the existing project. Hosted server access, public d
 - [ ] Confirm a signed-in browser audit result with the user's authenticated session.
 
 The existing Groq/Tavily citation probe, saved report schema, authentication, quotas, and Pro controls remain in use. Live Gemini access and hosted sitemap storage/RPC were verified after the user applied migration 009. The user approved gemini-embedding-001. The controlled authenticated route fixture verifies a 0.94 similarity becomes 94%; this is not a claimed live score. Confidence is returned with the current audit and is not added to historic saved reports. The live verification used a controlled broken citation with real sitemap discovery, Gemini vectors, hosted matching, and live HTTP checks, and did not create a hosted audit. See docs/day30-live-results.json. The existing browser tests cover anonymous workflows; authenticated browser confirmation remains separate.
+
+
+## Day 31: Competitor citation gap analyzer backend (COMPLETED)
+
+- [x] Install Cheerio and add lib/citation-capsule.ts plus authenticated POST /api/capsule.
+- [x] Safely fetch bounded public HTML with browser headers, DNS-pinned SSRF checks and checked redirects; extract H1/H2, FAQ markup and JSON-LD FAQs, paragraph/table structure, schema types, and up to 1,500 main-text words.
+- [x] Generate a two-sentence structural insight, exactly 80 words of escaped semantic section HTML, and valid FAQPage/Product JSON-LD; keep competitor facts separate from target evidence and make causation/fact-review limits explicit.
+- [x] Use user-approved gemini-3.8-flash with an explicitly approved gemini-3.6-flash fallback; report the actual model, validate output, and allow one bounded repair instead of truncating or padding drafts.
+- [x] Capture real answer-text citation gaps in new audits without confusing search-only sources, general references, or provider identities with proven competitor rankings.
+- [x] Apply migration 010_audit_citation_gaps.sql (user confirmed); independently verify owner-scoped hosted save/read, another-owner exclusion, public HTTP 401, and cleanup of the temporary fixture.
+- [x] Preserve core audit saves on optional evidence failure and keep buyer prompts private to their owner.
+- [x] Enforce sign-in, server-side Pro schema exports, encrypted owner-bound expiring export tokens, upload/body/deadline limits, and private no-store responses.
+- [x] Verify a real Ahrefs structure extraction and an 80-word Gemini capsule with the approved fallback; record docs/day31-live-capsule.json and docs/DAY31_BACKEND.md.
+- [x] Pass all 128 unit/integration tests, npm run lint, and npm run build with zero errors.
+
+The requested gemini-2.5-flash returned HTTP 404 for this key. The approved models are explicit and configurable; no provider identity is hidden. The live competitor URL was supplied manually for verification and is not a claimed ranking result.

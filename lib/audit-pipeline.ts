@@ -6,6 +6,8 @@ import type { CitationProbeResult as GeminiProbeResult } from "./gemini";
 import { runCitationProbe, type CitationProbeResult } from "./citation-probe";
 type ProbeResult = CitationProbeResult | GeminiProbeResult;
 import { fetchSitemapUrls, checkUrlStatus } from "./seo";
+import { detectCitationGap, type CitationGap } from "./citation-gap";
+import { saveAuditCitationGap } from "./citation-gap-store";
 import { persistAudit } from "./audit-store";
 import { matchSitemapUrls, SEMANTIC_MATCH_THRESHOLD } from "./sitemap-embeddings";
 
@@ -16,11 +18,13 @@ export type AuditReport = {
   groundingMetadata: GeminiProbeResult["groundingMetadata"];
   providerUsed?: string; searchGrounding?: CitationProbeResult["searchGrounding"];
   extractedUrls: string[]; sitemapUrlCount: number;
+  citationGap?: CitationGap;
   findings: AuditFinding[]; warnings: string[]; status: "completed" | "partial";
 };
 export type AuditDependencies = {
   probe: (domain: string, buyerPrompt: string) => Promise<ProbeResult>; sitemap: typeof fetchSitemapUrls; check: typeof checkUrlStatus;
   semantic: typeof matchSitemapUrls | null;
+  saveGap: typeof saveAuditCitationGap;
   resolve: (url: string) => Promise<string | null>;
   save: (report: AuditReport, userId?: string) => Promise<{ id: string; createdAt: string }>;
 };
@@ -114,7 +118,7 @@ function similarity(a: string, b: string): number {
 
 export async function runAudit(input: unknown, overrides: Partial<AuditDependencies> = {}, userId?: string) {
   const { domain, buyerPrompt } = validateAuditInput(input);
-  const deps: AuditDependencies = { probe: runCitationProbe, sitemap: fetchSitemapUrls, check: checkUrlStatus, resolve: resolveGroundingRedirect, save: persistAudit, semantic: process.env.GEMINI_API_KEY ? matchSitemapUrls : null, ...overrides };
+  const deps: AuditDependencies = { probe: runCitationProbe, sitemap: fetchSitemapUrls, check: checkUrlStatus, resolve: resolveGroundingRedirect, save: persistAudit, saveGap: saveAuditCitationGap, semantic: process.env.GEMINI_API_KEY ? matchSitemapUrls : null, ...overrides };
   const probe = await deps.probe(domain, buyerPrompt);
   const extracted = extractCitationUrls(probe);
   if (extracted.length > 100) throw new AuditInputError("The generated response contains more than 100 citation URLs; narrow the buyer prompt.");
@@ -179,6 +183,8 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
   const groundingMetadata = "groundingMetadata" in probe ? probe.groundingMetadata : null;
   if (!("searchGrounding" in probe) && !groundingMetadata) warnings.push("The probe returned no grounding metadata; only response text URLs could be inspected.");
   const report: AuditReport = { domain, buyerPrompt, generatedText: probe.text, groundingMetadata, providerUsed: "providerUsed" in probe ? probe.providerUsed : "gemini", ...("searchGrounding" in probe ? { searchGrounding: probe.searchGrounding } : {}), extractedUrls: allUrls, sitemapUrlCount: sitemap.length, findings, warnings: [...new Set(warnings)], status: warnings.length ? "partial" : "completed" };
+  const gap = detectCitationGap(domain, buyerPrompt, probe.text, report.providerUsed ?? "unknown");
+  if (gap) report.citationGap = gap;
   if (process.env.AUDIT_PERSISTENCE_MODE === "local") {
     report.status = "partial";
     report.warnings.push("Local report only: database persistence is disabled.");
@@ -186,6 +192,10 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
   }
   try {
     const saved = await deps.save(report, userId);
+    if (gap && userId) {
+      try { await deps.saveGap(saved.id, userId, domain, gap); }
+      catch { report.status = "partial"; report.warnings.push("The audit was saved, but citation-gap evidence could not be saved. Apply migration 010 to enable saved capsule actions."); }
+    }
     return { ...report, auditId: saved.id, createdAt: saved.createdAt, persistence: { status: "saved" as const }, suggestionCandidatesPer404: 5 };
   } catch {
     report.status = "partial";

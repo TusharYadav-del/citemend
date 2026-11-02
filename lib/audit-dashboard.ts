@@ -1,4 +1,5 @@
-﻿import type { AuditFinding, AuditReport } from "./audit-pipeline";
+﻿import { parseCitationGap } from "./citation-gap";
+import type { AuditFinding, AuditReport } from "./audit-pipeline";
 
 export type DashboardReport = AuditReport & { auditId: string | null; createdAt: string; persistence?: { status: "saved" | "failed" | "disabled" } };
 
@@ -44,6 +45,7 @@ export function parseDashboardReport(value: unknown): DashboardReport {
     if (finding.matchConfidence !== undefined && (typeof finding.matchConfidence !== "number" || !Number.isInteger(finding.matchConfidence)
       || finding.matchConfidence < 0 || finding.matchConfidence > 100 || finding.httpStatus !== 404 || !finding.suggestedRedirect)) return fail();
   }
+  if (report.citationGap !== undefined && !parseCitationGap(report.citationGap)) return fail();
   if (report.searchGrounding !== undefined && (!report.searchGrounding || typeof report.searchGrounding !== "object" || !["available", "unavailable", "not_configured"].includes(String((report.searchGrounding as Record<string, unknown>).status)))) return fail();
   if (report.persistence !== undefined && (!report.persistence || typeof report.persistence !== "object" || !["saved", "failed", "disabled"].includes(String((report.persistence as Record<string, unknown>).status)))) return fail();
   if (report.persistence) {

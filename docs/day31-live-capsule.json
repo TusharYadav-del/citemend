@@ -1,0 +1,28 @@
+{
+  "whyCompetitorWon": "The competitor page utilizes structured FAQ schema markup and clear heading hierarchies to break down distinct features and collection methodologies. However, whether these specific structural choices directly drive AI citation wins remains uncertain across different evaluation probes.",
+  "tldrHtmlBlock": "<section aria-label=\"Citation Capsule\"><p>To identify broken AI citation links, auditors should regularly crawl referred URLs and monitor server logs for four-oh-four errors. When a decayed or missing destination is detected, teams can map the outdated path to a relevant, live replacement using three-oh-one redirects. Maintaining accurate canonical tags, structured metadata, and consistent link taxonomies helps preserve referral integrity across crawlers. Evaluating link health requires testing endpoint status codes and verifying that target content aligns with original topics without introducing unintended redirect loops today.</p></section>",
+  "jsonLdSchema": "<script type=\"application/ld+json\">\n{\n  \"@context\": \"https://schema.org\",\n  \"@graph\": [\n    {\n      \"@type\": \"FAQPage\",\n      \"mainEntity\": [\n        {\n          \"@type\": \"Question\",\n          \"name\": \"How do technical teams detect broken citation links?\",\n          \"acceptedAnswer\": {\n            \"@type\": \"Answer\",\n            \"text\": \"Teams detect broken links by running automated web crawls, analyzing server error logs for missing pages, and verifying HTTP response status codes on cited paths.\"\n          }\n        },\n        {\n          \"@type\": \"Question\",\n          \"name\": \"What is the standard method for configuring verified redirects?\",\n          \"acceptedAnswer\": {\n            \"@type\": \"Answer\",\n            \"text\": \"Configuring permanent 301 redirects from the inactive URL to a closely matching live URL ensures traffic and crawlers reach the correct destination seamlessly.\"\n          }\n        }\n      ]\n    },\n    {\n      \"@type\": \"Product\",\n      \"name\": \"citemend.vercel.app\",\n      \"url\": \"https://citemend.vercel.app/\",\n      \"description\": \"To identify broken AI citation links, auditors should regularly crawl referred URLs and monitor server logs for four-oh-four errors. When a decayed or missing destination is detected, teams can map the outdated path to a relevant, live replacement using three-oh-one redirects. Maintaining accurate canonical tags, structured metadata, and consistent link taxonomies helps preserve referral integrity across crawlers. Evaluating link health requires testing endpoint status codes and verifying that target content aligns with original topics without introducing unintended redirect loops today.\"\n    }\n  ]\n}\n</script>",
+  "model": "gemini-3.6-flash",
+  "source": {
+    "url": "https://ahrefs.com/brand-radar",
+    "h1": "Brand Radar",
+    "faqCount": 0,
+    "paragraphCount": 12,
+    "bodyWords": 1500,
+    "tableHeaders": [],
+    "schemaTypes": [
+      "FAQPage",
+      "Question",
+      "Answer"
+    ],
+    "h2Count": 10
+  },
+  "warning": "Structure analysis suggests possible citation advantages; it cannot prove why an AI chose a page. Review every claim, publish matching visible FAQ content, and use Product schema only if it describes your offering.",
+  "verification": {
+    "date": "2026-11-02",
+    "timezone": "Asia/Kolkata",
+    "competitorUrlProvidedManually": true,
+    "authenticatedBrowserVerified": false,
+    "generatedDraftNeedsFactReview": true
+  }
+}
