@@ -1,6 +1,12 @@
 ﻿export type Database = {
   public: {
     Tables: {
+      sitemap_pages: {
+        Row: { id: string; domain: string; url: string; page_title: string; embedding: string; embedding_model: string; updated_at: string };
+        Insert: { id?: string; domain: string; url: string; page_title: string; embedding: string; embedding_model?: string; updated_at?: string };
+        Update: { id?: string; domain?: string; url?: string; page_title?: string; embedding?: string; embedding_model?: string; updated_at?: string };
+        Relationships: [];
+      };
       audits: {
         Row: { id: string; user_id: string | null; domain: string; buyer_prompt: string | null; status: string; created_at: string };
         Insert: { id?: string; user_id?: string | null; domain: string; buyer_prompt?: string | null; status?: string; created_at?: string };
@@ -45,7 +51,12 @@
       };
     };
     Views: { [key in never]: never };
-    Functions: { [key in never]: never };
+    Functions: {
+      match_sitemap_url: {
+        Args: { query_embedding: string; target_domain: string; match_threshold: number; match_count: number; query_model?: string };
+        Returns: { url: string; similarity: number }[];
+      };
+    };
     Enums: { [key in never]: never };
     CompositeTypes: { [key in never]: never };
   };

@@ -346,3 +346,15 @@ The current Lemon Squeezy configuration remains in test mode. The production web
 Day 28's stabilization and retrospective scope is complete. Historical Vercel logs beyond retention, Web Analytics, Supabase server logs, and authenticated dashboard UI review remain unverified. Production Clerk, billing webhook, scheduler, sender-domain, and Worker-route activation retain their earlier recorded status. Day 27 was not present in this plan and is not marked complete by this task.
 
 Recovery: Ask Codex to inspect and undo the specific broken change.
+
+
+## Day 29: pgvector sitemap schema (CODE COMPLETE; HOSTED ACTIVATION PENDING)
+
+- [x] Add forward migration 009_pgvector_sitemaps.sql without colliding with existing migration 002.
+- [x] Enable vector, add the 768-dimensional sitemap_pages table and domain/URL uniqueness, and provide a bounded cosine RPC with domain/model isolation.
+- [x] Restrict the table and RPC to server-side service-role access; keep existing tables and features unchanged.
+- [x] Execute the migration in local PostgreSQL with pgvector and verify cosine ordering, threshold/count filtering, domain/model isolation, and public access denial.
+- [x] Verify npm run lint and npm run build with zero errors.
+- [ ] Apply the migration to the existing hosted Citemend Supabase project and verify REST/RPC access.
+
+Dashboard automation cannot initialize and no management token or database connection is configured. SQL Editor application was requested; this record does not claim the hosted extension is active.
