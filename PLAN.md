@@ -506,3 +506,15 @@ The user will test live Slack webhook delivery later by saving the URL in `/dash
 - [x] Verify `npm run lint`, `npm run build`, `git diff --check`, and local homepage HTTP 200 with the demo present.
 
 The browser access host was unavailable, so the switch was not clicked through in Chrome during this run.
+
+
+## Day 42: Week 6 production deployment & CORS/load verification (COMPLETED)
+
+- [x] Explicitly bypass Clerk middleware for public `/api/pixel/resolve` while preserving authentication on dashboard routes.
+- [x] Configure wildcard CORS and public cache headers for `/citefix-pixel.js`; keep resolver responses wildcard-CORS and `no-store`.
+- [x] Pass `npm run lint`, `npm run build`, and `git diff --check`.
+- [x] Deploy commit `a69e7da` to `main`; GitHub reported the Vercel deployment check successful.
+- [x] Verify production from `https://citemend.vercel.app`: external-origin OPTIONS returned 204 with wildcard CORS; malformed unauthenticated POST reached the resolver and returned 400 JSON with wildcard CORS; pixel script returned 200 with wildcard CORS and public cache headers.
+- [x] Run 20 concurrent read-only production OPTIONS requests: 20/20 returned the expected CORS response in 1.39 seconds total.
+
+Only preflight requests were used for the concurrency check; no production telemetry or redirect rules were written.
