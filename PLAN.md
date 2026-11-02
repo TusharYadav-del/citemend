@@ -543,3 +543,13 @@ The Shopify helper targets Admin GraphQL API `2026-10`: the prompt's `2025-01` A
 - [ ] Verify a real connect/sync against a merchant development store. No Shopify store/token was supplied in this session; enter the credential directly in the signed-in dashboard to verify.
 
 Only active, owner-approved redirects are published to Shopify. Creating a URL redirect requires the `write_online_store_navigation` scope. The backend uses Shopify Admin GraphQL API `2026-10`; see the official [versioning schedule](https://shopify.dev/docs/api/usage/versioning).
+
+
+## Day 45: One-click exports for Vercel, Next.js, Cloudflare/Netlify, WordPress, and Shopify (COMPLETED)
+
+- [x] Add pure formatters for Vercel `vercel.json`, a Next.js redirects snippet, Cloudflare Pages/Netlify `_redirects`, WordPress Redirection CSV, and Shopify URL Redirects CSV.
+- [x] Add an accessible Export Redirects dashboard drawer with platform tabs, code preview, copy, and downloadable files.
+- [x] Populate exports only from the signed-in user's redirect rules that are active and enabled; preserve the existing Pro-gated public report export and Shopify sync behavior.
+- [x] Verify `npm run lint` and `npm run build` with zero errors.
+
+No third-party setup is required for downloading files. Import behavior should be reviewed against the destination platform's current requirements before applying redirects.

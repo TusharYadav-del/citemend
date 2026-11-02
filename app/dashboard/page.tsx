@@ -13,6 +13,7 @@ import { getAuditCitationGaps } from "@/lib/citation-gap-store";
 import type { CitationGap } from "@/lib/citation-gap";
 import CitationGapPanel from "@/components/citation-gap-panel";
 import PublishRedirect from "@/components/publish-redirect";
+import RedirectExportDrawer from "@/components/RedirectExportDrawer";
 
 function HistoryLoading() {
   return <main className="mx-auto w-full max-w-5xl px-5 py-10 sm:px-8 sm:py-14" role="status" aria-label="Loading your audit history"><div className="h-8 w-52 animate-pulse rounded-lg bg-[#e9eee4]" /><div className="mt-8 grid gap-4 sm:grid-cols-3">{[0, 1, 2].map((item) => <div key={item} className="h-32 animate-pulse rounded-2xl bg-[#f1f4ed]" />)}</div><div className="mt-8 h-36 animate-pulse rounded-2xl bg-[#f1f4ed]" /><span className="sr-only">Loading your audit history...</span></main>;
@@ -83,16 +84,20 @@ async function UserAuditHistory() {
   try { gaps = await getAuditCitationGaps(userId); } catch {}
 
   let activeRules = new Set<string>();
+  let exportRules: { source_path: string; target_url: string }[] = [];
   try {
-    const { data, error } = await createServerDatabase().from("redirect_rules").select("source_host,source_path").eq("user_id", userId).eq("active", true);
-    if (!error) activeRules = new Set((data ?? []).map((rule) => `${rule.source_host}:${rule.source_path}`));
+    const { data, error } = await createServerDatabase().from("redirect_rules").select("source_host,source_path,target_url").eq("user_id", userId).eq("active", true).eq("is_active", true).limit(500);
+    if (!error) {
+      activeRules = new Set((data ?? []).map((rule) => `${rule.source_host}:${rule.source_path}`));
+      exportRules = (data ?? []).map((rule) => ({ source_path: rule.source_path, target_url: rule.target_url }));
+    }
   } catch {}
 
   return (
     <main className="mx-auto w-full max-w-5xl px-5 py-10 sm:px-8 sm:py-14">
       <header className="mb-10 flex flex-wrap items-center justify-between gap-4 border-b border-[#dfe5dc] pb-6">
         <div><Link href="/" className="text-sm font-medium text-[#53704e] hover:underline">&larr; Back to Citemend</Link><p className="mt-4 text-[10px] font-semibold tracking-[.18em] text-[#53704e]">YOUR WORKSPACE</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Audit history</h1><p className="mt-2 text-sm text-[#68736b]">Your saved audits, sorted from newest to oldest.</p></div>
-        <div className="flex items-center gap-3"><Link href="/dashboard/pixel" className="rounded-lg border border-[#dfe5dc] px-3 py-2 text-sm font-medium text-[#36583f] hover:bg-[#f7f8f4]">Pixel &amp; traffic</Link><CheckoutButton /><UserButton /></div>
+        <div className="flex items-center gap-3"><RedirectExportDrawer rules={exportRules} /><Link href="/dashboard/pixel" className="rounded-lg border border-[#dfe5dc] px-3 py-2 text-sm font-medium text-[#36583f] hover:bg-[#f7f8f4]">Pixel &amp; traffic</Link><CheckoutButton /><UserButton /></div>
       </header>
       <MetricCards audits={audits} />
       <WeeklyMonitoring isPro={isPro} />
