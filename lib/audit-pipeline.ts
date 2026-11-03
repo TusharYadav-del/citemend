@@ -10,6 +10,7 @@ import { detectCitationGap, type CitationGap } from "./citation-gap";
 import { saveAuditCitationGap } from "./citation-gap-store";
 import { persistAudit } from "./audit-store";
 import { matchSitemapUrls, SEMANTIC_MATCH_THRESHOLD } from "./sitemap-embeddings";
+import { buildEngineMatrix, type EngineCitation } from "./engine-matrix";
 
 export class AuditInputError extends Error {}
 export type AuditFinding = { url: string; httpStatus: number | null; error: string | null; suggestedRedirect: string | null; matchConfidence?: number };
@@ -19,6 +20,8 @@ export type AuditReport = {
   providerUsed?: string; searchGrounding?: CitationProbeResult["searchGrounding"];
   extractedUrls: string[]; sitemapUrlCount: number;
   citationGap?: CitationGap;
+  engineMatrixJson?: ReturnType<typeof buildEngineMatrix>["rows"];
+  shareOfModelScore?: number;
   findings: AuditFinding[]; warnings: string[]; status: "completed" | "partial";
 };
 export type AuditDependencies = {
@@ -235,7 +238,18 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
   if (!("searchGrounding" in probe) && !groundingMetadata) warnings.push("The probe returned no grounding metadata; only response text URLs could be inspected.");
   const verifiedFindings = findings.filter((finding) => finding.httpStatus !== null);
   const visibilityScore = verifiedFindings.length ? Math.round(100 * verifiedFindings.filter((finding) => finding.httpStatus! >= 200 && finding.httpStatus! < 300).length / verifiedFindings.length) : 0;
-  const report: AuditReport = { domain, buyerPrompt, ...(buyerPrompts.length > 1 ? { buyerPrompts } : {}), competitorDomains, ...(groundTruthPricing ? { groundTruthPricing } : {}), visibilityScore, generatedText: probe.text, groundingMetadata, providerUsed: "providerUsed" in probe ? probe.providerUsed : "gemini", ...("searchGrounding" in probe ? { searchGrounding: probe.searchGrounding } : {}), extractedUrls: allUrls, sitemapUrlCount: sitemap.length, findings, warnings: [...new Set(warnings)], status: warnings.length ? "partial" : "completed" };
+  const findingByUrl = new Map(findings.map((finding) => [finding.url, finding]));
+  const engineMatrix = buildEngineMatrix({
+    domain,
+    competitorDomains,
+    prompts: buyerPrompts.map((prompt, index) => {
+      const result = probeResults[index];
+      const promptUrls = result.status === "fulfilled" ? extractCitationUrls(result.value) : [];
+      const citations: EngineCitation[] = promptUrls.map((url) => ({ url, httpStatus: findingByUrl.get(url)?.httpStatus ?? null }));
+      return { prompt, citations, responseText: result.status === "fulfilled" ? result.value.text : "" };
+    }),
+  });
+  const report: AuditReport = { domain, buyerPrompt, ...(buyerPrompts.length > 1 ? { buyerPrompts } : {}), competitorDomains, ...(groundTruthPricing ? { groundTruthPricing } : {}), visibilityScore, shareOfModelScore: engineMatrix.shareOfModelScore, engineMatrixJson: engineMatrix.rows, generatedText: probe.text, groundingMetadata, providerUsed: "providerUsed" in probe ? probe.providerUsed : "gemini", ...("searchGrounding" in probe ? { searchGrounding: probe.searchGrounding } : {}), extractedUrls: allUrls, sitemapUrlCount: sitemap.length, findings, warnings: [...new Set(warnings)], status: warnings.length ? "partial" : "completed" };
   const gap = detectCitationGap(domain, buyerPrompt, probe.text, report.providerUsed ?? "unknown");
   if (gap) report.citationGap = gap;
   if (process.env.AUDIT_PERSISTENCE_MODE === "local") {

@@ -663,3 +663,21 @@ IndexNow submission requires the site's root key file to contain the exact confi
 | Hijack pitch key and provider timeout handling | PASS |
 | Hosted llms.txt and LLM facts feed safety checks | PASS |
 | Production build (`npm run build`) | PASS |
+
+
+## Days 57–84: Engine Matrix, 404 Pixel Telemetry, Sync & Agency White-Label (IN PROGRESS)
+
+### Days 57–63: Big-4 Engine Disagreement Matrix & Share of Model
+
+- [x] Add additive migration 017 for audit engine/agency fields, rescued AI visit telemetry, and workspace integrations.
+- [x] Implement `lib/engine-matrix.ts` with four synthesis profiles, live citation status categories, competitor winner attribution, and SoM calculation.
+- [x] Persist SoM and matrix data with audits and expose the values in dashboard history and shareable reports.
+- [x] Add the SoM KPI and buyer-prompt engine breakdown with capsule, recovery, and source actions.
+- [x] Add unit coverage for SoM percentages, dead citations, Reddit, competitor wins, and empty evidence.
+- [x] Verify `npx tsc --noEmit`, `npm run lint`, and `npm test` (146 tests).
+- [x] Verify `npm run build` after the locked local `.next` directory was removed.
+- [x] User confirmed migration 017 applied successfully in hosted Supabase.
+
+Days 57–63 completed. The remaining Days 64–84 items are not started.
+
+Profiles reuse one live Tavily-grounded audit result to preserve the existing $0 provider path; they are comparative synthesis profiles, not independent calls to four engine APIs.

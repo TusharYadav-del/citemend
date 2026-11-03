@@ -18,7 +18,7 @@ test("public lookup selects only report fields and the exact UUID, and excludes 
     const url = new URL(String(input));
     assert.equal(url.searchParams.get("id"), "eq." + id);
     assert.equal(url.searchParams.get("status"), "in.(completed,partial,mock_completed)");
-    assert.equal(url.searchParams.get("select"), "id,domain,status,created_at,broken_links(id,cited_url,http_status,suggested_redirect)");
+    assert.equal(url.searchParams.get("select"), "id,domain,status,created_at,share_of_model_score,engine_matrix_json,broken_links(id,cited_url,http_status,suggested_redirect)");
     return Response.json({ id, domain: "example.com", status: "partial", created_at: "2026-10-31T00:00:00Z", broken_links: [{ id: "broken", http_status: 404 }, { id: "healthy", http_status: 200 }] });
   };
   const report = await getPublicAudit(id);

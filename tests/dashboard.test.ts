@@ -31,7 +31,7 @@ test("accepts explicit unsaved reports and rejects contradictory persistence sta
 });
 
 test("history cards count current 404s and ready redirects from each domain's latest scan", () => {
-  const audit = (id: string, domain: string, date: string, links: UserAuditHistoryItem["broken_links"]): UserAuditHistoryItem => ({ id, domain, created_at: date, status: "completed", broken_links: links });
+  const audit = (id: string, domain: string, date: string, links: UserAuditHistoryItem["broken_links"]): UserAuditHistoryItem => ({ id, domain, created_at: date, status: "completed", share_of_model_score: 0, engine_matrix_json: [], broken_links: links });
   const oldLink = { id: "old", cited_url: "https://example.com/old", http_status: 404, suggested_redirect: null };
   const currentLink = { id: "current", cited_url: "https://example.com/current", http_status: 404, suggested_redirect: "https://example.com/new" };
   const unresolved = { id: "unresolved", cited_url: "https://example.com/unresolved", http_status: 404, suggested_redirect: null };

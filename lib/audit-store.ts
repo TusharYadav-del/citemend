@@ -19,7 +19,7 @@ export async function persistAudit(report: AuditReport, userId?: string, reserva
       if (linkError) throw new Error("Link insert failed.");
     }
     const updateStatus = (includePrompt: boolean, includeCompetitors: boolean) => {
-      let query = db.from("audits").update({ status: report.status, ...(includePrompt ? { buyer_prompt: report.buyerPrompt } : {}), ...(includeCompetitors && report.competitorDomains?.length ? { competitor_domains: report.competitorDomains } : {}), ...(report.groundTruthPricing ? { ground_truth_pricing: report.groundTruthPricing } : {}) }).eq("id", audit.id).eq("user_id", userId);
+      let query = db.from("audits").update({ status: report.status, ...(includePrompt ? { buyer_prompt: report.buyerPrompt } : {}), ...(includeCompetitors && report.competitorDomains?.length ? { competitor_domains: report.competitorDomains } : {}), ...(report.groundTruthPricing ? { ground_truth_pricing: report.groundTruthPricing } : {}), ...(report.shareOfModelScore !== undefined ? { share_of_model_score: report.shareOfModelScore } : {}), ...(report.engineMatrixJson ? { engine_matrix_json: report.engineMatrixJson } : {}) }).eq("id", audit.id).eq("user_id", userId);
       if (reservation) query = query.eq("status", "free_saving").eq("created_at", reservation.createdAt);
       return query;
     };
@@ -30,6 +30,10 @@ export async function persistAudit(report: AuditReport, userId?: string, reserva
     }
     if (statusError && ["PGRST204", "42703"].includes(statusError.code) && statusError.message.includes("competitor_domains")) {
       ({ error: statusError } = await updateStatus(false, false));
+    }
+    if (statusError && ["PGRST204", "42703"].includes(statusError.code) && /share_of_model_score|engine_matrix_json/.test(statusError.message)) {
+      const fallback = await db.from("audits").update({ status: report.status, ...(report.groundTruthPricing ? { ground_truth_pricing: report.groundTruthPricing } : {}) }).eq("id", audit.id).eq("user_id", userId);
+      statusError = fallback.error;
     }
     if (statusError) throw new Error("Status update failed.");
     const { data: verified, error: readError } = await db.from("audits").select("id,user_id,status,broken_links(id)").eq("id", audit.id).eq("user_id", userId).single();

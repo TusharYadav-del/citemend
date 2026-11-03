@@ -6,6 +6,8 @@ export type UserAuditHistoryItem = {
   domain: string;
   status: string;
   created_at: string;
+  share_of_model_score: number | null;
+  engine_matrix_json: unknown;
   broken_links: {
     id: string;
     cited_url: string;
@@ -20,7 +22,7 @@ export async function getUserAuditHistory(userId: string): Promise<UserAuditHist
   const db = createServerDatabase();
   const { data, error } = await db
     .from("audits")
-    .select("id,domain,status,created_at,broken_links(id,cited_url,http_status,suggested_redirect)")
+    .select("id,domain,status,created_at,share_of_model_score,engine_matrix_json,broken_links(id,cited_url,http_status,suggested_redirect)")
     .eq("user_id", userId)
     .not("status", "in", "(free_pending,free_saving)")
     .order("created_at", { ascending: false });

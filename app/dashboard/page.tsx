@@ -17,6 +17,7 @@ import RedirectExportDrawer from "@/components/RedirectExportDrawer";
 import LlmsTxtGenerator from "@/components/LlmsTxtGenerator";
 import OnboardingChecklist, { type OnboardingProgress } from "@/components/OnboardingChecklist";
 import OpportunityCommandCenter from "@/components/OpportunityCommandCenter";
+import { ENGINE_PROFILES, type EngineMatrixRow } from "@/lib/engine-matrix";
 
 function HistoryLoading() {
   return <main className="min-h-screen bg-[#07090E] px-5 py-10 text-white sm:px-8 sm:py-14" role="status" aria-label="Loading your command center"><div className="h-8 w-52 animate-pulse rounded-lg bg-white/10" /><div className="mt-8 grid gap-4 sm:grid-cols-4">{[0, 1, 2, 3].map((item) => <div key={item} className="h-32 animate-pulse rounded-2xl bg-white/[0.04]" />)}</div><span className="sr-only">Loading your audit history...</span></main>;
@@ -28,8 +29,8 @@ function MetricCards({ audits, opportunities }: { audits: UserAuditHistoryItem[]
   const cards = [
     { label: "AI Citation Health Score", value: health === null ? "—" : `${health}%`, detail: "100 minus unresolved saved 404s; citations are not stored" },
     { label: "Own-Domain 404s Caught", value: metrics.active404s, detail: "Confirmed in latest audit per domain" },
+    { label: "SHARE OF MODEL (SoM %)", value: audits.length ? `${Math.round(audits.reduce((sum, audit) => sum + (audit.share_of_model_score ?? 0), 0) / audits.length)}%` : "—", detail: "Average share across saved grounded audit slots" },
     { label: "Competitor 404s to Hijack", value: opportunities.filter(item => item.opportunity_type === "competitor_direct_404" || item.opportunity_type === "listicle_outbound_404").length, detail: "Dead competitor citations saved" },
-    { label: "Cited Listicles & Reddit Gaps", value: opportunities.filter(item => item.opportunity_type === "listicle_missing_brand" || item.opportunity_type === "reddit_citation_thread").length, detail: "Third-party citations to review" },
   ];
   return <section aria-label="Live telemetry" className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map((card) => <div key={card.label} className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-sm sm:p-6"><p className="text-[10px] font-semibold uppercase tracking-[.12em] text-emerald-400">{card.label}</p><p className="mt-3 text-3xl font-semibold tabular-nums text-white">{typeof card.value === "number" ? card.value.toLocaleString() : card.value}</p><p className="mt-2 text-xs leading-5 text-slate-400">{card.detail}</p></div>)}</section>;
 }
@@ -69,6 +70,7 @@ function AuditCard({ audit, isPro, activeRules, gap }: { gap?: CitationGap; audi
           </ul>
         </details>
       )}
+      {Array.isArray(audit.engine_matrix_json) && audit.engine_matrix_json.length > 0 && <section className="mt-5 border-t border-white/10 pt-4" aria-label="Multi-engine citation matrix"><h3 className="text-sm font-semibold text-white">Multi-Engine Citation Matrix <span className="text-slate-400">· Buyer Prompt Breakdown</span></h3><p className="mt-1 text-xs text-slate-500">Shared live search grounding is shown through four synthesis profiles; results are not independent engine API observations.</p><div className="mt-3 space-y-3">{[...new Set((audit.engine_matrix_json as EngineMatrixRow[]).map(row => row.prompt))].map(prompt => <div key={prompt} className="rounded-lg bg-black/20 p-3"><p className="text-xs font-medium text-slate-200">{prompt}</p><div className="mt-2 grid gap-2 sm:grid-cols-2">{ENGINE_PROFILES.map(engine => { const row = (audit.engine_matrix_json as EngineMatrixRow[]).find(item => item.prompt === prompt && item.engine === engine); if (!row) return null; const label = row.status === "cited_rank_1" ? "✅ Cited #1" : row.status === "cited_rank_2_plus" ? "✅ Cited #2+" : row.status === "cited_dead_404_slug" ? "⚠️ Dead 404 slug" : row.status === "cited_reddit_thread" ? "❌ Cited Reddit thread" : `❌ Omitted (Cited ${row.competitor ?? "Competitor"})`; return <div key={engine} className="rounded-md border border-white/5 p-2 text-xs"><p className="font-medium text-slate-300">{engine}</p><p className="mt-1 text-slate-400">{label}</p>{row.citedUrl && <a className="mt-1 block break-all text-emerald-300 hover:underline" href={row.citedUrl} target="_blank" rel="noreferrer">{row.citedUrl}</a>}</div>; })}</div><div className="mt-2 flex flex-wrap gap-2 text-[11px]"><Link href="/#audit" className="rounded border border-emerald-400/20 px-2 py-1 text-emerald-300">⚡ Generate Capsule to Win Engine</Link><Link href="/dashboard/pixel" className="rounded border border-white/10 px-2 py-1 text-slate-300">🛠️ View Active 301 Recovery</Link><a href="#recovery-command" className="rounded border border-white/10 px-2 py-1 text-slate-300">🔥 View Reddit Source Thread</a></div></div>)}</div></section>}
       {gap && <div id="citation-gaps"><CitationGapPanel domain={audit.domain} gap={gap} /></div>}
     </article>
   );

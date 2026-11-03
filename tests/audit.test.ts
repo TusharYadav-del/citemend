@@ -6,6 +6,7 @@ import { GET } from "../app/api/audit/route";
 import { createAuditPostHandler } from "../lib/audit-handler";
 import { getUserAuditHistory } from "../lib/audit-history";
 import type { CitationProbeResult } from "../lib/gemini";
+import { buildEngineMatrix } from "../lib/engine-matrix";
 
 const originalEnv = process.env;
 const originalFetch = globalThis.fetch;
@@ -39,6 +40,36 @@ test("extracts Markdown and metadata URLs, deduplicates fragments, and ignores n
   assert.equal(urls.filter((url) => url === "https://example.com/docs/setup-old").length, 1);
 });
 
+test("engine matrix calculates live-citation share and disagreement states across four profiles", () => {
+  const result = buildEngineMatrix({
+    domain: "example.com",
+    competitorDomains: ["jira.com"],
+    prompts: [
+      { prompt: "Best docs", citations: [{ url: "https://example.com/docs", httpStatus: 200 }, { url: "https://jira.com/docs" }] },
+      { prompt: "Fix issue", citations: [{ url: "https://example.com/old-slug", httpStatus: 404 }, { url: "https://reddit.com/r/example" }] },
+      { prompt: "Compare tools", citations: [{ url: "https://jira.com/guide" }] },
+    ],
+  });
+  assert.equal(result.totalSlots, 12);
+  assert.equal(result.citedSlots, 4);
+  assert.equal(result.shareOfModelScore, 33);
+  assert.equal(result.rows[0].status, "cited_rank_1");
+  assert.equal(result.rows[4].status, "cited_dead_404_slug");
+  assert.equal(result.rows[8].status, "omitted_competitor_won");
+  assert.equal(result.rows[8].competitor, "jira.com");
+});
+
+test("engine matrix identifies Reddit citations and empty evidence without claiming a win", () => {
+  const result = buildEngineMatrix({ domain: "example.com", prompts: [
+    { prompt: "Community", citations: [{ url: "https://www.reddit.com/r/topic/123" }] },
+    { prompt: "No evidence", citations: [] },
+  ] });
+  assert.equal(result.rows[0].status, "omitted_competitor_won");
+  assert.equal(result.rows[0].competitor, "www.reddit.com");
+  assert.equal(result.shareOfModelScore, 0);
+  assert.equal(result.rows[4].citedUrl, null);
+});
+
 test("checks only target-domain citations and verifies next-best live sitemap destination", async () => {
   const checked: string[] = [];
   let stored: AuditReport | undefined;
@@ -54,6 +85,8 @@ test("checks only target-domain citations and verifies next-best live sitemap de
   assert.ok(checked.every((url) => new URL(url).hostname === "example.com"));
   assert.equal(new Set(checked).size, checked.length);
   assert.ok(stored);
+  assert.equal(report.shareOfModelScore, 100);
+  assert.equal(report.engineMatrixJson?.length, 4);
 });
 
 test("resolves Google grounding wrappers before target-domain filtering", async () => {
