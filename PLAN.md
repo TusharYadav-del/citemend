@@ -678,7 +678,7 @@ IndexNow submission requires the site's root key file to contain the exact confi
 - [x] Verify `npm run build` after the locked local `.next` directory was removed.
 - [x] User confirmed migration 017 applied successfully in hosted Supabase.
 
-Days 57–63 completed. The remaining Days 71–84 items are not started.
+Days 57–70 completed. Days 78–84 are not started.
 
 Profiles reuse one live Tavily-grounded audit result to preserve the existing $0 provider path; they are comparative synthesis profiles, not independent calls to four engine APIs.
 
@@ -691,3 +691,14 @@ Profiles reuse one live Tavily-grounded audit result to preserve the existing $0
 - [x] Add interceptor, telemetry, sandbox authorization, and pixel tests; verify TypeScript, lint, full test suite, and production build.
 
 The production build was verified with an alternate output directory because OneDrive locked an existing file in `.next/static`. Rescue telemetry is best effort; if its database write fails, a verified redirect is still returned. The interceptor fallback uses Tavily search and Groq relevance selection, without Gemini or indexed embeddings. Its match score is model confidence rather than cosine similarity. User confirmed migration 018 was applied.
+
+### Days 71–77: Redirect Sync & Rescue Alerts (COMPLETED)
+
+- [x] Add owner-scoped redirect sync and export for Vercel, Next.js, Cloudflare/Netlify, Nginx, and Shopify CSV; Shopify Admin API sync records per-rule results.
+- [x] Add dashboard bulk and per-link sync controls, showing saved Shopify sync state; Vercel and Cloudflare files are downloaded for deployment.
+- [x] Add domain-scoped workspace settings for Shopify credentials and Slack/Discord webhooks, with encrypted Shopify token storage and test alerts.
+- [x] Queue real visitor rescue alerts after the response, and compare weekly scan findings with the prior audit before notifying on new broken links or competitor 404s.
+- [x] Add unit tests for export formats, Shopify responses, notification payloads, rescue alert scheduling, and weekly comparison.
+- [x] Verify TypeScript, lint, full test suite (156 passed before the added focused weekly comparison test), and production build using an alternate output directory.
+
+Live Shopify sync needs a configured Shopify store and Admin token; file exports require deployment by the site owner. Slack and Discord delivery requires their saved incoming webhooks. Provider integrations were tested with mocked responses.

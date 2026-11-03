@@ -16,6 +16,7 @@ type Deps = {
   check: (url: string) => Promise<number>;
   log: (input: Input, target: Candidate, latency: number) => Promise<void>;
   authorizeSimulation: (domain: string) => Promise<boolean>;
+  notify: (domain: string, source: string, brokenPath: string, targetUrl: string) => void;
 };
 
 function safeTarget(value: string, domain: string, path: string): string | null {
@@ -66,6 +67,7 @@ const defaults: Deps = {
     const { data, error } = await createServerDatabase().from("audits").select("id").eq("user_id", userId).eq("domain", domain).limit(1).maybeSingle();
     return !error && !!data;
   },
+  notify: () => {},
 };
 
 export function createPixelInterceptHandler(overrides: Partial<Deps> = {}) {
@@ -95,6 +97,8 @@ export function createPixelInterceptHandler(overrides: Partial<Deps> = {}) {
       if (!target) return reply({ rescued: false, latencyMs: Math.round(performance.now() - started) });
       const latencyMs = Math.round(performance.now() - started);
       if (!input.simulation) await deps.log(input, target, latencyMs).catch(() => console.error("Rescue telemetry could not be saved."));
+      const source = aiSource(input.referrer) || aiSource(input.utmSource);
+      if (!input.simulation && source) { try { deps.notify(input.domain, source, input.brokenPath, target.url); } catch { /* A notification cannot block a rescue. */ } }
       return reply({ rescued: true, redirectTo: target.url, similarityScore: target.score, latencyMs });
     } catch { return reply({ error: "Rescue lookup is temporarily unavailable." }, 503); }
   };

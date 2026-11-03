@@ -1,6 +1,12 @@
 ﻿export type Database = {
   public: {
     Tables: {
+      workspace_integrations: {
+        Row: { id: string; user_id: string; domain: string; slack_webhook_url: string | null; discord_webhook_url: string | null; shopify_store_domain: string | null; shopify_admin_token: string | null; vercel_project_id: string | null; agency_brand_name: string | null; agency_logo_url: string | null; agency_primary_color: string | null; agency_cta_text: string | null; agency_cta_url: string | null; updated_at: string | null };
+        Insert: { id?: string; user_id: string; domain: string; slack_webhook_url?: string | null; discord_webhook_url?: string | null; shopify_store_domain?: string | null; shopify_admin_token?: string | null; vercel_project_id?: string | null; agency_brand_name?: string | null; agency_logo_url?: string | null; agency_primary_color?: string | null; agency_cta_text?: string | null; agency_cta_url?: string | null; updated_at?: string | null };
+        Update: { id?: string; user_id?: string; domain?: string; slack_webhook_url?: string | null; discord_webhook_url?: string | null; shopify_store_domain?: string | null; shopify_admin_token?: string | null; vercel_project_id?: string | null; agency_brand_name?: string | null; agency_logo_url?: string | null; agency_primary_color?: string | null; agency_cta_text?: string | null; agency_cta_url?: string | null; updated_at?: string | null };
+        Relationships: [];
+      };
       rescued_ai_visits: {
         Row: { id: string; domain: string; broken_path: string; rescued_target_url: string; ai_referrer: string; similarity_score: number | null; latency_ms: number | null; user_agent: string | null; created_at: string | null };
         Insert: { id?: string; domain: string; broken_path: string; rescued_target_url: string; ai_referrer: string; similarity_score?: number | null; latency_ms?: number | null; user_agent?: string | null; created_at?: string | null };

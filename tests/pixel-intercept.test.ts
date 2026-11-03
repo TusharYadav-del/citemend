@@ -53,6 +53,15 @@ test("simulation requires ownership and never logs; invalid or dead targets are 
   assert.equal((await dead(post({ ...body, brokenPath: "//evil.example" }))).status, 400);
 });
 
+test("rescue queues alerts only for live AI visits, not forced or simulated traffic", async () => {
+  const notifications: string[] = [];
+  const handler = createPixelInterceptHandler({ cached: async () => candidate, check: async () => 200, log: async () => {}, authorizeSimulation: async () => true, notify: (_domain, source) => { notifications.push(source); } });
+  await handler(post(body));
+  await handler(post({ ...body, simulation: true }));
+  await handler(post({ ...body, referrer: "", forceIntercept: true }));
+  assert.deepEqual(notifications, ["chatgpt.com"]);
+});
+
 test("pixel recognizes data-is-404 and sends a request to its script origin", async () => {
   let requested = "";
   const script = { src: "https://citemend.test/citemend-pixel.js", dataset: { domain: "example.com" }, getAttribute: (name: string) => name === "data-is-404" ? "true" : null };
