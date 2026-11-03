@@ -15,6 +15,7 @@ import CitationGapPanel from "@/components/citation-gap-panel";
 import PublishRedirect from "@/components/publish-redirect";
 import RedirectExportDrawer from "@/components/RedirectExportDrawer";
 import LlmsTxtGenerator from "@/components/LlmsTxtGenerator";
+import OnboardingChecklist, { type OnboardingProgress } from "@/components/OnboardingChecklist";
 
 function HistoryLoading() {
   return <main className="mx-auto w-full max-w-5xl px-5 py-10 sm:px-8 sm:py-14" role="status" aria-label="Loading your audit history"><div className="h-8 w-52 animate-pulse rounded-lg bg-[#e9eee4]" /><div className="mt-8 grid gap-4 sm:grid-cols-3">{[0, 1, 2].map((item) => <div key={item} className="h-32 animate-pulse rounded-2xl bg-[#f1f4ed]" />)}</div><div className="mt-8 h-36 animate-pulse rounded-2xl bg-[#f1f4ed]" /><span className="sr-only">Loading your audit history...</span></main>;
@@ -86,12 +87,27 @@ async function UserAuditHistory() {
 
   let activeRules = new Set<string>();
   let exportRules: { source_path: string; target_url: string }[] = [];
+  let onboarding: OnboardingProgress = { firstAudit: audits.some((audit) => ["completed", "partial"].includes(audit.status)), redirects: false, llmsAndCapsule: false, recovery: false };
   try {
-    const { data, error } = await createServerDatabase().from("redirect_rules").select("source_host,source_path,target_url").eq("user_id", userId).eq("active", true).eq("is_active", true).limit(500);
-    if (!error) {
-      activeRules = new Set((data ?? []).map((rule) => `${rule.source_host}:${rule.source_path}`));
-      exportRules = (data ?? []).map((rule) => ({ source_path: rule.source_path, target_url: rule.target_url }));
-    }
+    const db = createServerDatabase();
+    const domains = [...new Set(audits.map((audit) => audit.domain))];
+    const [rulesResult, cmsResult, llmsResult, webhookResult, eventResult] = await Promise.all([
+      db.from("redirect_rules").select("source_host,source_path,target_url,synced_to_cms").eq("user_id", userId).eq("active", true).eq("is_active", true).limit(500),
+      db.from("cms_connections").select("id").eq("user_id", userId).eq("platform", "shopify").limit(1),
+      db.from("audits").select("id").eq("user_id", userId).not("llms_txt_content", "is", null).limit(1),
+      db.from("audits").select("id").eq("user_id", userId).not("webhook_url", "is", null).limit(1),
+      domains.length ? db.from("ai_404_events").select("id").in("domain", domains).limit(1) : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (rulesResult.error || cmsResult.error || llmsResult.error || webhookResult.error || eventResult.error) throw rulesResult.error ?? cmsResult.error ?? llmsResult.error ?? webhookResult.error ?? eventResult.error;
+    const rules = rulesResult.data ?? [];
+    activeRules = new Set(rules.map((rule) => `${rule.source_host}:${rule.source_path}`));
+    exportRules = rules.map((rule) => ({ source_path: rule.source_path, target_url: rule.target_url }));
+    onboarding = {
+      ...onboarding,
+      redirects: rules.length > 0 || (cmsResult.data?.length ?? 0) > 0,
+      llmsAndCapsule: (llmsResult.data?.length ?? 0) > 0 && gaps.size > 0,
+      recovery: (eventResult.data?.length ?? 0) > 0 || (webhookResult.data?.length ?? 0) > 0,
+    };
   } catch {}
 
   return (
@@ -100,12 +116,13 @@ async function UserAuditHistory() {
         <div><Link href="/" className="text-sm font-medium text-[#53704e] hover:underline">&larr; Back to Citemend</Link><p className="mt-4 text-[10px] font-semibold tracking-[.18em] text-[#53704e]">YOUR WORKSPACE</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Audit history</h1><p className="mt-2 text-sm text-[#68736b]">Your saved audits, sorted from newest to oldest.</p></div>
         <div className="flex items-center gap-3"><RedirectExportDrawer rules={exportRules} /><Link href="/dashboard/pixel" className="rounded-lg border border-[#dfe5dc] px-3 py-2 text-sm font-medium text-[#36583f] hover:bg-[#f7f8f4]">Pixel &amp; traffic</Link><CheckoutButton /><UserButton /></div>
       </header>
+      <OnboardingChecklist progress={onboarding} />
       <MetricCards audits={audits} />
       <WeeklyMonitoring isPro={isPro} />
       <LlmsTxtGenerator domains={[...new Set(audits.map((audit) => audit.domain))]} />
-      <p className="mb-6 rounded-xl border border-[#dfe5dc] bg-[#f7f8f4] p-4 text-xs leading-5 text-[#68736b]">Pro users can publish or disable verified 301 suggestions below. Rules become active when the Cloudflare Worker is attached to the domain; edge lookups can retain a change for up to five seconds.</p>
+      <p id="redirect-export" className="mb-6 rounded-xl border border-[#dfe5dc] bg-[#f7f8f4] p-4 text-xs leading-5 text-[#68736b]">Pro users can publish or disable verified 301 suggestions below. Rules become active when the Cloudflare Worker is attached to the domain; edge lookups can retain a change for up to five seconds.</p>
       <p className="mb-6 rounded-xl border border-[#dfe5dc] bg-[#f7f8f4] p-4 text-xs leading-5 text-[#68736b]">Audits created before account ownership was enabled have no associated user and are not assigned to an account automatically.</p>
-      {audits.length ? <div className="space-y-4">{audits.map((audit) => <AuditCard key={audit.id} audit={audit} gap={gaps.get(audit.id)} isPro={isPro} activeRules={activeRules} />)}</div> : <section className="rounded-2xl border border-dashed border-[#d6dfce] px-6 py-14 text-center"><h2 className="text-base font-semibold">No audits saved yet</h2><p className="mt-2 text-sm text-[#85907e]">Run an audit and it will appear here.</p><Link href="/#audit" className="mt-5 inline-flex rounded-lg bg-[#214d39] px-5 py-3 text-sm font-medium text-white">Run an audit</Link></section>}
+      {audits.length ? <div id="audit-history" className="space-y-4">{audits.map((audit) => <AuditCard key={audit.id} audit={audit} gap={gaps.get(audit.id)} isPro={isPro} activeRules={activeRules} />)}</div> : <section className="rounded-2xl border border-dashed border-[#d6dfce] px-6 py-14 text-center"><h2 className="text-base font-semibold">No audits saved yet</h2><p className="mt-2 text-sm text-[#85907e]">Run an audit and it will appear here.</p><Link href="/#audit" className="mt-5 inline-flex rounded-lg bg-[#214d39] px-5 py-3 text-sm font-medium text-white">Run an audit</Link></section>}
     </main>
   );
 }

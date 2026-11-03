@@ -576,3 +576,14 @@ End-to-end generation and downloaded-file inspection require a signed-in Clerk d
 - [x] Verify `npm run lint` and `npm run build` with zero errors.
 
 The hosted migration is applied. A live URL response still requires a saved generated document for the requested domain.
+
+
+## Day 48: Dashboard onboarding checklist (COMPLETED; SIGNED-IN UI CHECK PENDING)
+
+- [x] Add a four-step onboarding checklist at the top of `/dashboard`, with an accessible progress bar, completed-step indicators, and links to relevant setup areas.
+- [x] Derive completion from saved account data: completed/partial audits, active redirect rules or a connected Shopify integration, generated `llms.txt` plus saved citation-gap evidence, and pixel events or a saved webhook.
+- [x] Preserve existing dashboard history, exports, citation-gap, `llms.txt`, pixel, and webhook features.
+- [x] Verify `npm run lint` and `npm run build` with zero errors.
+- [ ] Verify the checklist in a signed-in local browser and confirm progress against live account records. The local dev server returned 404 and then logged a missing Turbopack cache file during OneDrive compaction, preventing this visual check.
+
+The current database does not store the number of prompts used per audit or a distinct “capsule generated” event. The first step therefore recognizes a saved audit, while the capsule portion of step three uses persisted citation-gap evidence as its completion signal.
