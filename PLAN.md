@@ -626,3 +626,15 @@ No new database migration is required; opportunities use the Day 49 table. The t
 - [x] Verify `npx tsc --noEmit`, `npm run lint`, `npm test` (139 tests), and `npm run build`.
 
 The facts feed filters URLs to the audited hostname. Draft generation verifies the signed-in owner before reading or writing opportunity data. Free accounts may draft for their first two opportunities; subsequent drafts require Pro access.
+
+
+## Days 54–55: Proof of Fix, IndexNow ping, and Dark-Emerald Command Center (COMPLETED)
+
+- [x] Add authenticated `POST /api/verify-fix` with owner-scoped audit and broken-link lookup, SSRF-safe HTTP re-checks, original buyer-prompt Groq/Tavily re-probe, and `verified_won` updates for matched opportunities when recovery is confirmed.
+- [x] Add IndexNow key-file validation and bounded submission to `api.indexnow.org`; missing or rejected key files are reported without blocking HTTP/citation verification. Allow an owner to save a bounded IndexNow key to their audit from the verification control.
+- [x] Reskin `/dashboard` and `/audit/[id]` to the obsidian/neon-emerald design with left command navigation, glass KPI cards, recovery tabs, own-link verification, pricing schema patches, competitor semantic matches, listicle/Reddit contacts, and the hijack pitch modal.
+- [x] Preserve onboarding, audit history, export, weekly monitoring, llms.txt, pixel, citation-gap, and Shopify controls; keep free-account masking and server-side Pro checks for later opportunities.
+- [x] Add unit tests for owner/auth input rejection, IndexNow key-file handling, successful verification, and citation probing.
+- [x] Verify `npx tsc --noEmit`, `npm run lint`, `npm test` (142 tests), and `npm run build`.
+
+IndexNow submission requires the site's root key file to contain the exact configured key. An unavailable key file is surfaced as setup guidance; it does not turn a successful 404 recovery verification into a failure.

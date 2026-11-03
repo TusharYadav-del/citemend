@@ -52,18 +52,18 @@ export default function CopyRedirects({
   }
 
   return (
-    <div className="mt-6 rounded-xl border border-[#dfe5dc] bg-[#f7f8f4] p-5">
-      <label htmlFor="redirect-format" className="block text-sm font-semibold">Redirect format</label>
+    <div className="mt-6 rounded-xl border border-white/10 bg-black/20 p-5">
+      <label htmlFor="redirect-format" className="block text-sm font-semibold text-white">Redirect format</label>
       <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <select id="redirect-format" value={format} onChange={(event) => { setFormat(event.target.value as RedirectExportFormat); setMessage(""); }} className="min-h-11 rounded-lg border border-[#dfe5dc] bg-white px-3 text-sm">
+        <select id="redirect-format" value={format} onChange={(event) => { setFormat(event.target.value as RedirectExportFormat); setMessage(""); }} className="min-h-11 rounded-lg border border-white/10 bg-[#0b1015] px-3 text-sm text-white">
           {formats.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
         </select>
-        <button type="button" onClick={copyRedirects} disabled={pending} className="min-h-11 rounded-lg bg-[#214d39] px-5 py-3 text-sm font-semibold text-white hover:bg-[#153c2a] disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#53704e]">
+        <button type="button" onClick={copyRedirects} disabled={pending} className="min-h-11 rounded-lg bg-emerald-400 px-5 py-3 text-sm font-semibold text-[#07110d] hover:bg-emerald-300 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400">
           {pending ? "Checking access..." : "Copy All 301 Redirects"}
         </button>
       </div>
-      <p role="status" aria-live="polite" className="mt-3 min-h-5 text-xs text-[#53704e]">{message}</p>
-      <p className="text-xs leading-5 text-[#68736b]">One-click export is included with Pro. Exports include only saved HTTP 404 links with verified replacement URLs on this domain.</p>
+      <p role="status" aria-live="polite" className="mt-3 min-h-5 text-xs text-emerald-300">{message}</p>
+      <p className="text-xs leading-5 text-slate-400">One-click export is included with Pro. Exports include only saved HTTP 404 links with verified replacement URLs on this domain.</p>
       {upgrade && <UpgradeModal signedIn={upgrade === "signed-in"} onClose={() => setUpgrade(null)} />}
     </div>
   );
