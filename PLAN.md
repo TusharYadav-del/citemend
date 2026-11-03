@@ -614,3 +614,15 @@ The inference intentionally requires a cited host to be explicitly present in th
 - [x] Execute the focused listicle tests and complete `npm test` suite; all 133 tests pass.
 
 No new database migration is required; opportunities use the Day 49 table. The test command runs sequentially with a 4 GB heap cap and a test-only fallback for the Windows account lookup that previously prevented `tsx` startup.
+
+
+## Days 52–53: Entity pricing truth, LLM facts feed, and hijack outreach drafts (COMPLETED)
+
+- [x] Add `lib/entity-truth.ts` to use supplied `groundTruthPricing` or safely scrape `/pricing` and the homepage, compare pricing/comparison audit answers through Gemini `gemini-3.8-flash` with Groq fallback, and save mismatches with a grounded `SoftwareApplication`/`Offer` JSON-LD schema.
+- [x] Allow bounded user-supplied ground-truth pricing on audit requests and persist it on the audit record.
+- [x] Add public `GET /api/llm-facts?domain=...` with canonical pricing, same-domain sitemap URLs, and 404/410 paths with safe same-domain redirect recommendations.
+- [x] Add authenticated `POST /api/hijack-pitch`, owner checks, free-account protection for opportunities after the first two, structured Gemini/Groq drafting, and saved email, inclusion pitch, or Reddit disclosure comment.
+- [x] Add tests for pricing extraction/schema, user pricing validation, pitch content, disclosure requirements, and draft validation.
+- [x] Verify `npx tsc --noEmit`, `npm run lint`, `npm test` (139 tests), and `npm run build`.
+
+The facts feed filters URLs to the audited hostname. Draft generation verifies the signed-in owner before reading or writing opportunity data. Free accounts may draft for their first two opportunities; subsequent drafts require Pro access.

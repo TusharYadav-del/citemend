@@ -26,6 +26,12 @@ test("validates input before any provider call", async () => {
   assert.deepEqual(validateAuditInput({ domain: " Example.COM ", buyerPrompt: " Find docs " }), { domain: "example.com", buyerPrompt: "Find docs" });
 });
 
+test("accepts bounded user-supplied ground truth pricing for the persisted audit", () => {
+  const parsed = validateAuditInput({ ...input, groundTruthPricing: "Free tier; Pro $12/month" });
+  assert.equal(parsed.groundTruthPricing, "Free tier; Pro $12/month");
+  assert.throws(() => validateAuditInput({ ...input, groundTruthPricing: "x".repeat(8001) }), AuditInputError);
+});
+
 test("extracts Markdown and metadata URLs, deduplicates fragments, and ignores non-http schemes", () => {
   const urls = extractCitationUrls(probe);
   assert.ok(urls.includes("https://example.com/docs/setup-old"));

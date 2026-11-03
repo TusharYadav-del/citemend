@@ -6,6 +6,7 @@ import { hasProSubscription } from "./subscription";
 import { reserveFreeAudit, releaseFreeAudit } from "./free-audit";
 import { findCompetitor404Opportunities } from "./hijacker";
 import { inspectThirdPartyCitations } from "./listicle-crawler";
+import { detectEntityPricingTruth } from "./entity-truth";
 
 type AuditPostDependencies = {
   isConfigured?: () => boolean;
@@ -16,6 +17,7 @@ type AuditPostDependencies = {
   releaseFree?: typeof releaseFreeAudit;
   hijack?: typeof findCompetitor404Opportunities;
   crawlListicles?: typeof inspectThirdPartyCitations;
+  entityTruth?: typeof detectEntityPricingTruth;
 };
 
 export function createAuditPostHandler(dependencies: AuditPostDependencies = {}) {
@@ -32,6 +34,7 @@ export function createAuditPostHandler(dependencies: AuditPostDependencies = {})
   const releaseFree = dependencies.releaseFree ?? releaseFreeAudit;
   const hijack = dependencies.hijack ?? findCompetitor404Opportunities;
   const crawlListicles = dependencies.crawlListicles ?? inspectThirdPartyCitations;
+  const entityTruth = dependencies.entityTruth ?? detectEntityPricingTruth;
 
   return async function handleAuditPost(request: Request): Promise<Response> {
     if (!isConfigured()) {
@@ -102,6 +105,7 @@ export function createAuditPostHandler(dependencies: AuditPostDependencies = {})
         : {}, userId);
       let hijackResult: Awaited<ReturnType<typeof findCompetitor404Opportunities>> | null = null;
       let listicleResult: Awaited<ReturnType<typeof inspectThirdPartyCitations>> | null = null;
+      let entityTruthResult: Awaited<ReturnType<typeof detectEntityPricingTruth>> | null = null;
       if (report.persistence.status === "saved" && report.auditId) {
         try {
           hijackResult = await hijack({
@@ -127,6 +131,13 @@ export function createAuditPostHandler(dependencies: AuditPostDependencies = {})
             report.warnings.push("Listicle and Reddit citation analysis was temporarily unavailable.");
           }
         }
+        try {
+          entityTruthResult = await entityTruth({
+            auditId: report.auditId, domain: report.domain,
+            prompt: (report.buyerPrompts ?? [report.buyerPrompt]).find(prompt => /(price|pricing|cost|plan|tier|free|feature|compare|comparison|alternative)/i.test(prompt)) ?? report.buyerPrompt,
+            answer: report.generatedText,
+          });
+        } catch { report.warnings.push("Pricing truth comparison was temporarily unavailable."); }
       }
       const opportunities = [...(hijackResult?.opportunities ?? []), ...(listicleResult?.opportunities ?? [])];
       const visibleOpportunities = isPro ? opportunities : opportunities.map((opportunity, index) => index < 2 ? opportunity : {
@@ -140,6 +151,7 @@ export function createAuditPostHandler(dependencies: AuditPostDependencies = {})
         citationClassifications: hijackResult?.classifications ?? [],
         hijackOpportunities: visibleOpportunities,
         hijackOpportunityCount: opportunities.length,
+        entityTruth: entityTruthResult,
       }, { status: report.persistence.status === "saved" ? 201 : 200 });
     } catch (error) {
       if (error instanceof AuditInputError) return Response.json({ error: error.message }, { status: 400 });
