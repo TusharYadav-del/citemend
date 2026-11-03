@@ -564,3 +564,15 @@ No third-party setup is required for downloading files. Import behavior should b
 - [x] Verify `npm run lint` and `npm run build` with zero errors; verify unauthenticated API access is rejected.
 
 End-to-end generation and downloaded-file inspection require a signed-in Clerk dashboard session, a domain with stored sitemap evidence, and configured Gemini access; those interactive steps were not available in this run.
+
+
+## Day 47: Public hosted and weekly refreshed `llms.txt` (COMPLETED)
+
+- [x] Add forward migration `015_audit_llms_txt_content.sql` for the Markdown snapshot stored on audits and update the database types.
+- [x] Add public `GET /api/llms-txt/[domain]`, returning the latest saved Markdown as `text/plain` with the requested shared cache headers; return clear 400, 404, and 503 responses for invalid, absent, or unavailable content.
+- [x] Persist output from the authenticated Day 46 generator so it can be served publicly.
+- [x] Regenerate the hosted Markdown from freshly saved sitemap and confirmed 404/redirect evidence after each successful weekly Pro scan. Generation/storage failure is logged and does not discard a successful scan.
+- [x] Apply migration 015 in the hosted Supabase SQL Editor (user confirmed).
+- [x] Verify `npm run lint` and `npm run build` with zero errors.
+
+The hosted migration is applied. A live URL response still requires a saved generated document for the requested domain.

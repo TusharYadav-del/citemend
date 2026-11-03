@@ -6,6 +6,8 @@ import { runCitationProbe } from "./citation-probe";
 import { sendWeeklyDigest } from "./email";
 import { hasProSubscription } from "./subscription";
 import { WeeklyScanStore, type WeeklyDigest, type WeeklyJob } from "./weekly-scan-store";
+import { createServerDatabase } from "./supabase-server";
+import { generateLlmsTxt, type DeprecatedPath, type LlmsPage } from "./llms-txt";
 
 type WeeklyRun = Awaited<ReturnType<WeeklyScanStore["getOrCreateRun"]>>;
 type WeeklyStore = Pick<WeeklyScanStore, "getOrCreateRun" | "oldestOpenRun" | "claimInitialization" | "listTargets" | "initialize" | "releaseInitialization" | "candidates" | "claimJob" | "priorAudit" | "finishJob" | "prepareDigests" | "digestCandidates" | "claimDigest" | "digestLinks" | "finishDigest" | "finishRunIfDone">;
@@ -50,6 +52,23 @@ export async function runWeeklyAudit(job: WeeklyJob, dependencies: { execute?: t
     job.user_id,
   );
   if (report.persistence.status !== "saved" || report.auditId !== job.id) throw new Error("Weekly audit could not be saved.");
+  // The weekly scan already persisted fresh 404s and redirect suggestions. Refresh
+  // the public document from that evidence without failing the successful scan if
+  // Gemini or the optional column is not available yet.
+  try {
+    const db = createServerDatabase();
+    const [pagesResult, brokenResult] = await Promise.all([
+      db.from("sitemap_pages").select("url,page_title").eq("domain", job.domain).order("updated_at", { ascending: false }).limit(30),
+      db.from("broken_links").select("cited_url,suggested_redirect").eq("audit_id", job.id).eq("http_status", 404).limit(100),
+    ]);
+    if (pagesResult.error || brokenResult.error) throw pagesResult.error ?? brokenResult.error;
+    const deprecated = (brokenResult.data ?? []).map((link) => ({ url: link.cited_url, replacement: link.suggested_redirect })) as DeprecatedPath[];
+    const generated = await generateLlmsTxt(job.domain, (pagesResult.data ?? []) as LlmsPage[], deprecated);
+    const { error } = await db.from("audits").update({ llms_txt_content: generated.llmsTxt }).eq("id", job.id).eq("user_id", job.user_id);
+    if (error) throw error;
+  } catch (error) {
+    console.warn("Weekly scan saved, but hosted llms.txt could not be refreshed.", error instanceof Error ? error.message : "Unknown error");
+  }
 }
 
 export function createWeeklyScanHandler(dependencies: Dependencies = {}) {

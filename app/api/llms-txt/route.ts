@@ -24,6 +24,8 @@ export async function POST(request: Request) {
     const pages = (pagesResult.data ?? []) as LlmsPage[];
     const deprecated = (brokenResult.data ?? []).map((row) => ({ url: row.cited_url, replacement: row.suggested_redirect })) as DeprecatedPath[];
     const generated = await generateLlmsTxt(domain, pages, deprecated);
+    const { error: saveError } = await db.from("audits").update({ llms_txt_content: generated.llmsTxt }).eq("id", audit.id).eq("user_id", userId);
+    if (saveError) throw saveError;
     return Response.json(generated, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     const status = typeof error === "object" && error && "status" in error && typeof error.status === "number" ? error.status : 503;

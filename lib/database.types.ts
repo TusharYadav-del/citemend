@@ -14,9 +14,9 @@
         Relationships: [];
       };
       audits: {
-        Row: { id: string; user_id: string | null; domain: string; buyer_prompt: string | null; webhook_url: string | null; status: string; created_at: string };
-        Insert: { id?: string; user_id?: string | null; domain: string; buyer_prompt?: string | null; webhook_url?: string | null; status?: string; created_at?: string };
-        Update: { id?: string; user_id?: string | null; domain?: string; buyer_prompt?: string | null; webhook_url?: string | null; status?: string; created_at?: string };
+        Row: { id: string; user_id: string | null; domain: string; buyer_prompt: string | null; webhook_url: string | null; llms_txt_content: string | null; status: string; created_at: string };
+        Insert: { id?: string; user_id?: string | null; domain: string; buyer_prompt?: string | null; webhook_url?: string | null; llms_txt_content?: string | null; status?: string; created_at?: string };
+        Update: { id?: string; user_id?: string | null; domain?: string; buyer_prompt?: string | null; webhook_url?: string | null; llms_txt_content?: string | null; status?: string; created_at?: string };
         Relationships: [];
       };
       cms_connections: {
