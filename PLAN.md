@@ -678,6 +678,16 @@ IndexNow submission requires the site's root key file to contain the exact confi
 - [x] Verify `npm run build` after the locked local `.next` directory was removed.
 - [x] User confirmed migration 017 applied successfully in hosted Supabase.
 
-Days 57–63 completed. The remaining Days 64–84 items are not started.
+Days 57–63 completed. The remaining Days 71–84 items are not started.
 
 Profiles reuse one live Tavily-grounded audit result to preserve the existing $0 provider path; they are comparative synthesis profiles, not independent calls to four engine APIs.
+
+### Days 64–70: Edge 404 AI Traffic Interceptor Pixel & Live Rescue Sandbox (COMPLETED)
+
+- [x] Add CORS-enabled GET/POST interceptor with AI source detection, cached audit redirects, Groq/Tavily search fallback, same-domain live destination checks, and rescue telemetry.
+- [x] Add the standalone one-line pixel, installer, Cloudflare Worker snippet, and interactive sandbox; simulations do not count as rescued visits.
+- [x] Add the 30-day rescue KPI and estimated pipeline value to the command center.
+- [x] Add migration 018 to restrict direct access to rescue telemetry and workspace integration secrets. Apply it in hosted Supabase.
+- [x] Add interceptor, telemetry, sandbox authorization, and pixel tests; verify TypeScript, lint, full test suite, and production build.
+
+The production build was verified with an alternate output directory because OneDrive locked an existing file in `.next/static`. Rescue telemetry is best effort; if its database write fails, a verified redirect is still returned. The interceptor fallback uses Tavily search and Groq relevance selection, without Gemini or indexed embeddings. Its match score is model confidence rather than cosine similarity. User confirmed migration 018 was applied.

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Check, Copy, ExternalLink, LoaderCircle, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ShopifySyncModal from "@/components/ShopifySyncModal";
+import InterceptorSandbox from "@/components/interceptor-sandbox";
 
 type Rule = { id: string; source_path: string; target_url: string; confidence: number | null; is_active: boolean; hits_recovered: number; created_at: string };
 type PixelEvent = { id: string; broken_path: string; ai_referrer: string; redirected_to: string | null; created_at: string };
@@ -233,6 +234,7 @@ export default function PixelDashboard({ initialData, appOrigin, initialError = 
         </>}
       </section>
 
+      <InterceptorSandbox domain={data.domain} origin={origin} />
       <section className="mb-8 rounded-2xl border border-[#dfe5dc] bg-white p-5 shadow-sm sm:p-6">
         <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-[.12em] text-[#557447]">Team notifications</p><h2 className="mt-2 text-xl font-semibold text-[#182c25]">Slack &amp; Discord alerts</h2><p className="mt-1 text-sm leading-6 text-[#68736b]">Get a message when an AI referral is recovered. Webhook credentials stay on the server and are never returned to this page.</p></div>
         {!data.domain ? <p className="rounded-xl border border-dashed border-[#d6dfce] p-4 text-sm text-[#68736b]">Run an audit first to associate an alert destination with a domain.</p> : <>

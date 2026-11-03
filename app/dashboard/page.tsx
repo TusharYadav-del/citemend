@@ -23,14 +23,14 @@ function HistoryLoading() {
   return <main className="min-h-screen bg-[#07090E] px-5 py-10 text-white sm:px-8 sm:py-14" role="status" aria-label="Loading your command center"><div className="h-8 w-52 animate-pulse rounded-lg bg-white/10" /><div className="mt-8 grid gap-4 sm:grid-cols-4">{[0, 1, 2, 3].map((item) => <div key={item} className="h-32 animate-pulse rounded-2xl bg-white/[0.04]" />)}</div><span className="sr-only">Loading your audit history...</span></main>;
 }
 
-function MetricCards({ audits, opportunities }: { audits: UserAuditHistoryItem[]; opportunities: { opportunity_type: string }[] }) {
+function MetricCards({ audits, rescued }: { audits: UserAuditHistoryItem[]; rescued: number | null }) {
   const metrics = historyMetrics(audits);
   const health = audits.length ? Math.max(0, 100 - metrics.active404s) : null;
   const cards = [
     { label: "AI Citation Health Score", value: health === null ? "—" : `${health}%`, detail: "100 minus unresolved saved 404s; citations are not stored" },
     { label: "Own-Domain 404s Caught", value: metrics.active404s, detail: "Confirmed in latest audit per domain" },
+    { label: "AI VISITORS RESCUED (30D)", value: rescued ?? "—", detail: rescued === null ? "Rescue telemetry unavailable" : `$${(rescued * 15).toLocaleString()} estimated pipeline at $15 per click` },
     { label: "SHARE OF MODEL (SoM %)", value: audits.length ? `${Math.round(audits.reduce((sum, audit) => sum + (audit.share_of_model_score ?? 0), 0) / audits.length)}%` : "—", detail: "Average share across saved grounded audit slots" },
-    { label: "Competitor 404s to Hijack", value: opportunities.filter(item => item.opportunity_type === "competitor_direct_404" || item.opportunity_type === "listicle_outbound_404").length, detail: "Dead competitor citations saved" },
   ];
   return <section aria-label="Live telemetry" className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map((card) => <div key={card.label} className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-sm sm:p-6"><p className="text-[10px] font-semibold uppercase tracking-[.12em] text-emerald-400">{card.label}</p><p className="mt-3 text-3xl font-semibold tabular-nums text-white">{typeof card.value === "number" ? card.value.toLocaleString() : card.value}</p><p className="mt-2 text-xs leading-5 text-slate-400">{card.detail}</p></div>)}</section>;
 }
@@ -91,6 +91,15 @@ async function UserAuditHistory() {
   try { gaps = await getAuditCitationGaps(userId); } catch {}
 
   let activeRules = new Set<string>();
+  let rescued: number | null = null;
+  try {
+    const domains = [...new Set(audits.map(audit => audit.domain))];
+    if (!domains.length) rescued = 0;
+    else {
+      const result = await createServerDatabase().from("rescued_ai_visits").select("id", { count: "exact", head: true }).in("domain", domains).gte("created_at", new Date(Date.now() - 30 * 86400000).toISOString());
+      if (!result.error) rescued = result.count ?? 0;
+    }
+  } catch {}
   let exportRules: { source_path: string; target_url: string }[] = [];
   let opportunities: { id: string; audit_id: string | null; domain: string; opportunity_type: string; prompt_query: string; target_url: string; dead_competitor_url: string | null; competitor_domain: string | null; http_status: number | null; matched_user_live_url: string | null; similarity_score: number | null; contact_email_or_link: string | null; outreach_draft: string | null; corrective_schema_json: string | null; verification_status: string }[] = [];
   let onboarding: OnboardingProgress = { firstAudit: audits.some((audit) => ["completed", "partial"].includes(audit.status)), redirects: false, llmsAndCapsule: false, recovery: false };
@@ -141,7 +150,7 @@ async function UserAuditHistory() {
         <div className="flex items-center gap-3"><RedirectExportDrawer rules={exportRules} /><Link href="/dashboard/pixel" className="rounded-lg border border-white/10 px-3 py-2 text-sm font-medium text-emerald-300 hover:bg-white/5">Pixel &amp; traffic</Link><CheckoutButton /><UserButton /></div>
       </header>
       <OnboardingChecklist progress={onboarding} />
-      <MetricCards audits={audits} opportunities={opportunities} />
+      <MetricCards audits={audits} rescued={rescued} />
       <OpportunityCommandCenter opportunities={opportunities} brokenLinks={audits.flatMap(audit => audit.broken_links.map(link => ({ ...link, auditId: audit.id, domain: audit.domain }))) } />
       <WeeklyMonitoring isPro={isPro} />
       <div id="llms-txt-generator"><LlmsTxtGenerator domains={[...new Set(audits.map((audit) => audit.domain))]} /></div>

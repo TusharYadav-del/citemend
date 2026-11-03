@@ -1,6 +1,12 @@
 ﻿export type Database = {
   public: {
     Tables: {
+      rescued_ai_visits: {
+        Row: { id: string; domain: string; broken_path: string; rescued_target_url: string; ai_referrer: string; similarity_score: number | null; latency_ms: number | null; user_agent: string | null; created_at: string | null };
+        Insert: { id?: string; domain: string; broken_path: string; rescued_target_url: string; ai_referrer: string; similarity_score?: number | null; latency_ms?: number | null; user_agent?: string | null; created_at?: string | null };
+        Update: { id?: string; domain?: string; broken_path?: string; rescued_target_url?: string; ai_referrer?: string; similarity_score?: number | null; latency_ms?: number | null; user_agent?: string | null; created_at?: string | null };
+        Relationships: [];
+      };
       audit_citation_gaps: {
         Row: { audit_id: string; user_id: string; domain: string; buyer_prompt: string; provider: string; competitor_urls: string[]; created_at: string };
         Insert: { audit_id: string; user_id: string; domain: string; buyer_prompt: string; provider: string; competitor_urls: string[]; created_at?: string };
