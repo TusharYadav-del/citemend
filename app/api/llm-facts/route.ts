@@ -11,11 +11,12 @@ function onDomain(value: string, domain: string) {
 
 async function checkLimited(urls: string[]) {
   const result: { url: string; index: number; status: number | null }[] = new Array(urls.length);
+  const signal = AbortSignal.timeout(15_000);
   let cursor = 0;
   await Promise.all(Array.from({ length: Math.min(5, urls.length) }, async () => {
     while (cursor < urls.length) {
       const index = cursor++;
-      result[index] = { url: urls[index], index, status: await checkUrlStatus(urls[index]).catch(() => null) };
+      result[index] = { url: urls[index], index, status: await checkUrlStatus(urls[index], signal).catch(() => null) };
     }
   }));
   return result;

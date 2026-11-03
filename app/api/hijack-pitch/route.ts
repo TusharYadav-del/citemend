@@ -2,16 +2,21 @@ import { auth } from "@clerk/nextjs/server";
 import { createServerDatabase } from "@/lib/supabase-server";
 import { hasProSubscription } from "@/lib/subscription";
 import { generateHijackPitch, type PitchKind } from "@/lib/hijack-pitch";
+import { readRequestJson } from "@/lib/read-request-json";
 
 const privateHeaders = { "Cache-Control": "private, no-store" };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const kinds = new Set<PitchKind>(["competitor_direct_404", "listicle_outbound_404", "listicle_missing_brand", "reddit_citation_thread"]);
 
 export async function POST(request: Request) {
-  const { userId } = await auth();
+  let userId: string | null;
+  try { userId = (await auth()).userId; }
+  catch { return Response.json({ error: "Authentication is temporarily unavailable." }, { status: 503, headers: privateHeaders }); }
   if (!userId) return Response.json({ error: "Sign in to draft an outreach message." }, { status: 401, headers: privateHeaders });
-  let body: unknown;
-  try { body = await request.json(); } catch { return Response.json({ error: "Send a valid JSON request." }, { status: 400, headers: privateHeaders }); }
+  const parsed = await readRequestJson(request, 4096);
+  if (parsed.kind === "too_large") return Response.json({ error: "Request body exceeds 4 KiB." }, { status: 413, headers: privateHeaders });
+  if (parsed.kind !== "ok") return Response.json({ error: "Send a valid JSON request." }, { status: 400, headers: privateHeaders });
+  const body = parsed.value;
   const opportunityId = body && typeof body === "object" ? (body as { opportunityId?: unknown }).opportunityId : null;
   if (typeof opportunityId !== "string" || !UUID.test(opportunityId)) return Response.json({ error: "Provide a valid opportunityId." }, { status: 400, headers: privateHeaders });
   try {

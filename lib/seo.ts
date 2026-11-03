@@ -131,9 +131,9 @@ export async function fetchSitemapUrls(domain: string): Promise<string[]> {
 }
 
 /** Returns the final HTTP status; invalid URLs, timeouts, and network failures reject. */
-export async function checkUrlStatus(url: string): Promise<number> {
+export async function checkUrlStatus(url: string, parentSignal?: AbortSignal): Promise<number> {
   const target = httpUrl(url);
-  const signal = AbortSignal.timeout(8_000);
+  const signal = parentSignal ? AbortSignal.any([parentSignal, AbortSignal.timeout(8_000)]) : AbortSignal.timeout(8_000);
   let response = await request(target, "HEAD", signal);
   const status = response.status;
   await response.body?.cancel();

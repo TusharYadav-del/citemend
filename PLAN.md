@@ -638,3 +638,28 @@ The facts feed filters URLs to the audited hostname. Draft generation verifies t
 - [x] Verify `npx tsc --noEmit`, `npm run lint`, `npm test` (142 tests), and `npm run build`.
 
 IndexNow submission requires the site's root key file to contain the exact configured key. An unavailable key file is surfaced as setup guidance; it does not turn a successful 404 recovery verification into a failure.
+
+
+## Day 56: Batch 2 master QA and self-healing scorecard (COMPLETED)
+
+- [x] Run `npx tsc --noEmit`, `npm run lint`, `npm test` (144 passed), `npm audit --omit=dev` (0 vulnerabilities), and `npm run build` successfully.
+- [x] Compare migrations 001–008 against `lib/database.types.ts`: audits and broken_links (001–003), subscriptions (004 and 008), weekly runs/jobs/digests (005–006), and redirect_rules (007) align; fields introduced in later migrations are represented by the later additions in the interfaces.
+- [x] Review missing-key, timeout, and SSRF behavior in hijacker, listicle crawler, entity truth, verify-fix, hijack pitch, hosted llms.txt, and llm-facts.
+- [x] Bound pricing page reads to 1 MB and cap verify-fix, hijack-pitch, and llms.txt request JSON bodies at 4 KiB; bound LLM facts live URL checks to 15 seconds.
+- [x] Add regression tests for streamed JSON limits, malformed UTF-8, and bounded pricing HTML.
+
+### Batch 2 (Day 56) Readiness Scorecard
+
+| Subsystem | Result |
+| --- | --- |
+| Supabase migrations 001–008 ↔ TypeScript interfaces | PASS |
+| TypeScript (`npx tsc --noEmit`) | PASS |
+| Lint (`npm run lint`) | PASS |
+| Full test suite (`npm test`) | PASS — 144 tests |
+| Production dependency audit (`npm audit --omit=dev`) | PASS — 0 vulnerabilities |
+| Hijacker / listicle crawler SSRF and failure handling | PASS |
+| Entity truth keys, timeout, and bounded page reads | PASS |
+| Verify-fix authentication, URL checks, and IndexNow failure handling | PASS |
+| Hijack pitch key and provider timeout handling | PASS |
+| Hosted llms.txt and LLM facts feed safety checks | PASS |
+| Production build (`npm run build`) | PASS |

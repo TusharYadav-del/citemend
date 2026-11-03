@@ -1,12 +1,17 @@
 import { auth } from "@clerk/nextjs/server";
 import { createServerDatabase } from "@/lib/supabase-server";
 import { generateLlmsTxt, type DeprecatedPath, type LlmsPage } from "@/lib/llms-txt";
+import { readRequestJson } from "@/lib/read-request-json";
 
 export async function POST(request: Request) {
-  const { userId } = await auth();
+  let userId: string | null;
+  try { userId = (await auth()).userId; }
+  catch { return Response.json({ error: "Authentication is temporarily unavailable." }, { status: 503 }); }
   if (!userId) return Response.json({ error: "Sign in to generate llms.txt files." }, { status: 401 });
-  let input: unknown;
-  try { input = await request.json(); } catch { return Response.json({ error: "Send a valid JSON request." }, { status: 400 }); }
+  const parsed = await readRequestJson(request, 4096);
+  if (parsed.kind === "too_large") return Response.json({ error: "Request body exceeds 4 KiB." }, { status: 413 });
+  if (parsed.kind !== "ok") return Response.json({ error: "Send a valid JSON request." }, { status: 400 });
+  const input = parsed.value;
   if (!input || typeof input !== "object" || typeof (input as { domain?: unknown }).domain !== "string") return Response.json({ error: "Provide a domain." }, { status: 400 });
   const domain = ((input as { domain: string }).domain).trim().toLowerCase();
   if (domain.length > 253 || !/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(domain)) return Response.json({ error: "Enter a hostname such as example.com." }, { status: 400 });

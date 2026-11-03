@@ -18,6 +18,26 @@ export function extractPricingFacts(html: string): string {
   return text.slice(0, 8000);
 }
 
+export async function readPricingHtmlBounded(response: Response, maxBytes = 1_000_000): Promise<string> {
+  const limitText = maxBytes === 1_000_000 ? "1 MB" : `${maxBytes} byte`;
+  const advertised = Number(response.headers.get("content-length") ?? 0);
+  if (advertised > maxBytes) { await response.body?.cancel(); throw new Error(`Pricing page exceeds the ${limitText} analysis limit.`); }
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("Pricing page returned no HTML body.");
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > maxBytes) { await reader.cancel(); throw new Error(`Pricing page exceeds the ${limitText} analysis limit.`); }
+      chunks.push(value);
+    }
+  } finally { reader.releaseLock(); }
+  return new TextDecoder().decode(Buffer.concat(chunks));
+}
+
 export async function getCanonicalPricing(domain: string, supplied?: string | null): Promise<{ pricing: string; sourceUrl: string }> {
   if (supplied?.trim()) return { pricing: supplied.trim().slice(0, 8000), sourceUrl: `https://${domain}/pricing` };
   for (const path of ["/pricing", "/"]) {
@@ -33,7 +53,7 @@ export async function getCanonicalPricing(domain: string, supplied?: string | nu
           continue;
         }
         if (!response.ok || !/text\/html/i.test(response.headers.get("content-type") ?? "")) { await response.body?.cancel(); break; }
-        const html = await response.text();
+        const html = await readPricingHtmlBounded(response);
         const pricing = extractPricingFacts(html);
         if (pricing.length > 100) return { pricing, sourceUrl: url.href };
         break;

@@ -4,6 +4,7 @@ import { extractTextUrls } from "./citation-urls";
 import { checkUrlStatus } from "./seo";
 import { publicFetch } from "./public-http";
 import { createServerDatabase } from "./supabase-server";
+import { readRequestJson } from "./read-request-json";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PRIVATE = { "Cache-Control": "private, no-store" };
@@ -13,6 +14,7 @@ type Dependencies = {
   check?: typeof checkUrlStatus;
   probe?: typeof runCitationProbe;
   fetch?: typeof publicFetch;
+  readJson?: typeof readRequestJson;
 };
 
 function sameUrl(left: string, right: string) {
@@ -74,12 +76,15 @@ export function createVerifyFixHandler(dependencies: Dependencies = {}) {
   const check = dependencies.check ?? checkUrlStatus;
   const probe = dependencies.probe ?? runCitationProbe;
   const fetcher = dependencies.fetch ?? publicFetch;
+  const readJson = dependencies.readJson ?? readRequestJson;
   return async function handle(request: Request): Promise<Response> {
     let userId: string | null;
     try { userId = await getUserId(); } catch { return Response.json({ error: "Authentication is temporarily unavailable." }, { status: 503, headers: PRIVATE }); }
     if (!userId) return Response.json({ error: "Sign in to verify this fix." }, { status: 401, headers: PRIVATE });
-    let body: unknown;
-    try { body = await request.json(); } catch { return Response.json({ error: "Send a valid JSON request." }, { status: 400, headers: PRIVATE }); }
+    const parsed = await readJson(request, 4096);
+    if (parsed.kind === "too_large") return Response.json({ error: "Request body exceeds 4 KiB." }, { status: 413, headers: PRIVATE });
+    if (parsed.kind !== "ok") return Response.json({ error: "Send a valid JSON request." }, { status: 400, headers: PRIVATE });
+    const body = parsed.value;
     if (!body || typeof body !== "object") return Response.json({ error: "Provide an auditId and brokenLinkId." }, { status: 400, headers: PRIVATE });
     const input = body as Record<string, unknown>;
     if (typeof input.auditId !== "string" || !UUID.test(input.auditId) || typeof input.brokenLinkId !== "string" || !UUID.test(input.brokenLinkId)) return Response.json({ error: "Provide valid audit and broken link IDs." }, { status: 400, headers: PRIVATE });
