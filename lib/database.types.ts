@@ -14,10 +14,16 @@
         Relationships: [];
       };
       audits: {
-        Row: { id: string; user_id: string | null; domain: string; buyer_prompt: string | null; webhook_url: string | null; llms_txt_content: string | null; status: string; created_at: string };
-        Insert: { id?: string; user_id?: string | null; domain: string; buyer_prompt?: string | null; webhook_url?: string | null; llms_txt_content?: string | null; status?: string; created_at?: string };
-        Update: { id?: string; user_id?: string | null; domain?: string; buyer_prompt?: string | null; webhook_url?: string | null; llms_txt_content?: string | null; status?: string; created_at?: string };
+        Row: { id: string; user_id: string | null; domain: string; buyer_prompt: string | null; webhook_url: string | null; llms_txt_content: string | null; competitor_domains: string[]; ground_truth_pricing: string | null; indexnow_key: string | null; status: string; created_at: string };
+        Insert: { id?: string; user_id?: string | null; domain: string; buyer_prompt?: string | null; webhook_url?: string | null; llms_txt_content?: string | null; competitor_domains?: string[]; ground_truth_pricing?: string | null; indexnow_key?: string | null; status?: string; created_at?: string };
+        Update: { id?: string; user_id?: string | null; domain?: string; buyer_prompt?: string | null; webhook_url?: string | null; llms_txt_content?: string | null; competitor_domains?: string[]; ground_truth_pricing?: string | null; indexnow_key?: string | null; status?: string; created_at?: string };
         Relationships: [];
+      };
+      citation_hijack_opportunities: {
+        Row: { id: string; audit_id: string | null; domain: string; opportunity_type: string; prompt_query: string; cited_engine: string; target_url: string; dead_competitor_url: string | null; competitor_domain: string | null; http_status: number | null; matched_user_live_url: string | null; similarity_score: number | null; brand_mentioned: boolean; contact_email_or_link: string | null; outreach_draft: string | null; corrective_schema_json: string | null; verification_status: string; last_checked_at: string; created_at: string };
+        Insert: { id?: string; audit_id?: string | null; domain: string; opportunity_type: string; prompt_query: string; cited_engine?: string; target_url: string; dead_competitor_url?: string | null; competitor_domain?: string | null; http_status?: number | null; matched_user_live_url?: string | null; similarity_score?: number | null; brand_mentioned?: boolean; contact_email_or_link?: string | null; outreach_draft?: string | null; corrective_schema_json?: string | null; verification_status?: string; last_checked_at?: string; created_at?: string };
+        Update: { id?: string; audit_id?: string | null; domain?: string; opportunity_type?: string; prompt_query?: string; cited_engine?: string; target_url?: string; dead_competitor_url?: string | null; competitor_domain?: string | null; http_status?: number | null; matched_user_live_url?: string | null; similarity_score?: number | null; brand_mentioned?: boolean; contact_email_or_link?: string | null; outreach_draft?: string | null; corrective_schema_json?: string | null; verification_status?: string; last_checked_at?: string; created_at?: string };
+        Relationships: [{ foreignKeyName: "citation_hijack_opportunities_audit_id_fkey"; columns: ["audit_id"]; isOneToOne: false; referencedRelation: "audits"; referencedColumns: ["id"] }];
       };
       cms_connections: {
         Row: { id: string; user_id: string; domain: string; platform: "shopify" | "wordpress" | "vercel"; shop_subdomain: string | null; access_token: string; created_at: string };

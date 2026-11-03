@@ -587,3 +587,30 @@ The hosted migration is applied. A live URL response still requires a saved gene
 - [ ] Verify the checklist in a signed-in local browser and confirm progress against live account records. The local dev server returned 404 and then logged a missing Turbopack cache file during OneDrive compaction, preventing this visual check.
 
 The current database does not store the number of prompts used per audit or a distinct “capsule generated” event. The first step therefore recognizes a saved audit, while the capsule portion of step three uses persisted citation-gap evidence as its completion signal.
+
+
+## Day 49: Competitor 404 citation hijacker (COMPLETED)
+
+- [x] Add additive migration `016_citation_hijack_opportunities.sql` for the audit metadata columns and server-only opportunity table.
+- [x] Apply migration 016 in hosted Supabase (user confirmed success).
+- [x] Accept and validate optional `competitorDomains`; infer up to three explicitly named external citation domains when omitted and persist the selected domains on the audit.
+- [x] Classify cited URLs into own, competitor, and third-party buckets; SSRF-safely check competitor citations and record 404/410 opportunities.
+- [x] Embed dead competitor URL context with the existing `gemini-embedding-001` 768-dimensional helper and query `match_sitemap_url` against the user's audited domain; persist the best same-domain match and score when available.
+- [x] Add unit coverage for classification, competitor inference, and semantic matching.
+- [x] Verify `npx tsc --noEmit`, `npm run lint`, and `npm run build` successfully.
+- [x] Execute the complete test suite after adding the Windows `os.userInfo()` fallback to the test runner; all 133 tests pass.
+
+The inference intentionally requires a cited host to be explicitly present in the model response and excludes common review, news, and social-source domains. Semantic lookup failure does not prevent a confirmed dead-citation opportunity from being saved.
+
+
+## Days 50–51: Listicle outbound 404 crawler and Reddit citation radar (COMPLETED)
+
+- [x] Add `lib/listicle-crawler.ts` to inspect up to six third-party citations, record Reddit threads without fetching Reddit, and fetch other articles through the existing DNS-pinned public fetcher with an eight-second timeout, browser user agent, redirect bounds, and response-size limit.
+- [x] Detect missing brand mentions, discover a public email/social/contact link, and check up to five links per article for configured competitor domains.
+- [x] Record listicle outbound 404/410 opportunities and match dead competitor URL context against the user's indexed sitemap with the existing 768-dimensional Gemini embedding and pgvector helper.
+- [x] Combine direct competitor, listicle, and Reddit opportunities in the audit API response; return the total count and mask target/contact fields after the first two for non-Pro/non-VIP-Beta users.
+- [x] Add mocked-HTML tests for broken competitor links, semantic matches, contact extraction, link caps, missing-brand findings, and Reddit handling.
+- [x] Verify `npm run lint`, `npx tsc --noEmit`, and `npm run build` successfully.
+- [x] Execute the focused listicle tests and complete `npm test` suite; all 133 tests pass.
+
+No new database migration is required; opportunities use the Day 49 table. The test command runs sequentially with a 4 GB heap cap and a test-only fallback for the Windows account lookup that previously prevented `tsx` startup.

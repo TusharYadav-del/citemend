@@ -10,7 +10,7 @@ export async function persistAudit(report: AuditReport, userId?: string, reserva
   try { db = createServerDatabase(); } catch { throw new AuditStorageError("Configure the server-only Supabase key and project URL."); }
   const { data: audit, error } = reservation
     ? await db.from("audits").update({ status: "free_saving" }).eq("id", reservation.id).eq("user_id", userId).eq("status", "free_pending").eq("created_at", reservation.createdAt).select("id,created_at").single()
-    : await db.from("audits").insert({ ...(scheduledId ? { id: scheduledId } : {}), user_id: userId, domain: report.domain, status: "pending" }).select("id,created_at").single();
+    : await db.from("audits").insert({ ...(scheduledId ? { id: scheduledId } : {}), user_id: userId, domain: report.domain, status: "pending", ...(report.competitorDomains?.length ? { competitor_domains: report.competitorDomains } : {}) }).select("id,created_at").single();
   if (error || !audit) throw new AuditStorageError("Supabase could not create the audit.");
   const broken = report.findings.filter((item) => item.httpStatus === 404);
   try {
@@ -18,15 +18,18 @@ export async function persistAudit(report: AuditReport, userId?: string, reserva
       const { error: linkError } = await db.from("broken_links").insert(broken.map((item) => ({ audit_id: audit.id, cited_url: item.url, http_status: 404, suggested_redirect: item.suggestedRedirect })));
       if (linkError) throw new Error("Link insert failed.");
     }
-    const updateStatus = (includePrompt: boolean) => {
-      let query = db.from("audits").update({ status: report.status, ...(includePrompt ? { buyer_prompt: report.buyerPrompt } : {}) }).eq("id", audit.id).eq("user_id", userId);
+    const updateStatus = (includePrompt: boolean, includeCompetitors: boolean) => {
+      let query = db.from("audits").update({ status: report.status, ...(includePrompt ? { buyer_prompt: report.buyerPrompt } : {}), ...(includeCompetitors && report.competitorDomains?.length ? { competitor_domains: report.competitorDomains } : {}) }).eq("id", audit.id).eq("user_id", userId);
       if (reservation) query = query.eq("status", "free_saving").eq("created_at", reservation.createdAt);
       return query;
     };
-    let { error: statusError } = await updateStatus(true);
+    let { error: statusError } = await updateStatus(true, true);
     // Existing deployments keep saving audits while migration 005 is pending.
     if (statusError && ["PGRST204", "42703"].includes(statusError.code) && statusError.message.includes("buyer_prompt")) {
-      ({ error: statusError } = await updateStatus(false));
+      ({ error: statusError } = await updateStatus(false, true));
+    }
+    if (statusError && ["PGRST204", "42703"].includes(statusError.code) && statusError.message.includes("competitor_domains")) {
+      ({ error: statusError } = await updateStatus(false, false));
     }
     if (statusError) throw new Error("Status update failed.");
     const { data: verified, error: readError } = await db.from("audits").select("id,user_id,status,broken_links(id)").eq("id", audit.id).eq("user_id", userId).single();

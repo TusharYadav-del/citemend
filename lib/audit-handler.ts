@@ -4,6 +4,8 @@ import { AuditInputError, runAudit, validateAuditInput } from "./audit-pipeline"
 import { AuditStorageError, persistAudit } from "./audit-store";
 import { hasProSubscription } from "./subscription";
 import { reserveFreeAudit, releaseFreeAudit } from "./free-audit";
+import { findCompetitor404Opportunities } from "./hijacker";
+import { inspectThirdPartyCitations } from "./listicle-crawler";
 
 type AuditPostDependencies = {
   isConfigured?: () => boolean;
@@ -12,6 +14,8 @@ type AuditPostDependencies = {
   hasPro?: typeof hasProSubscription;
   reserveFree?: typeof reserveFreeAudit;
   releaseFree?: typeof releaseFreeAudit;
+  hijack?: typeof findCompetitor404Opportunities;
+  crawlListicles?: typeof inspectThirdPartyCitations;
 };
 
 export function createAuditPostHandler(dependencies: AuditPostDependencies = {}) {
@@ -26,6 +30,8 @@ export function createAuditPostHandler(dependencies: AuditPostDependencies = {})
   const hasPro = dependencies.hasPro ?? hasProSubscription;
   const reserveFree = dependencies.reserveFree ?? reserveFreeAudit;
   const releaseFree = dependencies.releaseFree ?? releaseFreeAudit;
+  const hijack = dependencies.hijack ?? findCompetitor404Opportunities;
+  const crawlListicles = dependencies.crawlListicles ?? inspectThirdPartyCitations;
 
   return async function handleAuditPost(request: Request): Promise<Response> {
     if (!isConfigured()) {
@@ -94,7 +100,47 @@ export function createAuditPostHandler(dependencies: AuditPostDependencies = {})
       const report = await execute(input, reservation
         ? { save: (value, owner) => persistAudit(value, owner, reservation) }
         : {}, userId);
-      return Response.json(report, { status: report.persistence.status === "saved" ? 201 : 200 });
+      let hijackResult: Awaited<ReturnType<typeof findCompetitor404Opportunities>> | null = null;
+      let listicleResult: Awaited<ReturnType<typeof inspectThirdPartyCitations>> | null = null;
+      if (report.persistence.status === "saved" && report.auditId) {
+        try {
+          hijackResult = await hijack({
+            auditId: report.auditId, domain: report.domain, competitorDomains: report.competitorDomains ?? [],
+            citationUrls: report.extractedUrls, prompt: (report.buyerPrompts ?? [report.buyerPrompt]).join("\n"),
+            citedEngine: report.providerUsed?.startsWith("groq-") ? "Groq+Tavily" : report.providerUsed ?? "unknown",
+            responseText: report.generatedText,
+          });
+          if (hijackResult.warning) report.warnings.push(hijackResult.warning);
+        } catch {
+          report.warnings.push("Competitor citation analysis was temporarily unavailable.");
+        }
+        if (hijackResult) {
+          try {
+            listicleResult = await crawlListicles({
+              auditId: report.auditId, domain: report.domain, competitorDomains: report.competitorDomains ?? [],
+              thirdPartyUrls: hijackResult.classifications.filter(item => item.bucket === "third_party_source").map(item => item.url),
+              prompt: (report.buyerPrompts ?? [report.buyerPrompt]).join("\n"),
+              citedEngine: report.providerUsed?.startsWith("groq-") ? "Groq+Tavily" : report.providerUsed ?? "unknown",
+            });
+            if (listicleResult.warning) report.warnings.push(listicleResult.warning);
+          } catch {
+            report.warnings.push("Listicle and Reddit citation analysis was temporarily unavailable.");
+          }
+        }
+      }
+      const opportunities = [...(hijackResult?.opportunities ?? []), ...(listicleResult?.opportunities ?? [])];
+      const visibleOpportunities = isPro ? opportunities : opportunities.map((opportunity, index) => index < 2 ? opportunity : {
+        ...opportunity,
+        target_url: "🔒 Upgrade to Pro to unlock hijack target",
+        dead_competitor_url: "🔒 Upgrade to Pro to unlock hijack target",
+        contact_email_or_link: "🔒 Upgrade to Pro to unlock hijack target",
+      });
+      return Response.json({
+        ...report,
+        citationClassifications: hijackResult?.classifications ?? [],
+        hijackOpportunities: visibleOpportunities,
+        hijackOpportunityCount: opportunities.length,
+      }, { status: report.persistence.status === "saved" ? 201 : 200 });
     } catch (error) {
       if (error instanceof AuditInputError) return Response.json({ error: error.message }, { status: 400 });
       if (error instanceof AuditStorageError) return Response.json({ error: error.message, stage: "persistence" }, { status: 502 });

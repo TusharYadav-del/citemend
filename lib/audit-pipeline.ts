@@ -14,7 +14,7 @@ import { matchSitemapUrls, SEMANTIC_MATCH_THRESHOLD } from "./sitemap-embeddings
 export class AuditInputError extends Error {}
 export type AuditFinding = { url: string; httpStatus: number | null; error: string | null; suggestedRedirect: string | null; matchConfidence?: number };
 export type AuditReport = {
-  domain: string; buyerPrompt: string; buyerPrompts?: string[]; visibilityScore?: number; generatedText: string;
+  domain: string; buyerPrompt: string; buyerPrompts?: string[]; competitorDomains?: string[]; visibilityScore?: number; generatedText: string;
   groundingMetadata: GeminiProbeResult["groundingMetadata"];
   providerUsed?: string; searchGrounding?: CitationProbeResult["searchGrounding"];
   extractedUrls: string[]; sitemapUrlCount: number;
@@ -29,9 +29,9 @@ export type AuditDependencies = {
   save: (report: AuditReport, userId?: string) => Promise<{ id: string; createdAt: string }>;
 };
 
-export function validateAuditInput(input: unknown): { domain: string; buyerPrompt: string; buyerPrompts?: string[] } {
+export function validateAuditInput(input: unknown): { domain: string; buyerPrompt: string; buyerPrompts?: string[]; competitorDomains?: string[] } {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new AuditInputError("Expected a JSON object with domain and buyerPrompt or buyerPrompts.");
-  const { domain, buyerPrompt, buyerPrompts: rawPrompts } = input as Record<string, unknown>;
+  const { domain, buyerPrompt, buyerPrompts: rawPrompts, competitorDomains: rawCompetitors } = input as Record<string, unknown>;
   if (typeof domain !== "string") throw new AuditInputError("domain must be a string.");
   const hostname = domain.trim().toLowerCase();
   if (hostname.length > 253 || !/^[a-z0-9.-]+$/.test(hostname) || !hostname.includes(".") || isIP(hostname) || /\.(local|localhost|internal)$/.test(hostname) || hostname.split(".").some((label) => !label || label.length > 63 || label.startsWith("-") || label.endsWith("-"))) {
@@ -41,6 +41,17 @@ export function validateAuditInput(input: unknown): { domain: string; buyerPromp
   try { parsedHost = new URL(`https://${hostname}`).hostname; }
   catch { throw new AuditInputError("Enter a valid public domain, not an IP address."); }
   if (parsedHost !== hostname || isIP(parsedHost)) throw new AuditInputError("Enter a public domain, not an IP address or numeric alias.");
+  let competitorDomains: string[] | undefined;
+  if (rawCompetitors !== undefined) {
+    if (!Array.isArray(rawCompetitors) || rawCompetitors.length > 20 || !rawCompetitors.every(value => typeof value === "string")) throw new AuditInputError("competitorDomains must contain up to 20 domain names.");
+    competitorDomains = [...new Set(rawCompetitors.map(value => (value as string).trim().toLowerCase()))];
+    for (const competitor of competitorDomains) {
+      if (competitor.length > 253 || !/^[a-z0-9.-]+$/.test(competitor) || !competitor.includes(".") || isIP(competitor) || /\.(local|localhost|internal)$/.test(competitor) || competitor.split(".").some(label => !label || label.length > 63 || label.startsWith("-") || label.endsWith("-"))) throw new AuditInputError("Each competitorDomains entry must be a public hostname such as competitor.com.");
+      try { if (new URL(`https://${competitor}`).hostname !== competitor) throw new Error(); }
+      catch { throw new AuditInputError("Each competitorDomains entry must be a public hostname such as competitor.com."); }
+    }
+    competitorDomains = competitorDomains.filter(candidate => candidate !== hostname);
+  }
   let prompts: string[];
   if (rawPrompts !== undefined) {
     if (!Array.isArray(rawPrompts) || rawPrompts.length < 1 || rawPrompts.length > 5 || !rawPrompts.every((value) => typeof value === "string")) throw new AuditInputError("buyerPrompts must contain 1 to 5 prompt strings.");
@@ -51,7 +62,7 @@ export function validateAuditInput(input: unknown): { domain: string; buyerPromp
     if (typeof buyerPrompt !== "string" || !buyerPrompt.trim() || buyerPrompt.length > 4000) throw new AuditInputError("buyerPrompt must contain 1 to 4000 characters.");
     prompts = [buyerPrompt.trim()];
   }
-  return { domain: hostname, buyerPrompt: prompts[0], ...(rawPrompts !== undefined ? { buyerPrompts: prompts } : {}) };
+  return { domain: hostname, buyerPrompt: prompts[0], ...(rawPrompts !== undefined ? { buyerPrompts: prompts } : {}), ...(competitorDomains !== undefined ? { competitorDomains } : {}) };
 }
 
 const normalizedUrl = normalizeCitationUrl;
@@ -126,7 +137,7 @@ function similarity(a: string, b: string): number {
 }
 
 export async function runAudit(input: unknown, overrides: Partial<AuditDependencies> = {}, userId?: string) {
-  const { domain, buyerPrompt, buyerPrompts = [buyerPrompt] } = validateAuditInput(input);
+  const { domain, buyerPrompt, buyerPrompts = [buyerPrompt], competitorDomains: providedCompetitors } = validateAuditInput(input);
   const deps: AuditDependencies = { probe: runCitationProbe, sitemap: fetchSitemapUrls, check: checkUrlStatus, resolve: resolveGroundingRedirect, save: persistAudit, saveGap: saveAuditCitationGap, semantic: process.env.GEMINI_API_KEY ? matchSitemapUrls : null, ...overrides };
   const [sitemapResults, probeResults] = await Promise.all([
     Promise.allSettled([deps.sitemap(domain)]),
@@ -154,7 +165,7 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
     }
     : {
       text: successfulProbes.map((item, index) => `Buyer intent ${index + 1}: ${buyerPrompts[index]}\n${item.text}`).join("\n\n"),
-      groundingMetadata: null,
+      groundingMetadata: "groundingMetadata" in firstProbe ? firstProbe.groundingMetadata : null,
       sources: [...new Map([...successfulProbes.flatMap((item) => "sources" in item ? item.sources : []).map((source) => [source.url, source] as const), ...allProbeUrls.map((url, index) => [url, { index: index + 100, url, title: url }] as const)]).values()].slice(0, 140),
       citations: successfulProbes.flatMap((item) => "citations" in item ? item.citations : []),
     };
@@ -167,6 +178,7 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
     return null;
   });
   const allUrls = [...new Set([...extracted, ...resolved.filter((url): url is string => !!url)])];
+  const competitorDomains = providedCompetitors ?? (await import("./hijacker")).inferCompetitorDomains(domain, allUrls, probe.text);
   const targetUrls = allUrls.filter((url) => inDomain(url, domain));
   if (targetUrls.length > 50) throw new AuditInputError("More than 50 target-domain citations were found; narrow the buyer prompt.");
   let sitemap: string[] = [];
@@ -222,7 +234,7 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
   if (!("searchGrounding" in probe) && !groundingMetadata) warnings.push("The probe returned no grounding metadata; only response text URLs could be inspected.");
   const verifiedFindings = findings.filter((finding) => finding.httpStatus !== null);
   const visibilityScore = verifiedFindings.length ? Math.round(100 * verifiedFindings.filter((finding) => finding.httpStatus! >= 200 && finding.httpStatus! < 300).length / verifiedFindings.length) : 0;
-  const report: AuditReport = { domain, buyerPrompt, ...(buyerPrompts.length > 1 ? { buyerPrompts } : {}), visibilityScore, generatedText: probe.text, groundingMetadata, providerUsed: "providerUsed" in probe ? probe.providerUsed : "gemini", ...("searchGrounding" in probe ? { searchGrounding: probe.searchGrounding } : {}), extractedUrls: allUrls, sitemapUrlCount: sitemap.length, findings, warnings: [...new Set(warnings)], status: warnings.length ? "partial" : "completed" };
+  const report: AuditReport = { domain, buyerPrompt, ...(buyerPrompts.length > 1 ? { buyerPrompts } : {}), competitorDomains, visibilityScore, generatedText: probe.text, groundingMetadata, providerUsed: "providerUsed" in probe ? probe.providerUsed : "gemini", ...("searchGrounding" in probe ? { searchGrounding: probe.searchGrounding } : {}), extractedUrls: allUrls, sitemapUrlCount: sitemap.length, findings, warnings: [...new Set(warnings)], status: warnings.length ? "partial" : "completed" };
   const gap = detectCitationGap(domain, buyerPrompt, probe.text, report.providerUsed ?? "unknown");
   if (gap) report.citationGap = gap;
   if (process.env.AUDIT_PERSISTENCE_MODE === "local") {
