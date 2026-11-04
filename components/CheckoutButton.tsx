@@ -8,7 +8,7 @@ import { toast } from "sonner";
 export default function CheckoutButton() {
   const { isSignedIn, isLoaded } = useUser();
   const [betaMode, setBetaMode] = useState<boolean | null>(null);
-  const [subscription, setSubscription] = useState<{ state: string; currentPeriodEnd: string | null; daysRemaining: number | null } | null>(null);
+  const [subscription, setSubscription] = useState<{ state: string; plan?: string; currentPeriodEnd: string | null; daysRemaining: number | null } | null>(null);
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [pending, setPending] = useState(false);
@@ -28,8 +28,8 @@ export default function CheckoutButton() {
     if (!isSignedIn) return;
     fetch("/api/subscription/status", { cache: "no-store" })
       .then((response) => response.ok ? response.json() : null)
-      .then((data: { state?: string; currentPeriodEnd?: string | null } | null) => {
-        if (data?.state) setSubscription({ state: data.state, currentPeriodEnd: data.currentPeriodEnd ?? null, daysRemaining: data.currentPeriodEnd ? Math.max(0, Math.ceil((Date.parse(data.currentPeriodEnd) - Date.now()) / 86_400_000)) : null });
+      .then((data: { state?: string; plan?: string; currentPeriodEnd?: string | null } | null) => {
+        if (data?.state) setSubscription({ state: data.state, plan: data.plan, currentPeriodEnd: data.currentPeriodEnd ?? null, daysRemaining: data.currentPeriodEnd ? Math.max(0, Math.ceil((Date.parse(data.currentPeriodEnd) - Date.now()) / 86_400_000)) : null });
       }).catch(() => {});
   }, [isSignedIn, betaResult]);
 
@@ -64,12 +64,12 @@ export default function CheckoutButton() {
     } finally { setPending(false); }
   }
 
-  async function startCheckout() {
+  async function startCheckout(plan: "pro" | "agency") {
     if (pending) return;
     setPending(true);
     setError("");
     try {
-      const response = await fetch("/api/lemonsqueezy/checkout", { method: "POST" });
+      const response = await fetch(`/api/lemonsqueezy/checkout?plan=${plan}`, { method: "POST" });
       const result: unknown = await response.json();
       if (response.ok && result && typeof result === "object" && (result as { betaMode?: boolean }).betaMode) {
         setBetaMode(true);
@@ -84,7 +84,7 @@ export default function CheckoutButton() {
           : "Checkout is temporarily unavailable. Please try again.";
         throw new Error(message);
       }
-      toast.info((result as { testMode?: boolean }).testMode ? "Opening Lemon Squeezy test checkout. No live payment will be charged." : "Opening secure checkout for Citemend Pro.");
+      toast.info((result as { testMode?: boolean }).testMode ? "Opening Lemon Squeezy test checkout. No live payment will be charged." : `Opening secure checkout for Citemend ${plan === "agency" ? "Agency" : "Pro"}.`);
       window.location.assign((result as { checkoutUrl: string }).checkoutUrl);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Checkout is temporarily unavailable. Please try again.";
@@ -101,9 +101,10 @@ export default function CheckoutButton() {
       {subscription?.state === "pending_beta" && <p role="status" className="mb-2 text-sm font-medium text-[#214d39]">Beta Request Pending</p>}
       {!isLoaded ? <button type="button" disabled className="rounded-lg bg-[#214d39] px-4 py-2.5 text-sm font-semibold text-white opacity-60">Loading...</button>
         : !isSignedIn ? <SignInButton mode="modal"><button type="button" className="rounded-lg bg-[#214d39] px-4 py-2.5 text-sm font-semibold text-white">Sign in to upgrade</button></SignInButton>
-          : <button type="button" onClick={betaMode ? () => { setError(""); setBetaResult(null); setBetaOpen(true); } : startCheckout} disabled={pending || subscription?.state === "active_beta" || subscription?.state === "paid"} className="rounded-lg bg-[#214d39] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#153c2a] disabled:cursor-wait disabled:opacity-60">
-            {pending ? "Please wait..." : subscription?.state === "active_beta" ? "Pro Beta Active" : subscription?.state === "pending_beta" ? "Beta Request Pending" : subscription?.state === "expired_beta" ? "Beta Access Expired" : subscription?.state === "paid" ? "Pro Active" : betaMode === true ? "Upgrade to Pro" : betaMode === false ? "Upgrade to Pro ($39/mo)" : "Check Pro availability"}
+          : <button type="button" onClick={betaMode ? () => { setError(""); setBetaResult(null); setBetaOpen(true); } : () => void startCheckout("pro")} disabled={pending || subscription?.state === "active_beta" || subscription?.state === "paid"} className="rounded-lg bg-[#214d39] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#153c2a] disabled:cursor-wait disabled:opacity-60">
+            {pending ? "Please wait..." : subscription?.state === "active_beta" ? "Pro Beta Active" : subscription?.state === "pending_beta" ? "Beta Request Pending" : subscription?.state === "expired_beta" ? "Beta Access Expired" : subscription?.state === "paid" ? subscription.plan === "agency" ? "Agency Active" : "Pro Active" : betaMode === true ? "Upgrade to Pro" : betaMode === false ? "Upgrade to Pro ($39/mo)" : "Check Pro availability"}
           </button>}
+      {isSignedIn && betaMode === false && <div className="mt-2"><button type="button" onClick={() => void startCheckout("agency")} disabled={pending || subscription?.plan === "agency" && subscription.state === "paid"} className="rounded-lg border border-[#5c8965] px-4 py-2.5 text-sm font-semibold text-[#214d39] disabled:opacity-60">{subscription?.plan === "agency" && subscription.state === "paid" ? "Agency Active" : "Choose Agency ($249/mo)"}</button>{subscription?.state === "paid" && subscription.plan !== "agency" && <p className="mt-2 max-w-xs text-xs text-[#68736b]">Agency checkout creates a separate subscription. Manage your existing Pro subscription to avoid overlapping charges.</p>}</div>}
       {!betaMode && error && <p role="alert" className="mt-2 max-w-xs text-xs leading-5 text-red-800">{error}</p>}
       {betaMode && betaOpen && <dialog ref={dialogRef} onClose={() => setBetaOpen(false)} aria-labelledby="beta-title" className="m-auto w-[min(92vw,30rem)] rounded-2xl border border-[#dfe5dc] bg-white p-6 text-[#182c25] shadow-2xl backdrop:bg-black/50 sm:p-8">
         <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-widest text-[#53704e]">Citemend design-partner beta</p><h2 id="beta-title" className="mt-2 text-2xl font-semibold">30 days of Pro, free</h2></div><button type="button" onClick={() => dialogRef.current?.close()} aria-label="Close beta request" className="rounded-md px-2 py-1 text-xl leading-none text-[#68736b] hover:bg-[#f1f4eb]">&times;</button></div>

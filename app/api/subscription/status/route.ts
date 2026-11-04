@@ -12,8 +12,9 @@ export async function GET() {
     if (isMissingBetaColumns(error)) return Response.json({ state: hasPro ? "paid" : "free", currentPeriodEnd: null });
     if (error) throw error;
     const rows = data ?? [];
-    if (rows.some((row) => row.plan !== "pro_beta" && grantsProAccess(row))) {
-      return Response.json({ state: "paid", currentPeriodEnd: null });
+    const paid = rows.find(row => row.plan === "agency" && grantsProAccess(row)) ?? rows.find(row => row.plan !== "pro_beta" && grantsProAccess(row));
+    if (paid) {
+      return Response.json({ state: "paid", plan: paid.plan === "agency" ? "agency" : "pro", currentPeriodEnd: null });
     }
     const beta = rows.find((row) => row.plan === "pro_beta");
     const state = beta?.status === "active" && grantsProAccess(beta) ? "active_beta"

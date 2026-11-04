@@ -24,3 +24,15 @@ test("test checkout fails closed if Lemon Squeezy does not confirm test mode", a
   process.env = { ...process.env, NODE_ENV: "production" };
   await assert.rejects(createLemonSqueezyCheckout("user_123", true), /development-only/);
 });
+
+test("agency checkout selects the configured Agency variant and keeps the account owner", async () => {
+  process.env = { ...oldEnv, NODE_ENV: "development", LEMON_SQUEEZY_API_KEY: "test-key", LEMON_SQUEEZY_STORE_ID: "123", LEMON_SQUEEZY_PRODUCT_ID: "456", LEMON_SQUEEZY_VARIANT_ID: "789", LEMON_SQUEEZY_AGENCY_VARIANT_ID: "2336501" };
+  globalThis.fetch = async (_url, options) => {
+    const body = JSON.parse(String(options?.body));
+    assert.equal(body.data.relationships.variant.data.id, "2336501");
+    assert.deepEqual(body.data.attributes.product_options.enabled_variants, [2336501]);
+    assert.equal(body.data.attributes.checkout_data.custom.user_id, "agency_owner");
+    return Response.json({ data: { attributes: { url: "https://example.lemonsqueezy.com/checkout/custom/agency" } } });
+  };
+  assert.match(await createLemonSqueezyCheckout("agency_owner", false, "agency"), /agency/);
+});

@@ -9,6 +9,7 @@ import { WeeklyScanStore, type WeeklyDigest, type WeeklyJob } from "./weekly-sca
 import { createServerDatabase } from "./supabase-server";
 import { generateLlmsTxt, type DeprecatedPath, type LlmsPage } from "./llms-txt";
 import { notifyWeeklyFindings } from "./weekly-alerts";
+import { stampAgencyProfile } from "./agency-store";
 
 type WeeklyRun = Awaited<ReturnType<WeeklyScanStore["getOrCreateRun"]>>;
 type WeeklyStore = Pick<WeeklyScanStore, "getOrCreateRun" | "oldestOpenRun" | "claimInitialization" | "listTargets" | "initialize" | "releaseInitialization" | "candidates" | "claimJob" | "priorAudit" | "finishJob" | "prepareDigests" | "digestCandidates" | "claimDigest" | "digestLinks" | "finishDigest" | "finishRunIfDone">;
@@ -53,6 +54,8 @@ export async function runWeeklyAudit(job: WeeklyJob, dependencies: { execute?: t
     job.user_id,
   );
   if (report.persistence.status !== "saved" || report.auditId !== job.id) throw new Error("Weekly audit could not be saved.");
+  try { await stampAgencyProfile(job.user_id, job.domain, job.id); }
+  catch { console.warn("Weekly audit white-label settings could not be applied."); }
   try { await notifyWeeklyFindings(job.user_id, job.id, report); }
   catch { console.warn("Weekly alert processing was unavailable."); }
   // The weekly scan already persisted fresh 404s and redirect suggestions. Refresh

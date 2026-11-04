@@ -4,6 +4,8 @@ import { grantsProAccess, hasProSubscription } from "../lib/subscription";
 
 const now = Date.parse("2026-11-01T00:00:00Z");
 test("Pro access respects subscription status and cancellation grace period", () => {
+  assert.equal(grantsProAccess({ plan: "agency", status: "active", cancelled: false, ends_at: null }, now), true);
+  assert.equal(grantsProAccess({ plan: "agency", status: "expired", cancelled: false, ends_at: null }, now), false);
   for (const status of ["active", "on_trial", "past_due"]) assert.equal(grantsProAccess({ status, cancelled: false, ends_at: null }, now), true);
   for (const status of ["expired", "unpaid", "paused"]) assert.equal(grantsProAccess({ status, cancelled: false, ends_at: null }, now), false);
   assert.equal(grantsProAccess({ status: "cancelled", cancelled: true, ends_at: "2026-11-02T00:00:00Z" }, now), true);

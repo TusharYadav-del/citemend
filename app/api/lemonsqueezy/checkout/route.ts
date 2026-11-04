@@ -5,7 +5,7 @@ export function GET() {
   return Response.json({ mode: isBillingEnabled() ? "billing" : "beta" });
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || !process.env.CLERK_SECRET_KEY) {
     return Response.json({ error: "Sign-in is not configured." }, { status: 503 });
   }
@@ -17,11 +17,13 @@ export async function POST() {
     return Response.json({ error: "Sign-in is temporarily unavailable." }, { status: 503 });
   }
   if (!userId) return Response.json({ error: "Sign in before upgrading." }, { status: 401 });
+  const plan = new URL(request.url).searchParams.get("plan") ?? "pro";
+  if (plan !== "pro" && plan !== "agency") return Response.json({ error: "Choose a valid plan." }, { status: 400 });
   if (!isBillingEnabled()) return Response.json({ betaMode: true });
 
   try {
     const testMode = process.env.NODE_ENV === "development" && process.env.LEMON_SQUEEZY_TEST_MODE === "true";
-    const checkoutUrl = configuredCheckoutUrl(userId) ?? await createLemonSqueezyCheckout(userId, testMode);
+    const checkoutUrl = (plan === "pro" && !testMode ? configuredCheckoutUrl(userId) : null) ?? await createLemonSqueezyCheckout(userId, testMode, plan);
     return Response.json({ checkoutUrl, testMode });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";

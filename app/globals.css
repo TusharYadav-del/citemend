@@ -53,3 +53,21 @@ body {
 @media (prefers-reduced-motion: reduce) { .audit-workspace *, .audit-workspace *::before, .audit-workspace *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
 
 @layer base { .audit-workspace * { border-color: var(--border); } }
+
+.report-print-only { display: none; }
+@media print {
+  @page { size: A4; margin: 15mm; }
+  body:has(.audit-report), body:has(.audit-report) main, .audit-report, .audit-report * { color: #17211c !important; background: transparent !important; box-shadow: none !important; text-shadow: none !important; }
+  .audit-report { display: block !important; min-height: 0 !important; max-width: none !important; }
+  .audit-report-content { width: 100% !important; max-width: none !important; padding: 0 !important; }
+  .audit-report .print-hide, .audit-report .report-screen-only, .audit-report button, .audit-report a[href^="/"] { display: none !important; }
+  .audit-report p.report-print-only { display: block; }
+  .audit-report table.report-print-only { display: table; }
+  .audit-report article, .audit-report li, .audit-report tr, .audit-report .report-cta { break-inside: avoid; }
+  .audit-report section, .audit-report article { border-color: #d2dad5 !important; }
+  .audit-report .overflow-x-auto, .audit-report pre { overflow: visible !important; white-space: normal !important; }
+  .audit-report table { width: 100%; table-layout: fixed; border-collapse: collapse; margin-top: 1rem; }
+  .audit-report th, .audit-report td { padding: 6px; border: 1px solid #d2dad5; text-align: left; overflow-wrap: anywhere; vertical-align: top; }
+  .audit-report a, .audit-report p, .audit-report h1, .audit-report h2 { overflow-wrap: anywhere; }
+  .audit-report .report-cta { position: static !important; border: 1px solid #d2dad5; }
+}

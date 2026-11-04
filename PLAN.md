@@ -678,7 +678,7 @@ IndexNow submission requires the site's root key file to contain the exact confi
 - [x] Verify `npm run build` after the locked local `.next` directory was removed.
 - [x] User confirmed migration 017 applied successfully in hosted Supabase.
 
-Days 57–70 completed. Days 78–84 are not started.
+Days 57–77 completed. Day 84 is not started.
 
 Profiles reuse one live Tavily-grounded audit result to preserve the existing $0 provider path; they are comparative synthesis profiles, not independent calls to four engine APIs.
 
@@ -702,3 +702,23 @@ The production build was verified with an alternate output directory because One
 - [x] Verify TypeScript, lint, full test suite (156 passed before the added focused weekly comparison test), and production build using an alternate output directory.
 
 Live Shopify sync needs a configured Shopify store and Admin token; file exports require deployment by the site owner. Slack and Discord delivery requires their saved incoming webhooks. Provider integrations were tested with mocked responses.
+
+### Days 78–83: Agency White-Label Pitch Reports & Workspace Switching (COMPLETED)
+
+- [x] Add paid-access, owner-scoped white-label settings for agency name, logo, color, and booking CTA, preserving existing integration settings.
+- [x] Stamp validated agency profiles onto eligible newly saved and scheduled audits; retain each report's branding snapshot.
+- [x] Render agency branding, booking CTA, saved competitor opportunities, and engine matrix in shareable reports; support neutral `?whitelabel=1` mode.
+- [x] Add print-friendly report tables, KPI cards, matrix, and Export Report controls using the browser's Save as PDF flow.
+- [x] Add an owned-domain workspace switcher and filter the dashboard to the selected domain.
+- [x] Test paid access, domain ownership, validation, profile persistence, audit stamping, and public report rendering; verify TypeScript, lint, npm test (162 passed), and production build.
+
+Agency access follows the existing active Pro/VIP Beta/paid subscription check. The build used an alternate output directory because the existing `.next` directory is subject to OneDrive file locks.
+
+#### Agency billing
+
+- [x] Add an Agency checkout option using user-provided Lemon Squeezy variant `2336501`, with an environment override for a test variant.
+- [x] Accept signed Agency subscription events for the configured store and persist the actual product, variant, and Agency plan; preserve existing Pro events and ownership checks.
+- [x] Display Agency subscription status and disclose that purchasing it alongside an existing Pro subscription creates a separate subscription.
+- [x] Test Agency checkout payloads, Agency webhook validation, and subscription entitlement.
+
+Lemon Squeezy reported variant `2336501` as a $249/month subscription in test mode with pending status. A published live variant and the existing API/store credentials and live billing switch are required for production; set `LEMON_SQUEEZY_AGENCY_VARIANT_ID` to that live variant. Production ignores test-mode subscription events. No live purchase was made during verification.

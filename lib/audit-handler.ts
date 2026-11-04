@@ -7,6 +7,7 @@ import { reserveFreeAudit, releaseFreeAudit } from "./free-audit";
 import { findCompetitor404Opportunities } from "./hijacker";
 import { inspectThirdPartyCitations } from "./listicle-crawler";
 import { detectEntityPricingTruth } from "./entity-truth";
+import { stampAgencyProfile } from "./agency-store";
 
 type AuditPostDependencies = {
   isConfigured?: () => boolean;
@@ -107,6 +108,10 @@ export function createAuditPostHandler(dependencies: AuditPostDependencies = {})
       let listicleResult: Awaited<ReturnType<typeof inspectThirdPartyCitations>> | null = null;
       let entityTruthResult: Awaited<ReturnType<typeof detectEntityPricingTruth>> | null = null;
       if (report.persistence.status === "saved" && report.auditId) {
+        if (isPro) {
+          try { await stampAgencyProfile(userId, report.domain, report.auditId); }
+          catch { report.warnings?.push("White-label settings could not be applied to this saved audit."); }
+        }
         try {
           hijackResult = await hijack({
             auditId: report.auditId, domain: report.domain, competitorDomains: report.competitorDomains ?? [],

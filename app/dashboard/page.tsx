@@ -20,6 +20,8 @@ import OpportunityCommandCenter from "@/components/OpportunityCommandCenter";
 import { ENGINE_PROFILES, type EngineMatrixRow } from "@/lib/engine-matrix";
 import RedirectSyncButton from "@/components/redirect-sync-button";
 import WorkspaceIntegrations from "@/components/workspace-integrations";
+import AgencyProfileSettings from "@/components/agency-profile-settings";
+import DomainSwitcher from "@/components/domain-switcher";
 
 function HistoryLoading() {
   return <main className="min-h-screen bg-[#07090E] px-5 py-10 text-white sm:px-8 sm:py-14" role="status" aria-label="Loading your command center"><div className="h-8 w-52 animate-pulse rounded-lg bg-white/10" /><div className="mt-8 grid gap-4 sm:grid-cols-4">{[0, 1, 2, 3].map((item) => <div key={item} className="h-32 animate-pulse rounded-2xl bg-white/[0.04]" />)}</div><span className="sr-only">Loading your audit history...</span></main>;
@@ -79,7 +81,7 @@ function AuditCard({ audit, isPro, activeRules, syncedLinks, gap }: { gap?: Cita
   );
 }
 
-async function UserAuditHistory() {
+async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ domain?: string | string[] }> }) {
   const { userId } = await auth();
   if (!userId) redirect("/");
 
@@ -89,6 +91,11 @@ async function UserAuditHistory() {
   let audits: UserAuditHistoryItem[];
   try { audits = await getUserAuditHistory(userId); }
   catch { return <HistoryUnavailable />; }
+  const allDomains = [...new Set(audits.map(audit => audit.domain))];
+  const requestedDomain = (await searchParams).domain;
+  const selectedDomain = typeof requestedDomain === "string" && allDomains.includes(requestedDomain) ? requestedDomain : "";
+  if (selectedDomain) audits = audits.filter(audit => audit.domain === selectedDomain);
+  const latestReport = audits.find(audit => ["completed", "partial", "mock_completed"].includes(audit.status));
 
   let gaps = new Map<string, CitationGap>();
   try { gaps = await getAuditCitationGaps(userId); } catch {}
@@ -120,7 +127,7 @@ async function UserAuditHistory() {
       auditIds.length ? db.from("citation_hijack_opportunities").select("id,audit_id,domain,opportunity_type,prompt_query,target_url,dead_competitor_url,competitor_domain,http_status,matched_user_live_url,similarity_score,contact_email_or_link,outreach_draft,corrective_schema_json,verification_status").in("audit_id", auditIds).order("created_at", { ascending: true }).order("id", { ascending: true }).limit(500) : Promise.resolve({ data: [], error: null }),
     ]);
     if (rulesResult.error || cmsResult.error || llmsResult.error || webhookResult.error || eventResult.error || opportunityResult.error) throw rulesResult.error ?? cmsResult.error ?? llmsResult.error ?? webhookResult.error ?? eventResult.error ?? opportunityResult.error;
-    const rules = rulesResult.data ?? [];
+    const rules = (rulesResult.data ?? []).filter(rule => !selectedDomain || rule.source_host === selectedDomain);
     activeRules = new Set(rules.map((rule) => `${rule.source_host}:${rule.source_path}`));
     syncedLinks = rules.filter(rule => rule.synced_to_cms && rule.source_link_id).map(rule => rule.source_link_id!);
     exportRules = rules.map((rule) => ({ source_path: rule.source_path, target_url: rule.target_url }));
@@ -152,21 +159,23 @@ async function UserAuditHistory() {
       <div className="min-w-0 flex-1 px-5 py-8 sm:px-8 sm:py-10">
       <header className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-6">
         <div><Link href="/" className="text-sm font-medium text-emerald-300 hover:underline">&larr; Back to Citemend</Link><p className="mt-4 text-[10px] font-semibold tracking-[.18em] text-emerald-400">LIVE TELEMETRY · {audits.length} SAVED SCANS</p><h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">Command Center</h1><p className="mt-2 text-sm text-slate-400">Monitor citations, recover links, and pursue hijack opportunities.</p></div>
-        <div className="flex flex-wrap items-center gap-3"><RedirectSyncButton domains={[...new Set(audits.map(audit => audit.domain))]} /><RedirectExportDrawer rules={exportRules} /><Link href="/dashboard/pixel" className="rounded-lg border border-white/10 px-3 py-2 text-sm font-medium text-emerald-300 hover:bg-white/5">Pixel &amp; traffic</Link><CheckoutButton /><UserButton /></div>
+        <div className="flex flex-wrap items-center gap-3"><DomainSwitcher domains={allDomains} selected={selectedDomain} /><RedirectSyncButton domains={[...new Set(audits.map(audit => audit.domain))]} /><RedirectExportDrawer rules={exportRules} /><Link href="/dashboard/pixel" className="rounded-lg border border-white/10 px-3 py-2 text-sm font-medium text-emerald-300 hover:bg-white/5">Pixel &amp; traffic</Link><CheckoutButton /><UserButton /></div>
       </header>
       <OnboardingChecklist progress={onboarding} />
       <MetricCards audits={audits} rescued={rescued} />
+      {latestReport && <section aria-label="Quick tools" className="mb-6 rounded-xl border border-white/10 bg-white/[0.03] p-4"><h2 className="text-sm font-semibold text-white">Quick Tools</h2><a href={`/audit/${latestReport.id}?print=1`} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg border border-emerald-400/30 px-3 py-2 text-xs font-semibold text-emerald-300">Export Report / Save as PDF</a><p className="mt-2 text-xs text-slate-500">Opens the latest report for {latestReport.domain}.</p></section>}
       <OpportunityCommandCenter opportunities={opportunities} brokenLinks={audits.flatMap(audit => audit.broken_links.map(link => ({ ...link, auditId: audit.id, domain: audit.domain }))) } syncedLinks={syncedLinks} />
       <WeeklyMonitoring isPro={isPro} />
       <div id="llms-txt-generator"><LlmsTxtGenerator domains={[...new Set(audits.map((audit) => audit.domain))]} /></div>
       <p id="redirect-export" className="mb-6 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-xs leading-5 text-slate-400">Pro users can publish or disable verified 301 suggestions below. Rules become active when the Cloudflare Worker is attached to the domain; edge lookups can retain a change for up to five seconds.</p>
-      <WorkspaceIntegrations domains={[...new Set(audits.map(audit => audit.domain))]} />
+      <WorkspaceIntegrations key={`workspace-${selectedDomain}`} domains={[...new Set(audits.map(audit => audit.domain))]} />
+      <AgencyProfileSettings key={`agency-${selectedDomain}`} domains={[...new Set(audits.map(audit => audit.domain))]} isPro={isPro} />
       {audits.length ? <div id="audit-history" className="space-y-4">{audits.map((audit) => <AuditCard key={audit.id} audit={audit} gap={gaps.get(audit.id)} isPro={isPro} activeRules={activeRules} syncedLinks={syncedLinks} />)}</div> : <section className="rounded-2xl border border-dashed border-white/15 px-6 py-14 text-center"><h2 className="text-base font-semibold text-white">No audits saved yet</h2><p className="mt-2 text-sm text-slate-400">Run an audit and it will appear here.</p><Link href="/#audit" className="mt-5 inline-flex rounded-lg bg-emerald-400 px-5 py-3 text-sm font-medium text-[#07110d]">Run an audit</Link></section>}
       </div></div>
     </main>
   );
 }
 
-export default function DashboardPage() {
-  return <Suspense fallback={<HistoryLoading />}><UserAuditHistory /></Suspense>;
+export default function DashboardPage({ searchParams }: { searchParams: Promise<{ domain?: string | string[] }> }) {
+  return <Suspense fallback={<HistoryLoading />}><UserAuditHistory searchParams={searchParams} /></Suspense>;
 }

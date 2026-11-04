@@ -1,5 +1,6 @@
 import { isValidLemonSqueezySignature } from "@/lib/lemonsqueezy-webhook";
 import { createServerDatabase } from "@/lib/supabase-server";
+import { agencyVariantId } from "@/lib/lemonsqueezy";
 
 const MAX_WEBHOOK_BYTES = 64 * 1024;
 
@@ -61,16 +62,23 @@ export async function POST(request: Request) {
   const subscriptionId = subscription?.id;
   const storeId = (process.env.LEMON_SQUEEZY_STORE_ID || process.env.LEMONSQUEEZY_STORE_ID)?.trim();
   const productId = (process.env.LEMON_SQUEEZY_PRODUCT_ID || process.env.LEMONSQUEEZY_PRODUCT_ID)?.trim();
-  if (!storeId || !productId) return Response.json({ error: "Webhook is not configured." }, { status: 503 });
+  const variantId = String(attributes?.variant_id ?? "");
+  const agency = variantId === agencyVariantId();
+  if (!storeId || (!agency && !productId)) return Response.json({ error: "Webhook is not configured." }, { status: 503 });
   if (
     subscription?.type !== "subscriptions" ||
     typeof subscriptionId !== "string" ||
     !/^\d+$/.test(subscriptionId) ||
     !attributes ||
     String(attributes.store_id) !== storeId ||
-    String(attributes.product_id) !== productId
+    !/^\d+$/.test(String(attributes.product_id ?? "")) ||
+    !/^\d+$/.test(variantId) ||
+    (!agency && String(attributes.product_id) !== productId)
   ) {
     return Response.json({ error: "Invalid subscription event." }, { status: 400 });
+  }
+  if (process.env.NODE_ENV === "production" && attributes.test_mode === true) {
+    return Response.json({ received: true, ignored: true });
   }
 
   const customUserId = event.meta?.custom_data?.user_id;
@@ -114,8 +122,9 @@ export async function POST(request: Request) {
         id: subscriptionId,
         user_id: userId,
         store_id: storeId,
-        product_id: productId,
-        variant_id: String(attributes.variant_id ?? ""),
+        product_id: String(attributes.product_id),
+        variant_id: variantId,
+        plan: agency ? "agency" : "pro",
         customer_id: numericString(attributes.customer_id),
         order_id: numericString(attributes.order_id),
         status: attributes.status,

@@ -42,3 +42,34 @@ test("signed subscription events cannot replace newer billing state or change it
   assert.equal((await send("subscription_updated", "2026-11-01T13:00:00Z", "active", false, "other_user")).status, 400);
   assert.equal((row as Record<string, unknown> | null)?.user_id, "user_123");
 });
+
+test("signed Agency variant is accepted for its store and records the actual product and Agency plan", async () => {
+  process.env = { ...oldEnv, NEXT_PUBLIC_SUPABASE_URL: "https://db.example.com", SUPABASE_SECRET_KEY: "test-server-key", LEMON_SQUEEZY_WEBHOOK_SECRET: "webhook-secret", LEMON_SQUEEZY_STORE_ID: "123", LEMON_SQUEEZY_PRODUCT_ID: "456", LEMON_SQUEEZY_AGENCY_VARIANT_ID: "2336501" };
+  let stored: Record<string, unknown> | undefined;
+  globalThis.fetch = async (_input, init) => {
+    if ((init?.method ?? "GET") === "GET") return Response.json([]);
+    stored = JSON.parse(String(init?.body));
+    return new Response(null, { status: 201 });
+  };
+  const send = (variant: number, store = 123) => {
+    const event = { meta: { event_name: "subscription_created", custom_data: { user_id: "agency_owner" } }, data: { type: "subscriptions", id: "102", attributes: { store_id: store, product_id: 999, variant_id: variant, status: "active", cancelled: false, updated_at: "2026-11-01T10:00:00Z" } } };
+    const body = JSON.stringify(event);
+    return POST(new Request("http://localhost/api/webhooks/lemonsqueezy", { method: "POST", headers: { "x-signature": createHmac("sha256", "webhook-secret").update(body).digest("hex") }, body }));
+  };
+  assert.equal((await send(2336501, 999)).status, 400);
+  assert.equal((await send(99999)).status, 400);
+  assert.equal((await send(2336501)).status, 200);
+  assert.equal(stored?.product_id, "999");
+  assert.equal(stored?.variant_id, "2336501");
+  assert.equal(stored?.plan, "agency");
+  assert.equal(stored?.user_id, "agency_owner");
+});
+
+test("production ignores signed test-mode Agency subscriptions", async () => {
+  process.env = { ...oldEnv, NODE_ENV: "production", LEMON_SQUEEZY_WEBHOOK_SECRET: "webhook-secret", LEMON_SQUEEZY_STORE_ID: "123", LEMON_SQUEEZY_PRODUCT_ID: "456", LEMON_SQUEEZY_AGENCY_VARIANT_ID: "2336501" };
+  globalThis.fetch = async () => { throw new Error("Test event must not touch storage"); };
+  const body = JSON.stringify({ meta: { event_name: "subscription_created", custom_data: { user_id: "agency_owner" } }, data: { type: "subscriptions", id: "103", attributes: { store_id: 123, product_id: 999, variant_id: 2336501, status: "active", updated_at: "2026-11-01T10:00:00Z", test_mode: true } } });
+  const response = await POST(new Request("http://localhost/api/webhooks/lemonsqueezy", { method: "POST", headers: { "x-signature": createHmac("sha256", "webhook-secret").update(body).digest("hex") }, body }));
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).ignored, true);
+});

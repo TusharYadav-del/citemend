@@ -1,5 +1,10 @@
 import "server-only";
 
+export type CheckoutPlan = "pro" | "agency";
+export function agencyVariantId(): string {
+  return process.env.LEMON_SQUEEZY_AGENCY_VARIANT_ID?.trim() || "2336501";
+}
+
 export function isBillingEnabled(): boolean {
   return Boolean(process.env.LEMONSQUEEZY_CHECKOUT_URL?.trim())
     || process.env.LEMONSQUEEZY_LIVE_BILLING_ENABLED === "true"
@@ -17,15 +22,15 @@ export function configuredCheckoutUrl(userId: string): string | null {
   return url.href;
 }
 
-export async function createLemonSqueezyCheckout(userId: string, testMode = false) {
+export async function createLemonSqueezyCheckout(userId: string, testMode = false, plan: CheckoutPlan = "pro") {
   if (testMode && process.env.NODE_ENV === "production") throw new Error("Test-mode checkout is development-only.");
   const apiKey = (process.env.LEMON_SQUEEZY_API_KEY || process.env.LEMONSQUEEZY_API_KEY)?.trim();
   const storeId = (process.env.LEMON_SQUEEZY_STORE_ID || process.env.LEMONSQUEEZY_STORE_ID)?.trim();
   const productId = (process.env.LEMON_SQUEEZY_PRODUCT_ID || process.env.LEMONSQUEEZY_PRODUCT_ID)?.trim();
-  const variantId = (process.env.LEMON_SQUEEZY_VARIANT_ID || process.env.LEMONSQUEEZY_VARIANT_ID)?.trim();
+  const variantId = plan === "agency" ? agencyVariantId() : (process.env.LEMON_SQUEEZY_VARIANT_ID || process.env.LEMONSQUEEZY_VARIANT_ID)?.trim();
   const isNumericId = (value: string) => value.length > 0 && [...value].every((character) => character >= "0" && character <= "9");
 
-  if (!apiKey || !storeId || !productId || !variantId || !isNumericId(storeId) || !isNumericId(productId) || !isNumericId(variantId) || !Number.isSafeInteger(Number(variantId))) {
+  if (!apiKey || !storeId || !variantId || !isNumericId(storeId) || (plan === "pro" && (!productId || !isNumericId(productId))) || !isNumericId(variantId) || !Number.isSafeInteger(Number(variantId))) {
     throw new Error("Lemon Squeezy checkout is not configured.");
   }
 
