@@ -133,6 +133,33 @@ export async function fetchSitemapUrls(domain: string): Promise<string[]> {
 export type UrlState = "hallucinated" | "404" | "410" | "301" | "200" | "blocked" | "timeout" | "unknown";
 export type UrlVerification = { state: UrlState; httpStatus: number | null; finalUrl?: string; error?: string };
 
+export type RedirectTrace = { status: number; visitedUrls: string[]; finalUrl: string };
+
+/** Follows a small, SSRF-checked redirect chain and returns every public URL visited. */
+export async function tracePublicRedirects(value: string, parentSignal?: AbortSignal): Promise<RedirectTrace> {
+  let url = httpUrl(value);
+  const signal = parentSignal ? AbortSignal.any([parentSignal, AbortSignal.timeout(8_000)]) : AbortSignal.timeout(8_000);
+  const visitedUrls = [url.href];
+  for (let redirects = 0; redirects <= 5; redirects++) {
+    signal.throwIfAborted();
+    let response = await publicFetch(url, { method: "HEAD", signal, redirect: "manual", cache: "no-store" });
+    if ([403, 405, 501].includes(response.status)) {
+      await response.body?.cancel();
+      response = await publicFetch(url, { method: "GET", signal, redirect: "manual", cache: "no-store" });
+    }
+    const status = response.status;
+    const location = response.headers.get("location");
+    await response.body?.cancel();
+    if (![301, 302, 303, 307, 308].includes(status)) return { status, visitedUrls, finalUrl: url.href };
+    if (!location) throw new Error("Redirect response has no Location header.");
+    if (redirects === 5) throw new Error("Too many redirects (maximum 5).");
+    url = httpUrl(new URL(location, url).href);
+    if (visitedUrls.includes(url.href)) throw new Error("Redirect loop detected.");
+    visitedUrls.push(url.href);
+  }
+  throw new Error("Too many redirects (maximum 5).");
+}
+
 function classifyStatus(status: number): UrlState {
   if (status === 404) return "404";
   if (status === 410) return "410";

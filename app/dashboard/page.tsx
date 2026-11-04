@@ -123,28 +123,32 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
     }
   } catch {}
   let exportRules: { source_path: string; target_url: string }[] = [];
-  let opportunities: { id: string; audit_id: string | null; domain: string; opportunity_type: string; prompt_query: string; target_url: string; dead_competitor_url: string | null; competitor_domain: string | null; http_status: number | null; matched_user_live_url: string | null; similarity_score: number | null; contact_email_or_link: string | null; outreach_draft: string | null; corrective_schema_json: string | null; verification_status: string | null }[] = [];
+  let opportunities: { id: string; audit_id: string | null; domain: string; opportunity_type: string; prompt_query: string; target_url: string; dead_competitor_url: string | null; competitor_domain: string | null; http_status: number | null; matched_user_live_url: string | null; similarity_score: number | null; contact_email_or_link: string | null; outreach_draft: string | null; corrective_schema_json: string | null; verification_status: string | null; lifecycle_stage: "discovered" | "reviewed" | "contacted" | "replied" | "link_updated" | "ai_citation_observed"; relevance_score: number; buyer_intent_score: number; citation_evidence_score: number; replacement_quality_score: number; composite_priority_score: number }[] = [];
+  let actionLogs: { id: string; workspace_domain: string; actor_user_id: string; action_type: string; target_url: string | null; safety_check_passed: boolean; created_at: string }[] = [];
   let onboarding: OnboardingProgress = { firstAudit: audits.some((audit) => ["completed", "partial"].includes(audit.status)), redirects: false, llmsAndCapsule: false, recovery: false };
   try {
     const db = createServerDatabase();
     const domains = [...new Set(audits.map((audit) => audit.domain))];
     const auditIds = audits.map(audit => audit.id);
-    const [rulesResult, cmsResult, llmsResult, webhookResult, eventResult, opportunityResult] = await Promise.all([
+    const [rulesResult, cmsResult, llmsResult, webhookResult, eventResult, opportunityResult, actionLogResult] = await Promise.all([
       db.from("redirect_rules").select("source_host,source_path,target_url,synced_to_cms,source_link_id").eq("user_id", userId).eq("active", true).eq("is_active", true).limit(500),
       db.from("cms_connections").select("id").eq("user_id", userId).eq("platform", "shopify").limit(1),
       db.from("audits").select("id").eq("user_id", userId).not("llms_txt_content", "is", null).limit(1),
       db.from("audits").select("id").eq("user_id", userId).not("webhook_url", "is", null).limit(1),
       domains.length ? db.from("ai_404_events").select("id").in("domain", domains).limit(1) : Promise.resolve({ data: [], error: null }),
-      auditIds.length ? db.from("citation_hijack_opportunities").select("id,audit_id,domain,opportunity_type,prompt_query,target_url,dead_competitor_url,competitor_domain,http_status,matched_user_live_url,similarity_score,contact_email_or_link,outreach_draft,corrective_schema_json,verification_status").in("audit_id", auditIds).order("created_at", { ascending: true }).order("id", { ascending: true }).limit(500) : Promise.resolve({ data: [], error: null }),
+      auditIds.length ? db.from("citation_hijack_opportunities").select("id,audit_id,domain,opportunity_type,prompt_query,target_url,dead_competitor_url,competitor_domain,http_status,matched_user_live_url,similarity_score,contact_email_or_link,outreach_draft,corrective_schema_json,verification_status,lifecycle_stage,relevance_score,buyer_intent_score,citation_evidence_score,replacement_quality_score,composite_priority_score").in("audit_id", auditIds).order("composite_priority_score", { ascending: false }).order("created_at", { ascending: true }).order("id", { ascending: true }).limit(500) : Promise.resolve({ data: [], error: null }),
+      domains.length ? db.from("action_audit_logs").select("id,workspace_domain,actor_user_id,action_type,target_url,safety_check_passed,created_at").in("workspace_domain", domains).eq("actor_user_id", userId).order("created_at", { ascending: false }).limit(200) : Promise.resolve({ data: [], error: null }),
     ]);
-    if (rulesResult.error || cmsResult.error || llmsResult.error || webhookResult.error || eventResult.error || opportunityResult.error) throw rulesResult.error ?? cmsResult.error ?? llmsResult.error ?? webhookResult.error ?? eventResult.error ?? opportunityResult.error;
+    if (rulesResult.error || cmsResult.error || llmsResult.error || webhookResult.error || eventResult.error || opportunityResult.error || actionLogResult.error) throw rulesResult.error ?? cmsResult.error ?? llmsResult.error ?? webhookResult.error ?? eventResult.error ?? opportunityResult.error ?? actionLogResult.error;
     const rules = (rulesResult.data ?? []).filter(rule => !selectedDomain || rule.source_host === selectedDomain);
     activeRules = new Set(rules.map((rule) => `${rule.source_host}:${rule.source_path}`));
     syncedLinks = rules.filter(rule => rule.synced_to_cms && rule.source_link_id).map(rule => rule.source_link_id!);
     exportRules = rules.map((rule) => ({ source_path: rule.source_path, target_url: rule.target_url }));
     const savedOpportunities = opportunityResult.data ?? [];
+    actionLogs = actionLogResult.data ?? [];
+    const lifecycleRows = savedOpportunities.map(item => ({ ...item, lifecycle_stage: item.lifecycle_stage as "discovered" | "reviewed" | "contacted" | "replied" | "link_updated" | "ai_citation_observed" }));
     const visibleByAudit = new Map<string, number>();
-    opportunities = isPro ? savedOpportunities : savedOpportunities.map(item => {
+    opportunities = isPro ? lifecycleRows : lifecycleRows.map(item => {
       const auditId = item.audit_id ?? "unlinked";
       const position = visibleByAudit.get(auditId) ?? 0;
       visibleByAudit.set(auditId, position + 1);
@@ -172,7 +176,7 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
       <OnboardingChecklist progress={onboarding} />
       <MetricCards audits={audits} rescued={rescued} />
       {latestReport && <section aria-label="Quick tools" className="mb-6 rounded-xl border border-white/10 bg-white/[0.03] p-4"><h2 className="text-sm font-semibold text-white">Quick Tools</h2><a href={`/audit/${latestReport.id}?print=1`} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg border border-emerald-400/30 px-3 py-2 text-xs font-semibold text-emerald-300">Export Report / Save as PDF</a><p className="mt-2 text-xs text-slate-500">Opens the latest report for {latestReport.domain}.</p></section>}
-      <OpportunityCommandCenter opportunities={opportunities} brokenLinks={audits.flatMap(audit => audit.broken_links.map(link => ({ ...link, auditId: audit.id, domain: audit.domain }))) } syncedLinks={syncedLinks} />
+      <OpportunityCommandCenter opportunities={opportunities} brokenLinks={audits.flatMap(audit => audit.broken_links.map(link => ({ ...link, auditId: audit.id, domain: audit.domain }))) } syncedLinks={syncedLinks} actionLogs={actionLogs} />
       <WeeklyMonitoring isPro={isPro} />
       <div id="llms-txt-generator"><LlmsTxtGenerator domains={[...new Set(audits.map((audit) => audit.domain))]} /></div>
       <p id="redirect-export" className="mb-6 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-xs leading-5 text-slate-400">Pro users can publish or disable verified 301 suggestions below. Rules become active when the Cloudflare Worker is attached to the domain; edge lookups can retain a change for up to five seconds.</p>

@@ -13,9 +13,9 @@
 | Four-profile engine matrix and Share of Model | `lib/engine-matrix.ts`, `lib/engine-synthesis.ts`, saved audit matrix fields | Shipped |
 | Semantic sitemap indexing and citation matching | `lib/sitemap-embeddings.ts`, migration 009 | Shipped; live Gemini credentials/provider behavior needs verification |
 | Competitor 404 hijacker, listicle crawler, entity pricing truth | `lib/hijacker.ts`, `lib/listicle-crawler.ts`, `lib/entity-truth.ts` | Shipped; provider and target-site behavior needs verification |
-| Pixel 404 interception, rescue telemetry, installer, quota | `lib/pixel-intercept.ts`, `public/citemend-pixel.js`, migrations 017–020 | Shipped; new hosted approval migration remains to be applied/verified |
+| Pixel 404 interception, rescue telemetry, installer, quota | `lib/pixel-intercept.ts`, `public/citemend-pixel.js`, migrations 017-021 | Shipped; user confirmed hosted migration 021 was applied |
 | Redirect export and platform sync | `lib/redirect-export.ts`, `lib/redirect-sync.ts`, sync route, redirect rules; destinations rechecked as exact HTTP 200 at export/sync time | Shipped; actual external deployment is customer-managed; Shopify live credentials need verification |
-| Redirect approval, signed preview, confidence threshold, manual mapping, rollback | `lib/recovery-workflow.ts`, `lib/recovery-policy.ts`, migration 020, recovery routes and dashboard controls | Shipped in code; hosted migration application needs verification |
+| Redirect approval, signed preview, confidence threshold, manual mapping, rollback, canonical/loop/conflict safety and immutable action events | `lib/recovery-workflow.ts`, `lib/recovery-policy.ts`, `lib/seo.ts`, migrations 020/021 and recovery/sync routes | Shipped in code; user confirmed hosted migration 021 was applied |
 | Slack/Discord alerts and weekly scans | `lib/alerts.ts`, `lib/weekly-alerts.ts`, `lib/weekly-scan.ts` | Shipped; saved webhook delivery and scheduled production invocation need verification |
 | Agency white-label reports and workspace switching | `lib/agency-store.ts`, `lib/agency-whitelabel.ts`, settings route, audit report/dashboard | Shipped; live agency billing variant remains unverified in Day 84 record |
 | Lemon Squeezy checkout and signed subscription updates | `lib/lemonsqueezy.ts`, `lib/lemonsqueezy-webhook.ts`, webhook route | Shipped; live product, webhook configuration, and completed live purchase need verification |
@@ -43,11 +43,12 @@
 | `GET,POST,OPTIONS /api/pixel/intercept` | Intentionally public CORS endpoint; audited-domain quota is atomically limited to 120 requests/minute; only approved live 404 mappings with score >=70 auto-redirect | Shipped; migration 020 must be live before this new query is deployed |
 | `GET /api/pixel/resolve` | Public edge resolver accepts only approved, live broken-link mappings with score >=70; it no longer auto-creates rules from fresh semantic matches | Shipped; edge deployment configuration needs verification |
 | `POST /api/prompts/suggest` | Authenticated prompt suggestions with bounded inputs | Shipped |
-| `POST /api/recovery/approve` | Clerk owner-scoped preview/approval; requires HTTP 200; scores below 70 are rejected; medium/unscored require explicit confirmation | Shipped in code; migration 020 needs hosted application |
+| `POST /api/recovery/approve` | Clerk owner-scoped preview/approval; requires HTTP 200; scores below 70 are rejected; medium/unscored require explicit confirmation | Shipped in code; user confirmed hosted migrations 020 and 021 were applied |
 | `POST /api/recovery/rollback` | Owner-scoped local rule disable/restore; removes tracked Shopify redirect IDs; refuses untracked remote rollback | Shipped in code; remote Shopify permissions need verification |
+| `POST /api/opportunities/lifecycle` | Clerk-authenticated; audit-owner scoped; sequential six-stage advancement with timestamped notes and weighted-signal score | Shipped in code; user confirmed hosted migration 021 was applied |
 | `POST /api/redirect-export` | Authenticated paid export with same-domain safety checks | Shipped |
 | `POST /api/redirect-rules` | Owner-scoped edge rule toggle; activation requires approved/deployed eligible recovery | Shipped |
-| `POST /api/redirects/sync` | Authenticated paid Shopify sync/export; filters to approved/deployed eligible suggestions | Shipped; Shopify Admin API access needs verification |
+| `POST /api/redirects/sync` | Authenticated paid Shopify sync/export; rechecks source 404, canonical host, redirect chain, conflicts, and destination health; writes action logs | Shipped; user confirmed migration 021, Shopify Admin API access needs verification |
 | `GET,POST /api/settings/whitelabel` | Owner and paid-plan scoped white-label settings | Shipped |
 | `GET,POST /api/verify-fix` | Authenticated re-verification and IndexNow request workflow | Shipped |
 | `GET,POST /api/workspace/integrations` | Owner/domain-scoped webhook and integration settings | Shipped |
@@ -67,21 +68,23 @@
 | `audit_citation_gaps` | Owner-scoped prompt/citation gap evidence | Shipped |
 | `ai_404_events` | Pixel/edge 404 event telemetry | Shipped |
 | `cms_connections` | CMS connection metadata | Shipped; remote connections need verification |
-| `citation_hijack_opportunities` | Competitor/listicle recovery opportunities and verification status | Shipped |
+| `action_audit_logs` | Append-only redirect preview/approval/rejection/deployment/rollback and redirect export records; service-role-only | Shipped in code; user confirmed hosted migration 021 was applied |
+| `citation_hijack_opportunities` | Competitor/listicle opportunities with six lifecycle stages and four 0-100 ranking signals | Shipped in code; user confirmed hosted migration 021 was applied |
 | `rescued_ai_visits` | Rescued visitor telemetry | Shipped |
 | `workspace_integrations` | Shopify, Slack/Discord, and agency settings | Shipped |
 | `pixel_intercept_quotas` | Atomic per-domain interceptor quota | Shipped |
 
-Migration files are numbered 001–020 and the local schema test applies them in order, then compares TypeScript row fields and SQL nullability. Migrations 001–019 were previously recorded as applied/locally verified in `PLAN.md`; migration 020 is new in this task and has not been applied to the hosted Supabase project by this repository audit.
+Migration files are numbered 001-021 and the local schema test applies them in order, then compares TypeScript row fields and SQL nullability. The user confirmed migration 020 was applied. Migration 021 is new in this task and the user confirmed it was applied to hosted Supabase before deployment.
 
 ## Security and operational checks
 
 | Check | Finding | Status |
 | --- | --- | --- |
 | Clerk authentication | Dashboard routes are protected by Clerk middleware and verify the session again server-side. Audit, capsule, subscription, settings, and recovery handlers enforce authenticated user ownership. Public reports and pixel endpoints are intentionally public. | Shipped |
-| Supabase RLS | RLS is enabled across the audited application tables. Application reads/writes use the server-only service key and enforce Clerk owner/domain filters. `redirect_rules` public access is now additionally filtered by a security-definer approval predicate; telemetry/integration/vector tables revoke anon/authenticated access. A complete hosted role/grant and policy audit cannot be inferred from local files alone. | Needs Verification (hosted grants/policies) |
+| Supabase RLS | RLS is enabled across the audited application tables. Application reads/writes use the server-only service key and enforce Clerk owner/domain filters. `redirect_rules` public access is filtered by a security-definer approval predicate; telemetry, integrations, vectors, and action audit logs revoke anon/authenticated access. A complete hosted role/grant and policy audit cannot be inferred from local files alone. | Needs Verification (hosted grants/policies) |
 | SSRF protection | `lib/public-http.ts` rejects non-HTTP(S), credentials, non-standard ports, private/loopback/link-local DNS results and pins public DNS results in its Undici connection. SEO/sitemap redirects are manually followed with each hop revalidated and bounded. Recovery additionally requires a same-domain HTTPS destination and an exact HTTP 200 preview. | Shipped |
 | Rate limits | Pixel interception uses migration 019's atomic limit of 120 requests per audited domain per minute. Free audit reservations and weekly leases prevent duplicate/free overuse. There is no shared per-user limiter across all authenticated AI/provider routes; production traffic limits should be verified/configured at the platform/provider layer. | In Progress |
 | Webhook signature verification | Lemon Squeezy inbound subscription events require bounded payloads and constant-time HMAC-SHA256 signature verification. Weekly cron uses a separate constant-time bearer-secret check. Slack/Discord are outbound webhooks; no inbound Slack/Discord signature route exists. | Shipped (Lemon Squeezy/cron); other inbound providers not present |
-| New approval lifecycle | Migration 020 is additive; legacy 404s are backfilled as `url_state='404'` and stay `pending_review`. Similarity below 70 is manual-only; owners must supply a destination, preview HTTP 200, and confirm a signed, five-minute, owner/link/destination-bound preview token. Pixel redirects require approved/deployed status and score >=70; 301 sync requires approval. Shopify rollback is available only when a remote redirect ID has been recorded. | Shipped in code; hosted schema needs verification |
+| Recovery safety and action history | Migrations 020/021 are additive; approval checks enforce canonical-host URLs, a non-looping same-host redirect chain, no live HTTP 200 source overwrite, no conflicting active source rule, and a final HTTP 200 destination. Action rows are append-only and service-role-only. | Shipped in code; user confirmed hosted migration 021 was applied |
+| Opportunity lifecycle guardrails | API stages advance one step at a time and keep actor/time/note events; scores use equal 25% weights for relevance, buyer intent, citation evidence, and replacement quality. Outreach and Reddit content remain human-reviewed drafts. | Shipped in code; user confirmed hosted migration 021 was applied |
 | External production state | This inspection did not make live provider calls or inspect Vercel, Shopify, Clerk, Lemon Squeezy, or hosted Supabase dashboards. Day 84 records the Agency variant as pending/test-mode. | Needs Verification |

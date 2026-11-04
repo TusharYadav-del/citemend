@@ -14,25 +14,30 @@ const baseLink = {
 
 function setup(link = baseLink, rule: Record<string, unknown> | null = null, integration: Record<string, unknown> | null = null) {
   const updates: { table: string; value: Record<string, unknown> }[] = [];
+  const logs: Record<string, unknown>[] = [];
   const db = { from(table: string) {
     let updateValue: Record<string, unknown> | null = null;
+    const filters: Record<string, unknown> = {};
     const query = {
       select() { return query; },
-      eq() { return query; },
+      eq(column: string, value: unknown) { filters[column] = value; return query; },
+      limit() { return query; },
+      insert(value: Record<string, unknown>) { logs.push(value); return Promise.resolve({ error: null }); },
       update(value: Record<string, unknown>) { updateValue = value; updates.push({ table, value }); return query; },
       maybeSingle: async () => ({ data: table === "broken_links" ? link : table === "redirect_rules" ? rule : table === "workspace_integrations" ? integration : null, error: null }),
-      then(resolve: (value: unknown) => unknown) { return Promise.resolve({ data: null, error: null, updateValue }).then(resolve); },
+      then(resolve: (value: unknown) => unknown) { const data = table === "redirect_rules" && filters.source_host && rule ? [rule] : null; return Promise.resolve({ data, error: null, updateValue }).then(resolve); },
     };
     return query;
   } };
-  return { db: db as unknown as ReturnType<typeof createServerDatabase>, updates };
+  return { db: db as unknown as ReturnType<typeof createServerDatabase>, updates, logs };
 }
 const request = (body: object) => new Request("https://citemend.test/api/recovery", { method: "POST", body: JSON.stringify(body) });
-const http200 = async () => ({ state: "200" as const, httpStatus: 200 });
+const checkedUrl = async (url: string) => url.endsWith("/old") ? ({ state: "404" as const, httpStatus: 404 }) : ({ state: "200" as const, httpStatus: 200 });
+const safeTrace = async (url: string) => ({ status: 200, visitedUrls: [url], finalUrl: url });
 
 test("low similarity blocks approval of the candidate until a manual mapping is supplied", async () => {
   const { db, updates } = setup({ ...baseLink, match_confidence: 69 });
-  const handler = createRecoveryApproveHandler({ getUserId: async () => "owner", database: () => db, verify: http200 });
+  const handler = createRecoveryApproveHandler({ getUserId: async () => "owner", database: () => db, verify: checkedUrl, trace: safeTrace });
   const preview = await handler(request({ linkId, action: "preview" }));
   assert.equal(preview.status, 409);
   assert.equal((await preview.json()).code, "MANUAL_MAPPING_REQUIRED");
@@ -40,8 +45,8 @@ test("low similarity blocks approval of the candidate until a manual mapping is 
 });
 
 test("an explicit manual mapping can be previewed and approved without reusing a low similarity score", async () => {
-  const { db, updates } = setup({ ...baseLink, match_confidence: 62 });
-  const handler = createRecoveryApproveHandler({ getUserId: async () => "owner", database: () => db, verify: http200, previewSecret: () => "test-recovery-preview-secret-that-is-long-enough" });
+  const { db, updates, logs } = setup({ ...baseLink, match_confidence: 62 });
+  const handler = createRecoveryApproveHandler({ getUserId: async () => "owner", database: () => db, verify: checkedUrl, trace: safeTrace, previewSecret: () => "test-recovery-preview-secret-that-is-long-enough" });
   const destinationUrl = "https://acme.com/manual-page";
   const preview = await handler(request({ linkId, action: "preview", destinationUrl }));
   const previewData = (await preview.json()).preview;
@@ -52,12 +57,14 @@ test("an explicit manual mapping can be previewed and approved without reusing a
   assert.equal((await handler(request({ linkId, action: "approve", destinationUrl, reviewConfirmed: true, previewToken: previewData.previewToken }))).status, 200);
   assert.equal(updates.at(-1)?.value.suggested_redirect, destinationUrl);
   assert.equal(updates.at(-1)?.value.match_confidence, null);
+  assert.equal(logs.filter(item => item.action_type === "redirect_preview").length, 1);
+  assert.equal(logs.filter(item => item.action_type === "redirect_approval").length, 1);
 });
 
 test("medium scores need a successful preview and explicit human confirmation", async () => {
   const { db, updates } = setup();
   let checks = 0;
-  const handler = createRecoveryApproveHandler({ getUserId: async () => "owner", database: () => db, verify: async url => { checks++; assert.equal(url, baseLink.suggested_redirect); return http200(); }, previewSecret: () => "test-recovery-preview-secret-that-is-long-enough" });
+  const handler = createRecoveryApproveHandler({ getUserId: async () => "owner", database: () => db, verify: async url => { checks++; return url.endsWith("/old") ? { state: "404", httpStatus: 404 } : { state: "200", httpStatus: 200 }; }, trace: safeTrace, previewSecret: () => "test-recovery-preview-secret-that-is-long-enough" });
   const preview = await handler(request({ linkId, action: "preview" }));
   assert.equal(preview.status, 200);
   const previewData = (await preview.json()).preview;
@@ -71,7 +78,7 @@ test("medium scores need a successful preview and explicit human confirmation", 
 
 test("high confidence is eligible for one-click approval but still requires HTTP 200", async () => {
   const { db, updates } = setup({ ...baseLink, match_confidence: 91 });
-  const handler = createRecoveryApproveHandler({ getUserId: async () => "owner", database: () => db, verify: async () => ({ state: "301", httpStatus: 301 }) });
+  const handler = createRecoveryApproveHandler({ getUserId: async () => "owner", database: () => db, verify: checkedUrl, trace: async url => ({ status: 301, visitedUrls: [url], finalUrl: url }) });
   assert.equal((await handler(request({ linkId, action: "approve" }))).status, 422);
   assert.equal(updates.length, 0);
 });
@@ -98,4 +105,35 @@ test("rollback removes a tracked Shopify redirect before changing local state", 
 test("approval endpoints reject unauthenticated requests without touching storage", async () => {
   const handler = createRecoveryApproveHandler({ getUserId: async () => null, database: () => { throw new Error("database should not be created"); } });
   assert.equal((await handler(request({ linkId, action: "preview" }))).status, 401);
+});
+
+test("approval rejects off-domain mappings and logs canonical overwrite conflicts", async () => {
+  const { db, logs } = setup();
+  const handler = createRecoveryApproveHandler({ getUserId: async () => "owner", database: () => db, verify: async url => url.endsWith("/old") ? { state: "200", httpStatus: 200 } : { state: "200", httpStatus: 200 }, trace: safeTrace });
+  assert.equal((await handler(request({ linkId, action: "approve", destinationUrl: "https://attacker.test/collect" }))).status, 422);
+  assert.equal((await handler(request({ linkId, action: "approve" }))).status, 409);
+  assert.equal(logs.filter(item => item.action_type === "redirect_conflict_rejection").length, 2);
+  assert.ok(logs.every(item => item.safety_check_passed === false));
+});
+
+test("approval rejects destination chains that return to the broken source and logs the conflict", async () => {
+  const { db, logs } = setup({ ...baseLink, match_confidence: 90 });
+  const handler = createRecoveryApproveHandler({ getUserId: async () => "owner", database: () => db, verify: checkedUrl, trace: async url => ({ status: 404, visitedUrls: [url, "https://acme.com/old"], finalUrl: "https://acme.com/old" }) });
+  assert.equal((await handler(request({ linkId, action: "approve" }))).status, 422);
+  assert.equal(logs[0].action_type, "redirect_conflict_rejection");
+});
+
+test("approval rejects a chain that exits the canonical domain", async () => {
+  const { db, logs } = setup({ ...baseLink, match_confidence: 90 });
+  const handler = createRecoveryApproveHandler({ getUserId: async () => "owner", database: () => db, verify: checkedUrl, trace: async url => ({ status: 200, visitedUrls: [url, "https://elsewhere.example/page"], finalUrl: "https://elsewhere.example/page" }) });
+  assert.equal((await handler(request({ linkId, action: "approve" }))).status, 422);
+  assert.match(String(logs[0].new_state_json && (logs[0].new_state_json as { reason?: string }).reason), /leaves the verified canonical domain/);
+});
+
+test("approval rejects an existing active redirect conflict", async () => {
+  const otherRule = { id: "other", user_id: "owner", source_link_id: "another-link", source_host: "acme.com", source_path: "/old", active: true, is_active: true, destination: "https://acme.com/different", target_url: "https://acme.com/different" };
+  const { db, logs } = setup({ ...baseLink, match_confidence: 90 }, otherRule);
+  const handler = createRecoveryApproveHandler({ getUserId: async () => "owner", database: () => db, verify: checkedUrl, trace: safeTrace });
+  assert.equal((await handler(request({ linkId, action: "approve" }))).status, 409);
+  assert.match(String((logs[0].new_state_json as { reason: string }).reason), /active redirect/);
 });

@@ -768,4 +768,15 @@ The repository's checkout implementation supports Pro ($39/month) and Agency ($2
 - [x] Add tests for eight URL states, migration/schema/RLS filtering, threshold policy, explicit manual mappings, signed preview confirmation, approval, Shopify rollback, and local rollback.
 - [x] Verify `npx tsc --noEmit`, `npm run lint`, `npm test` (186 passed), and `npm run build`.
 
-Migration 020 is present in the repository and locally applied/validated by the ordered PGlite migration test. It has not been applied to the hosted Supabase project during this task; hosted approval workflow activation requires applying it there. External Vercel/Cloudflare/Shopify behavior and production credentials remain outside this repository-only verification.
+Migration 020 is locally applied/validated and the user confirmed it was applied to hosted Supabase. External Vercel/Cloudflare/Shopify behavior and production credentials remain outside this repository-only verification.
+
+### Days 89-94: Redirect Safety Delta & Opportunity Lifecycle CRM (COMPLETED IN CODE)
+
+- [x] Add migration 021 for append-only, service-role-only action audit logs and six-stage opportunity lifecycle, four ranking signals, composite priority, constraints, and indexes. Migration 011 is already in the repository history, so the additive change uses 021.
+- [x] Enforce canonical-domain-only redirect targets, safe same-host redirect-chain tracing, source 404 revalidation, live 200 canonical overwrite prevention, active-source conflict detection, and final destination HTTP 200 before approval, export, or Shopify deployment.
+- [x] Record redirect previews, approval attempts, safety conflict rejections, deployments, rollbacks, and redirect exports in immutable action logs.
+- [x] Add owner-scoped sequential opportunity stages, timestamped actor notes, equal-weight multi-factor ranking, lifecycle filters, and priority badges; keep outreach and Reddit drafts human-reviewed.
+- [x] Add unit coverage for open redirect rejection, loops and external redirect chains, live canonical overwrite, active-rule conflicts, action-log immutability, ranking, and lifecycle progression.
+- [x] Verify `npx tsc --noEmit`, `npm run lint`, `npm test` (193 tests), and `npm run build` (alternate output directory).
+
+Migration 021 is present in the repository and passed the ordered local PGlite schema/RLS tests. The user confirmed migration 021 was applied to hosted Supabase. Live Shopify operations remain to be verified externally.

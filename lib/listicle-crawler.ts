@@ -4,6 +4,7 @@ import { assertPublicUrl, publicFetch } from "./public-http";
 import { checkUrlStatus, indexDomainSitemap } from "./seo";
 import { createServerDatabase } from "./supabase-server";
 import { matchDeadCitationToOwnSitemap, type HijackOpportunity } from "./hijacker";
+import { rankOpportunityEvidence } from "./opportunity-lifecycle";
 
 const MAX_ARTICLES = 6;
 const MAX_LINKS_PER_ARTICLE = 5;
@@ -125,7 +126,8 @@ const defaultDependencies: ListicleCrawlerDependencies = {
   match: matchDeadCitationToOwnSitemap,
   save: async (rows) => {
     if (!rows.length) return;
-    const { error } = await createServerDatabase().from("citation_hijack_opportunities").insert(rows);
+    const ranked = rows.map(row => ({ ...row, ...rankOpportunityEvidence(row) }));
+    const { error } = await createServerDatabase().from("citation_hijack_opportunities").insert(ranked);
     if (error) throw new Error("Could not save listicle and Reddit opportunities.");
   },
 };

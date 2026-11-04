@@ -2,6 +2,7 @@ import "server-only";
 import { checkUrlStatus, indexDomainSitemap } from "./seo";
 import { createServerDatabase } from "./supabase-server";
 import { generateUrlEmbedding, normalizeUrlEmbedding, urlEmbeddingModel } from "./gemini";
+import { rankOpportunityEvidence } from "./opportunity-lifecycle";
 
 export type CitationBucket = "own_domain" | "competitor_domain" | "third_party_source";
 export type CitationClassification = { url: string; domain: string; bucket: CitationBucket };
@@ -36,7 +37,8 @@ const DEFAULT_DEPENDENCIES: HijackerDependencies = {
   },
   save: async (rows) => {
     if (!rows.length) return;
-    const { error } = await createServerDatabase().from("citation_hijack_opportunities").insert(rows);
+    const ranked = rows.map(row => ({ ...row, ...rankOpportunityEvidence(row) }));
+    const { error } = await createServerDatabase().from("citation_hijack_opportunities").insert(ranked);
     if (error) throw new Error("Could not save citation hijack opportunities.");
   },
 };
