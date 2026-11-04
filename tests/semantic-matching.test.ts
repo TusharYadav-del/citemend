@@ -128,10 +128,14 @@ test("semantic candidates must be live; provider failure preserves lexical match
   assert.equal(fallback.findings[0].suggestedRedirect, "https://example.com/new-enterprise-tier");
   assert.equal(fallback.findings[0].matchConfidence, undefined);
   assert.ok(fallback.warnings.some(warning => warning.includes("Semantic matching was unavailable")));
+  const low = await runAudit(input, {...auditOptions, sitemap: async () => [destination], semantic: async () => new Map([[broken, [{url: destination, similarity: 0.69}]]])});
+  assert.equal(low.findings[0].suggestedRedirect, null);
+  assert.equal(low.findings[0].matchConfidence, 69);
+  assert.match(low.findings[0].matchEvidenceReason ?? "", /manual_mapping_required/);
 });
 
 test("report parser rejects fabricated or malformed confidence values", () => {
-  const report = {auditId:"saved", domain:"example.com", generatedText:"answer", status:"completed", sitemapUrlCount:1, warnings:[], findings:[{url:broken, httpStatus:404, error:null, suggestedRedirect:destination, matchConfidence:94}]};
+  const report = {auditId:"saved", domain:"example.com", generatedText:"answer", status:"completed", sitemapUrlCount:1, warnings:[], findings:[{url:broken, httpStatus:404, urlState:"404", error:null, suggestedRedirect:destination, matchConfidence:94}]};
   assert.equal(parseDashboardReport(report).findings[0].matchConfidence, 94);
   for (const matchConfidence of [NaN, -1, 101, "94", 0.94]) assert.throws(() => parseDashboardReport({...report, findings:[{...report.findings[0], matchConfidence}]}));
   assert.throws(() => parseDashboardReport({...report, findings:[{...report.findings[0], suggestedRedirect:null}]}));

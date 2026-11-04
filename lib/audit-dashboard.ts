@@ -34,18 +34,22 @@ export function parseDashboardReport(value: unknown): DashboardReport {
     if (typeof value !== "string") return false;
     try { const url = new URL(value); return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password; } catch { return false; }
   }
+  const urlStates = ["hallucinated", "404", "410", "301", "200", "blocked", "timeout", "unknown"];
   if (!(typeof report.auditId === "string" && !!report.auditId || report.auditId === null && report.persistence && typeof report.persistence === "object" && ["failed", "disabled"].includes(String((report.persistence as Record<string, unknown>).status))) || typeof report.domain !== "string" || typeof report.generatedText !== "string" || !["completed", "partial"].includes(String(report.status)) || typeof report.sitemapUrlCount !== "number" || !Number.isInteger(report.sitemapUrlCount) || report.sitemapUrlCount < 0 || !Array.isArray(report.warnings) || !report.warnings.every((warning) => typeof warning === "string") || !Array.isArray(report.findings)) return fail();
   if (report.visibilityScore !== undefined && (typeof report.visibilityScore !== "number" || !Number.isInteger(report.visibilityScore) || report.visibilityScore < 0 || report.visibilityScore > 100)) return fail();
   if (report.buyerPrompts !== undefined && (!Array.isArray(report.buyerPrompts) || report.buyerPrompts.length < 1 || report.buyerPrompts.length > 5 || !report.buyerPrompts.every((prompt) => typeof prompt === "string" && prompt.trim().length > 0 && prompt.length <= 4000))) return fail();
   for (const entry of report.findings) {
     if (!entry || typeof entry !== "object") return fail();
     const finding = entry as Record<string, unknown>;
-    if (!httpUrl(finding.url) || !(finding.httpStatus === null || typeof finding.httpStatus === "number" && Number.isInteger(finding.httpStatus) && finding.httpStatus >= 100 && finding.httpStatus <= 599) || !(finding.suggestedRedirect === null || httpUrl(finding.suggestedRedirect)) || !(finding.error === null || typeof finding.error === "string")) return fail();
+    if (!httpUrl(finding.url) || !(finding.httpStatus === null || typeof finding.httpStatus === "number" && Number.isInteger(finding.httpStatus) && finding.httpStatus >= 100 && finding.httpStatus <= 599) || !urlStates.includes(String(finding.urlState)) || !(finding.suggestedRedirect === null || httpUrl(finding.suggestedRedirect)) || !(finding.error === null || typeof finding.error === "string") || !(finding.matchEvidenceReason === undefined || typeof finding.matchEvidenceReason === "string")) return fail();
+    if (finding.httpStatus === 404 && finding.urlState !== "404" || finding.httpStatus === 410 && finding.urlState !== "410" || finding.httpStatus === 301 && finding.urlState !== "301" || finding.httpStatus === 200 && finding.urlState !== "200") return fail();
   }
   for (const entry of report.findings) {
     const finding = entry as Record<string, unknown>;
     if (finding.matchConfidence !== undefined && (typeof finding.matchConfidence !== "number" || !Number.isInteger(finding.matchConfidence)
-      || finding.matchConfidence < 0 || finding.matchConfidence > 100 || finding.httpStatus !== 404 || !finding.suggestedRedirect)) return fail();
+      || finding.matchConfidence < 0 || finding.matchConfidence > 100 || finding.httpStatus !== 404
+      || finding.matchConfidence < 70 && (finding.suggestedRedirect !== null || typeof finding.matchEvidenceReason !== "string" || !finding.matchEvidenceReason.includes("manual_mapping_required"))
+      || finding.matchConfidence >= 70 && !finding.suggestedRedirect)) return fail();
   }
   if (report.citationGap !== undefined && !parseCitationGap(report.citationGap)) return fail();
   if (report.searchGrounding !== undefined && (!report.searchGrounding || typeof report.searchGrounding !== "object" || !["available", "unavailable", "not_configured"].includes(String((report.searchGrounding as Record<string, unknown>).status)))) return fail();

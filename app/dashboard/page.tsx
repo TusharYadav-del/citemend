@@ -27,6 +27,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Sidebar } from "@/components/ui/sidebar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SparklineChart } from "@/components/ui/sparkline-chart";
+import { RecoveryApprovalControls } from "@/components/RecoveryApprovalControls";
 
 function HistoryLoading() {
   return <main className="min-h-screen bg-[#07090E] px-5 py-10 text-white sm:px-8 sm:py-14" role="status" aria-label="Loading your command center"><div className="h-8 w-52 animate-pulse rounded-lg bg-white/10" /><div className="mt-8 grid gap-4 sm:grid-cols-4">{[0, 1, 2, 3].map((item) => <div key={item} className="h-32 animate-pulse rounded-2xl bg-white/[0.04]" />)}</div><span className="sr-only">Loading your audit history...</span></main>;
@@ -77,8 +78,9 @@ function AuditCard({ audit, isPro, activeRules, syncedLinks, gap }: { gap?: Cita
               <li key={link.id} className="rounded-lg bg-black/20 p-3 text-xs">
                 <p className="break-all font-medium text-slate-200">{link.cited_url} <span className="text-rose-300">HTTP {link.http_status}</span></p>
                 {link.suggested_redirect && <p className="mt-2 break-all text-emerald-300">Suggested destination: {link.suggested_redirect}</p>}
-                {link.http_status === 404 && link.suggested_redirect && ruleKey(link.cited_url) && <PublishRedirect linkId={link.id} initiallyActive={activeRules.has(ruleKey(link.cited_url)!)} isPro={isPro} />}
-                {link.http_status === 404 && link.suggested_redirect && <div className="mt-2"><RedirectSyncButton domains={[audit.domain]} linkId={link.id} auditId={audit.id} initiallySynced={syncedLinks.includes(link.id)} /></div>}
+                {link.http_status === 404 && <RecoveryApprovalControls linkId={link.id} suggestedRedirect={link.suggested_redirect} approvalStatus={link.approval_status} confidence={link.match_confidence} evidence={link.match_evidence_reason} />}
+                {link.http_status === 404 && link.suggested_redirect && ["approved", "deployed"].includes(link.approval_status) && ruleKey(link.cited_url) && <PublishRedirect linkId={link.id} initiallyActive={activeRules.has(ruleKey(link.cited_url)!)} isPro={isPro} />}
+                {link.http_status === 404 && link.suggested_redirect && ["approved", "deployed"].includes(link.approval_status) && <div className="mt-2"><RedirectSyncButton domains={[audit.domain]} linkId={link.id} auditId={audit.id} initiallySynced={syncedLinks.includes(link.id)} /></div>}
               </li>
             ))}
           </ul>

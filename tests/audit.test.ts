@@ -241,7 +241,7 @@ test("POST runs real SDK/parser/checker/store code against controlled HTTP fixtu
   assert.equal(report.findings[0].suggestedRedirect, "https://example.com/docs/setup");
   assert.equal(insertCount, 1);
   assert.equal(persistedAudit?.user_id, "user_test_123");
-  assert.deepEqual(persistedLinks, [{ audit_id: id, cited_url: "https://example.com/docs/setup-old", http_status: 404, suggested_redirect: "https://example.com/docs/setup" }]);
+  assert.deepEqual(persistedLinks, [{ audit_id: id, cited_url: "https://example.com/docs/setup-old", http_status: 404, url_state: "404", approval_status: "pending_review", suggested_redirect: "https://example.com/docs/setup", match_confidence: null, match_evidence_reason: "URL path overlap candidate verified live; human review is required because no semantic confidence was recorded." }]);
 });
 
 test("POST returns a safe Groq 429 without writing to Supabase", async () => {
@@ -260,7 +260,7 @@ test("POST returns a safe Groq 429 without writing to Supabase", async () => {
 
 test("failed child persistence removes only the new parent and missing credentials make no calls", async () => {
   const methods: string[] = [];
-  const report: AuditReport = { domain: input.domain, buyerPrompt: input.buyerPrompt, generatedText: "sample", groundingMetadata: null, extractedUrls: [], sitemapUrlCount: 0, findings: [{ url: "https://example.com/missing", httpStatus: 404, error: null, suggestedRedirect: null }], warnings: [], status: "completed" };
+  const report: AuditReport = { domain: input.domain, buyerPrompt: input.buyerPrompt, generatedText: "sample", groundingMetadata: null, extractedUrls: [], sitemapUrlCount: 0, findings: [{ url: "https://example.com/missing", httpStatus: 404, urlState: "404", error: null, suggestedRedirect: null }], warnings: [], status: "completed" };
   mock.method(globalThis, "fetch", async (value: string | URL, options?: RequestInit) => {
     methods.push(options?.method ?? "GET");
     if (String(value).includes("broken_links")) return Response.json({ code: "23503", message: "failed insert" }, { status: 400 });

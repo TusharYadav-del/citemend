@@ -1,9 +1,9 @@
 import "server-only";
 import { createServerDatabase } from "./supabase-server";
 import { normalizeDashboardDomain } from "./audit-dashboard";
-import { findPixelSearchMatch } from "./pixel-search-match";
 import { checkUrlStatus } from "./seo";
 import { readRequestJson } from "./read-request-json";
+import { canAutoRedirect } from "./recovery-policy";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type", "Cache-Control": "no-store" };
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: cors });
@@ -13,7 +13,6 @@ type Candidate = { url: string; score: number };
 type Deps = {
   quota: (domain: string) => Promise<boolean>;
   cached: (domain: string, path: string) => Promise<Candidate | null>;
-  semantic: (domain: string, path: string) => Promise<Candidate[]>;
   check: (url: string) => Promise<number>;
   log: (input: Input, target: Candidate, latency: number) => Promise<void>;
   authorizeSimulation: (domain: string) => Promise<boolean>;
@@ -55,12 +54,11 @@ const defaults: Deps = {
     if (error) throw error;
     if (!audits?.length) return null;
     // Match the entire URL after restricting to this domain's audits.
-    const { data: links, error: linkError } = await db.from("broken_links").select("cited_url,suggested_redirect").in("audit_id", audits.map(a => a.id)).eq("http_status", 404).not("suggested_redirect", "is", null).limit(500);
+    const { data: links, error: linkError } = await db.from("broken_links").select("cited_url,suggested_redirect,approval_status,match_confidence,url_state").in("audit_id", audits.map(a => a.id)).eq("http_status", 404).eq("url_state", "404").in("approval_status", ["approved", "deployed"]).gte("match_confidence", 70).not("suggested_redirect", "is", null).limit(500);
     if (linkError) throw linkError;
-    const link = links?.find(item => { try { const url = new URL(item.cited_url); return url.hostname === domain && url.pathname === path; } catch { return false; } });
+    const link = links?.find(item => canAutoRedirect({ urlState: item.url_state, httpStatus: 404, approvalStatus: item.approval_status, similarityPercent: item.match_confidence }) && (() => { try { const url = new URL(item.cited_url); return url.hostname === domain && url.pathname === path; } catch { return false; } })());
     return link?.suggested_redirect ? { url: link.suggested_redirect, score: 1 } : null;
   },
-  semantic: findPixelSearchMatch,
   check: checkUrlStatus,
   log: async (input, target, latency) => {
     const { error } = await createServerDatabase().from("rescued_ai_visits").insert({ domain: input.domain, broken_path: input.brokenPath, rescued_target_url: target.url, ai_referrer: aiSource(input.referrer) || aiSource(input.utmSource) || "forced", similarity_score: target.score, latency_ms: latency, user_agent: input.userAgent });
@@ -90,16 +88,14 @@ export function createPixelInterceptHandler(overrides: Partial<Deps> = {}) {
       if (input.simulation && !await deps.authorizeSimulation(input.domain)) return reply({ error: "Sign in to test an owned domain." }, 403);
       if (!await deps.quota(input.domain)) return reply({ rescued: false, error: "Rescue lookup is unavailable for this domain or is temporarily rate limited." }, 429);
       const cached = await deps.cached(input.domain, input.brokenPath);
-      let candidates = cached ? [cached] : [];
       let target: Candidate | null = null;
-      for (let stage = 0; stage < 2 && !target; stage++) {
-        if (stage === 1) candidates = await deps.semantic(input.domain, input.brokenPath);
-        for (const candidate of candidates) {
+      if (cached) {
+        const candidate = cached;
           const url = safeTarget(candidate.url, input.domain, input.brokenPath);
-          if (!url || !Number.isFinite(candidate.score) || candidate.score < 0.7 || candidate.score > 1) continue;
-          const status = await deps.check(url).catch(() => 0);
-          if (status >= 200 && status < 300) { target = { url, score: candidate.score }; break; }
-        }
+          if (url && Number.isFinite(candidate.score) && candidate.score >= 0.7 && candidate.score <= 1) {
+            const status = await deps.check(url).catch(() => 0);
+            if (status === 200) target = { url, score: candidate.score };
+          }
       }
       if (!target) return reply({ rescued: false, latencyMs: Math.round(performance.now() - started) });
       const latencyMs = Math.round(performance.now() - started);

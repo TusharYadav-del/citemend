@@ -50,15 +50,15 @@
         Relationships: [];
       };
       broken_links: {
-        Row: { id: string; audit_id: string; cited_url: string; http_status: number; suggested_redirect: string | null; created_at: string };
-        Insert: { id?: string; audit_id: string; cited_url: string; http_status: number; suggested_redirect?: string | null; created_at?: string };
-        Update: { id?: string; audit_id?: string; cited_url?: string; http_status?: number; suggested_redirect?: string | null; created_at?: string };
+        Row: { id: string; audit_id: string; cited_url: string; http_status: number; suggested_redirect: string | null; url_state: string; approval_status: string; approved_by: string | null; approved_at: string | null; previous_destination_url: string | null; deployed_at: string | null; rolled_back_at: string | null; match_evidence_reason: string | null; match_confidence: number | null; created_at: string };
+        Insert: { id?: string; audit_id: string; cited_url: string; http_status: number; suggested_redirect?: string | null; url_state?: string; approval_status?: string; approved_by?: string | null; approved_at?: string | null; previous_destination_url?: string | null; deployed_at?: string | null; rolled_back_at?: string | null; match_evidence_reason?: string | null; match_confidence?: number | null; created_at?: string };
+        Update: { id?: string; audit_id?: string; cited_url?: string; http_status?: number; suggested_redirect?: string | null; url_state?: string; approval_status?: string; approved_by?: string | null; approved_at?: string | null; previous_destination_url?: string | null; deployed_at?: string | null; rolled_back_at?: string | null; match_evidence_reason?: string | null; match_confidence?: number | null; created_at?: string };
         Relationships: [{ foreignKeyName: "broken_links_audit_id_fkey"; columns: ["audit_id"]; isOneToOne: false; referencedRelation: "audits"; referencedColumns: ["id"] }];
       };
       redirect_rules: {
-        Row: { id: string; user_id: string; source_link_id: string | null; source_host: string; source_path: string; destination: string; active: boolean; domain: string; target_url: string; confidence: number | null; is_active: boolean; hits_recovered: number; synced_to_cms: boolean; created_at: string; updated_at: string };
-        Insert: { id?: string; user_id: string; source_link_id?: string | null; source_host: string; source_path: string; destination: string; active?: boolean; domain?: string; target_url?: string; confidence?: number | null; is_active?: boolean; hits_recovered?: number; synced_to_cms?: boolean; created_at?: string; updated_at?: string };
-        Update: { id?: string; user_id?: string; source_link_id?: string | null; source_host?: string; source_path?: string; destination?: string; active?: boolean; domain?: string; target_url?: string; confidence?: number | null; is_active?: boolean; hits_recovered?: number; synced_to_cms?: boolean; created_at?: string; updated_at?: string };
+        Row: { id: string; user_id: string; source_link_id: string | null; source_host: string; source_path: string; destination: string; active: boolean; domain: string; target_url: string; confidence: number | null; is_active: boolean; hits_recovered: number; synced_to_cms: boolean; shopify_redirect_id: string | null; created_at: string; updated_at: string };
+        Insert: { id?: string; user_id: string; source_link_id?: string | null; source_host: string; source_path: string; destination: string; active?: boolean; domain?: string; target_url?: string; confidence?: number | null; is_active?: boolean; hits_recovered?: number; synced_to_cms?: boolean; shopify_redirect_id?: string | null; created_at?: string; updated_at?: string };
+        Update: { id?: string; user_id?: string; source_link_id?: string | null; source_host?: string; source_path?: string; destination?: string; active?: boolean; domain?: string; target_url?: string; confidence?: number | null; is_active?: boolean; hits_recovered?: number; synced_to_cms?: boolean; shopify_redirect_id?: string | null; created_at?: string; updated_at?: string };
         Relationships: [{ foreignKeyName: "redirect_rules_source_link_id_fkey"; columns: ["source_link_id"]; isOneToOne: false; referencedRelation: "broken_links"; referencedColumns: ["id"] }];
       };
       ai_404_events: {

@@ -5,7 +5,7 @@ import { normalizeCitationUrl, extractTextUrls } from "./citation-urls";
 import type { CitationProbeResult as GeminiProbeResult } from "./gemini";
 import { runCitationProbe, type CitationProbeResult } from "./citation-probe";
 type ProbeResult = CitationProbeResult | GeminiProbeResult;
-import { fetchSitemapUrls, checkUrlStatus } from "./seo";
+import { fetchSitemapUrls, checkUrlStatus, verifyUrl, type UrlState, type UrlVerification } from "./seo";
 import { detectCitationGap, type CitationGap } from "./citation-gap";
 import { saveAuditCitationGap } from "./citation-gap-store";
 import { persistAudit } from "./audit-store";
@@ -14,7 +14,7 @@ import { buildEngineMatrix, type EngineCitation, type EngineName, type EnginePro
 import { synthesizeEngineProfiles, type SynthesizedProfile } from "./engine-synthesis";
 
 export class AuditInputError extends Error {}
-export type AuditFinding = { url: string; httpStatus: number | null; error: string | null; suggestedRedirect: string | null; matchConfidence?: number };
+export type AuditFinding = { url: string; httpStatus: number | null; urlState: UrlState; error: string | null; suggestedRedirect: string | null; matchConfidence?: number; matchEvidenceReason?: string };
 export type AuditReport = {
   domain: string; buyerPrompt: string; buyerPrompts?: string[]; competitorDomains?: string[]; groundTruthPricing?: string; visibilityScore?: number; generatedText: string;
   groundingMetadata: GeminiProbeResult["groundingMetadata"];
@@ -26,7 +26,7 @@ export type AuditReport = {
   findings: AuditFinding[]; warnings: string[]; status: "completed" | "partial";
 };
 export type AuditDependencies = {
-  probe: (domain: string, buyerPrompt: string) => Promise<ProbeResult>; sitemap: typeof fetchSitemapUrls; check: typeof checkUrlStatus;
+  probe: (domain: string, buyerPrompt: string) => Promise<ProbeResult>; sitemap: typeof fetchSitemapUrls; check: typeof checkUrlStatus; verify?: typeof verifyUrl;
   semantic: typeof matchSitemapUrls | null;
   synthesize: typeof synthesizeEngineProfiles | null;
   saveGap: typeof saveAuditCitationGap;
@@ -193,15 +193,22 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
   let sitemap: string[] = [];
   if (sitemapResult.status === "fulfilled") sitemap = [...new Set(sitemapResult.value.map(normalizedUrl).filter((url): url is string => !!url && inDomain(url, domain)))];
   else warnings.push("Sitemap discovery failed; redirect suggestions may be unavailable.");
-  const statusCache = new Map<string, Promise<number | null>>();
+  const statusCache = new Map<string, Promise<UrlVerification>>();
   let checkDeadline = Date.now() + 30_000;
-  function status(url: string) {
-    if (!statusCache.has(url)) statusCache.set(url, Date.now() >= checkDeadline ? Promise.resolve(null) : deps.check(url).catch(() => null));
+  function verification(url: string) {
+    if (!statusCache.has(url)) statusCache.set(url, Date.now() >= checkDeadline
+      ? Promise.resolve({ state: "unknown", httpStatus: null, error: "Status check budget exceeded." })
+      : (overrides.check && !overrides.verify
+        ? deps.check(url).then(httpStatus => ({ state: httpStatus === 404 ? "404" as const : httpStatus === 410 ? "410" as const : httpStatus === 301 ? "301" as const : httpStatus === 200 ? "200" as const : "unknown" as const, httpStatus })).catch(error => ({ state: /timeout/i.test(String(error)) ? "timeout" as const : /private|blocked|unsafe/i.test(String(error)) ? "blocked" as const : "unknown" as const, httpStatus: null, error: String(error) }))
+        : (deps.verify ?? verifyUrl)(url)));
     return statusCache.get(url)!;
   }
+  function status(url: string) {
+    return verification(url).then(result => result.httpStatus);
+  }
   const findings: AuditFinding[] = await mapLimited(targetUrls, async (url) => {
-    const httpStatus = await status(url);
-    return { url, httpStatus, error: httpStatus === null ? "HTTP status check failed or timed out." : null, suggestedRedirect: null };
+    const result = await verification(url);
+    return { url, httpStatus: result.httpStatus, urlState: result.state, error: result.error ?? (result.httpStatus === null ? "HTTP status check failed or timed out." : null), suggestedRedirect: null };
   });
   const broken = findings.filter(item => item.httpStatus === 404);
   let semanticMatches = new Map<string, { url: string; similarity: number }[]>();
@@ -217,17 +224,23 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
       const url = normalizedUrl(candidate.url);
       if (!url || !sitemap.includes(url) || new URL(url).hostname !== new URL(finding.url).hostname
         || new URL(url).pathname === new URL(finding.url).pathname || !Number.isFinite(candidate.similarity)
-        || candidate.similarity < SEMANTIC_MATCH_THRESHOLD || candidate.similarity > 1) continue;
+        || candidate.similarity < 0 || candidate.similarity > 1) continue;
+      if (candidate.similarity < SEMANTIC_MATCH_THRESHOLD) {
+        finding.matchConfidence = Math.round(candidate.similarity * 100);
+        finding.matchEvidenceReason = "manual_mapping_required: similarity is below the 0.70 review floor; this value ranks candidates and is not a probability.";
+        break;
+      }
       const code = await status(url);
       if (code !== null && code >= 200 && code < 300) {
         finding.suggestedRedirect = url;
         finding.matchConfidence = Math.round(candidate.similarity * 100);
+        finding.matchEvidenceReason = "Semantic sitemap candidate verified live; similarity is a ranking signal and requires human approval.";
         break;
       }
     }
   }
   // Preserve lexical matching when semantic search is unavailable or inconclusive.
-  for (const finding of broken.filter(item => !item.suggestedRedirect)) {
+  for (const finding of broken.filter(item => !item.suggestedRedirect && item.matchConfidence === undefined)) {
     const ranked = sitemap.filter((url) => url !== finding.url)
       .map((url) => ({ url, score: similarity(finding.url, url) }))
       .filter((candidate) => candidate.score > 0)
@@ -235,7 +248,7 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
     for (const candidate of ranked) {
       const code = await status(candidate.url);
       if (code === null) warnings.push("A redirect candidate could not be verified within the checking budget.");
-      if (code !== null && code >= 200 && code < 300) { finding.suggestedRedirect = candidate.url; break; }
+      if (code !== null && code >= 200 && code < 300) { finding.suggestedRedirect = candidate.url; finding.matchEvidenceReason = "URL path overlap candidate verified live; human review is required because no semantic confidence was recorded."; break; }
     }
   }
   if (findings.some((item) => item.error)) warnings.push("Some citation statuses are unknown; these are not classified as 404s.");

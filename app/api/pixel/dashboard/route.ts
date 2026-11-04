@@ -4,6 +4,8 @@ import { normalizeDashboardDomain } from "@/lib/audit-dashboard";
 import { routingPair } from "@/lib/edge-redirect-rule";
 import { hasProSubscription } from "@/lib/subscription";
 import { sendWebhookAlert, webhookProvider } from "@/lib/webhook-notify";
+import { canDeployApproved } from "@/lib/recovery-policy";
+import { verifyUrl } from "@/lib/seo";
 
 const privateHeaders = { "Cache-Control": "private, no-store" };
 
@@ -97,7 +99,7 @@ export async function PATCH(request: Request) {
 
   try {
     const db = createServerDatabase();
-    const { data: rule, error: ruleError } = await db.from("redirect_rules").select("id,source_path")
+    const { data: rule, error: ruleError } = await db.from("redirect_rules").select("id,source_path,source_link_id,target_url")
       .eq("id", input.id).eq("user_id", userId).eq("domain", domain).maybeSingle();
     if (ruleError) throw ruleError;
     if (!rule) return Response.json({ error: "Redirect rule not found." }, { status: 404, headers: privateHeaders });
@@ -108,6 +110,15 @@ export async function PATCH(request: Request) {
       try { isPro = await hasProSubscription(userId); }
       catch { return Response.json({ error: "Subscription status is temporarily unavailable." }, { status: 503, headers: privateHeaders }); }
       if (!isPro) return Response.json({ error: "Upgrade to Pro to publish or edit redirect rules.", code: "PRO_REQUIRED" }, { status: 403, headers: privateHeaders });
+      if (!rule.source_link_id) return Response.json({ error: "Only a reviewed broken-link mapping can be published." }, { status: 409, headers: privateHeaders });
+      const { data: sourceLink, error: sourceError } = await db.from("broken_links")
+        .select("id,http_status,url_state,approval_status,match_confidence,audits!inner(user_id)")
+        .eq("id", rule.source_link_id).eq("audits.user_id", userId).maybeSingle();
+      if (sourceError) throw sourceError;
+      if (!sourceLink || !canDeployApproved({ urlState: sourceLink.url_state, httpStatus: sourceLink.http_status, approvalStatus: sourceLink.approval_status, similarityPercent: sourceLink.match_confidence })) return Response.json({ error: "Preview and approve this eligible destination before publishing it." }, { status: 409, headers: privateHeaders });
+      const candidateTarget = typeof input.targetUrl === "string" ? input.targetUrl.trim() : rule.target_url;
+      const preview = await verifyUrl(candidateTarget);
+      if (preview.state !== "200" || preview.httpStatus !== 200) return Response.json({ error: "The target must currently return HTTP 200." }, { status: 422, headers: privateHeaders });
     }
 
     const updates: { active?: boolean; is_active?: boolean; destination?: string; target_url?: string; updated_at: string } = { updated_at: new Date().toISOString() };

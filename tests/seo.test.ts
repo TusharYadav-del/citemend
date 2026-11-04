@@ -2,7 +2,7 @@
 import { afterEach, mock, test } from "node:test";
 import { createServer } from "node:http";
 import { gzipSync } from "node:zlib";
-import { checkUrlStatus, fetchSitemapUrls } from "../lib/seo";
+import { checkUrlStatus, fetchSitemapUrls, verifyUrl } from "../lib/seo";
 
 const nativeFetch = globalThis.fetch;
 afterEach(() => { mock.restoreAll(); globalThis.fetch = nativeFetch; });
@@ -155,4 +155,24 @@ test("uses an eight-second request budget and a browser-compatible User-Agent", 
   await fetchSitemapUrls("example.com/");
   await checkUrlStatus(`${site}/ok`);
   assert.deepEqual(budgets, [8000, 8000]);
+});
+
+test("URL verification returns every supported state without treating failures as 404", async () => {
+  routes({
+    [`HEAD ${site}/ok`]: () => new Response(null, { status: 200 }),
+    [`HEAD ${site}/missing`]: () => new Response(null, { status: 404 }),
+    [`HEAD ${site}/gone`]: () => new Response(null, { status: 410 }),
+    [`HEAD ${site}/moved`]: () => new Response(null, { status: 301, headers: { location: "/new" } }),
+    [`HEAD ${site}/other`]: () => new Response(null, { status: 503 }),
+  });
+  assert.equal((await verifyUrl(`${site}/ok`)).state, "200");
+  assert.equal((await verifyUrl(`${site}/missing`)).state, "404");
+  assert.equal((await verifyUrl(`${site}/gone`)).state, "410");
+  assert.equal((await verifyUrl(`${site}/moved`)).state, "301");
+  assert.equal((await verifyUrl(`${site}/other`)).state, "unknown");
+  assert.equal((await verifyUrl("ftp://example.com/page")).state, "hallucinated");
+  assert.equal((await verifyUrl("http://127.0.0.1/private")).state, "blocked");
+  mock.restoreAll();
+  mock.method(globalThis, "fetch", async () => { throw new DOMException("The operation timed out", "TimeoutError"); });
+  assert.equal((await verifyUrl(`${site}/slow`)).state, "timeout");
 });

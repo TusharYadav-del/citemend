@@ -28,7 +28,7 @@ test("CORS supports GET, POST and preflight; unrelated traffic is ignored", asyn
 
 test("cached redirect is live checked and logged with latency and attribution", async () => {
   let logged: unknown;
-  const handler = createPixelInterceptHandler({ cached: async () => candidate, semantic: async () => { throw new Error("unexpected fallback"); }, check: async () => 200, log: async (input, target, latency) => { logged = { input, target, latency }; } });
+  const handler = createPixelInterceptHandler({ cached: async () => candidate, check: async () => 200, log: async (input, target, latency) => { logged = { input, target, latency }; } });
   const response = await handler(post(body));
   const result = await response.json();
   assert.equal(result.redirectTo, candidate.url);
@@ -38,19 +38,18 @@ test("cached redirect is live checked and logged with latency and attribution", 
   assert.equal((logged as { input: { referrer: string } }).input.referrer, body.referrer);
 });
 
-test("GET uses utm_source and falls back to a verified semantic match", async () => {
+test("pixel never auto-redirects a fresh unapproved semantic match", async () => {
   let logged = false;
-  const handler = createPixelInterceptHandler({ cached: async () => null, semantic: async () => [{ url: "https://evil.example/x", score: 0.99 }, { url: "https://example.com/new", score: 0.72 }], check: async () => 200, log: async () => { logged = true; } });
+  const handler = createPixelInterceptHandler({ cached: async () => null, check: async () => 200, log: async () => { logged = true; } });
   const params = new URLSearchParams({ domain: "example.com", brokenPath: "/old", utm_source: "perplexity.ai" });
   const result = await (await handler(new Request(`https://citemend.test/api/pixel/intercept?${params}`))).json();
-  assert.equal(result.redirectTo, "https://example.com/new");
-  assert.equal(result.similarityScore, 0.72);
-  assert.equal(logged, true);
+  assert.equal(result.rescued, false);
+  assert.equal(logged, false);
 });
 
 test("simulation requires ownership and never logs; invalid or dead targets are rejected", async () => {
   let logs = 0;
-  const dependencies = { cached: async () => candidate, semantic: async () => [], check: async () => 200, log: async () => { logs++; } };
+  const dependencies = { cached: async () => candidate, check: async () => 200, log: async () => { logs++; } };
   assert.equal((await createPixelInterceptHandler({ ...dependencies, authorizeSimulation: async () => false })(post({ ...body, simulation: true }))).status, 403);
   const simulated = await createPixelInterceptHandler({ ...dependencies, authorizeSimulation: async () => true })(post({ ...body, simulation: true }));
   assert.equal((await simulated.json()).rescued, true);

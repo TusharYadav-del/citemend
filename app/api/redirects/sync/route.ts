@@ -6,6 +6,8 @@ import { readRequestJson } from "@/lib/read-request-json";
 import { hasProSubscription } from "@/lib/subscription";
 import { decryptShopifyAccessToken } from "@/lib/shopify";
 import { exportSyncRules, pushShopifyRedirect, type SyncFormat, type SyncRule } from "@/lib/redirect-sync";
+import { canDeployApproved, verifyRedirectDestinations } from "@/lib/recovery-policy";
+import { verifyUrl } from "@/lib/seo";
 
 export const maxDuration = 60;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -32,20 +34,23 @@ export async function POST(request: Request) {
     const audits = await auditsQuery;
     if (audits.error) throw audits.error;
     if (!audits.data?.length) return json({ error: "No owned audit was found for this domain." }, 404);
-    let linksQuery = db.from("broken_links").select("id,cited_url,suggested_redirect,http_status").in("audit_id", audits.data.map(audit => audit.id)).eq("http_status", 404).not("suggested_redirect", "is", null).order("created_at", { ascending: false }).limit(500);
+    let linksQuery = db.from("broken_links").select("id,cited_url,suggested_redirect,http_status,approval_status,url_state,match_confidence").in("audit_id", audits.data.map(audit => audit.id)).eq("http_status", 404).eq("url_state", "404").in("approval_status", ["approved", "deployed"]).not("suggested_redirect", "is", null).order("created_at", { ascending: false }).limit(500);
     if (typeof input.linkId === "string") linksQuery = linksQuery.eq("id", input.linkId);
     const links = await linksQuery;
     if (links.error) throw links.error;
     const byPath = new Map<string, SyncRule>();
     for (const link of links.data ?? []) {
-      if (!link.suggested_redirect) continue;
+        if (!link.suggested_redirect || !canDeployApproved({ urlState: link.url_state, httpStatus: link.http_status, approvalStatus: link.approval_status, similarityPercent: link.match_confidence })) continue;
       const pair = routingPair(link.cited_url, link.suggested_redirect, domain);
       if (pair && !byPath.has(pair.source_path)) byPath.set(pair.source_path, { id: link.id, source: pair.source_path, destination: pair.destination });
     }
-    const rules = [...byPath.values()];
-    if (!rules.length) return json({ error: "No verified redirect suggestions were found." }, 404);
-    if (input.action === "export") return json({ content: exportSyncRules(input.format as SyncFormat, rules), count: rules.length });
-    if (rules.length > 50) return json({ error: "Select an audit with at most 50 redirects for a Shopify sync." }, 400);
+    const approvedRules = [...byPath.values()];
+    if (!approvedRules.length) return json({ error: "No approved redirect suggestions were found." }, 404);
+    if (input.action === "sync" && approvedRules.length > 50) return json({ error: "Select an audit with at most 50 redirects for a Shopify sync." }, 400);
+    const { live: rules, skipped } = await verifyRedirectDestinations(approvedRules, verifyUrl);
+    if (!rules.length) return json({ error: "No approved destination currently returns HTTP 200." }, 409);
+    if (input.action === "export") return json({ content: exportSyncRules(input.format as SyncFormat, rules), count: rules.length, skippedNotLive: skipped.length });
+    if (skipped.length) return json({ error: "One or more approved destinations no longer return HTTP 200. Review them before syncing.", unavailableCount: skipped.length }, 409);
     const connection = await db.from("workspace_integrations").select("shopify_store_domain,shopify_admin_token").eq("user_id", userId).eq("domain", domain).maybeSingle();
     if (connection.error) throw connection.error;
     if (!connection.data?.shopify_store_domain || !connection.data.shopify_admin_token) return json({ error: "Add Shopify credentials in workspace settings before syncing." }, 409);
@@ -56,12 +61,17 @@ export async function POST(request: Request) {
         const prior = await db.from("redirect_rules").select("id,user_id,synced_to_cms,target_url").eq("domain", domain).eq("source_path", rule.source).maybeSingle();
         if (prior.error) throw prior.error;
         if (prior.data && prior.data.user_id !== userId) { results.push({ id: rule.id, status: "failed", message: "This path is managed by another account." }); continue; }
-        if (prior.data?.synced_to_cms && prior.data.target_url === rule.destination) { results.push({ id: rule.id, status: "synced" }); continue; }
+        if (prior.data?.synced_to_cms && prior.data.target_url === rule.destination) {
+          await db.from("broken_links").update({ approval_status: "deployed", deployed_at: new Date().toISOString() }).eq("id", rule.id);
+          results.push({ id: rule.id, status: "synced" }); continue;
+        }
         if (prior.data?.synced_to_cms) { results.push({ id: rule.id, status: "failed", message: "A different destination is already synced; review it in Shopify." }); continue; }
-        await pushShopifyRedirect(connection.data.shopify_store_domain, token, rule);
-        const payload = { user_id: userId, source_link_id: rule.id, source_host: domain, source_path: rule.source, destination: rule.destination, domain, target_url: rule.destination, active: true, is_active: true, synced_to_cms: true };
+        const shopifyRedirectId = await pushShopifyRedirect(connection.data.shopify_store_domain, token, rule);
+        const payload = { user_id: userId, source_link_id: rule.id, source_host: domain, source_path: rule.source, destination: rule.destination, domain, target_url: rule.destination, active: true, is_active: true, synced_to_cms: true, shopify_redirect_id: shopifyRedirectId };
         const saved = prior.data ? await db.from("redirect_rules").update(payload).eq("id", prior.data.id).eq("user_id", userId) : await db.from("redirect_rules").insert(payload);
         if (saved.error) { results.push({ id: rule.id, status: "review", message: "Created in Shopify; verify the rule before retrying because its status could not be saved." }); continue; }
+        const markedDeployed = await db.from("broken_links").update({ approval_status: "deployed", deployed_at: new Date().toISOString() }).eq("id", rule.id);
+        if (markedDeployed.error) { results.push({ id: rule.id, status: "review", message: "Created in Shopify, but deployment status could not be saved. Check the destination before retrying." }); continue; }
         results.push({ id: rule.id, status: "synced" });
       } catch { results.push({ id: rule.id, status: "failed", message: "Shopify could not create this redirect. Check the store connection and existing redirects." }); }
     }

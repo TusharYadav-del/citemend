@@ -1,16 +1,12 @@
 import { auth } from "@clerk/nextjs/server";
 import { after } from "next/server";
 import { createServerDatabase } from "@/lib/supabase-server";
-import { generateUrlEmbedding, urlEmbeddingModel } from "@/lib/gemini";
 import { normalizeDashboardDomain } from "@/lib/audit-dashboard";
-import { urlPathKeywords } from "@/lib/url-keywords";
 import { isAlertableAIReferrer, sendWebhookAlert } from "@/lib/webhook-notify";
 
 export const maxDuration = 20;
 
 const MAX_BODY_BYTES = 4096;
-const MATCH_THRESHOLD = 0.78;
-
 type ResolveInput = { domain: string; brokenPath: string; referrer: string; fullUrl: string };
 
 function corsHeaders(): HeadersInit {
@@ -171,7 +167,7 @@ export async function POST(request: Request) {
 
   const validated = validRequest(input);
   if (!validated) return json({ error: "Provide a matching domain, broken path, referrer, and full URL." }, 400);
-  const { domain, input: body, fullUrl } = validated;
+  const { domain, input: body } = validated;
 
   // Browser callers must be running on the reported customer domain.
   const origin = request.headers.get("origin");
@@ -203,8 +199,10 @@ export async function POST(request: Request) {
 
   try {
     const { data: rule, error: ruleError } = await db.from("redirect_rules")
-      .select("id,user_id,target_url,confidence,hits_recovered")
-      .eq("domain", domain).eq("source_path", body.brokenPath).eq("is_active", true).maybeSingle();
+      .select("id,user_id,target_url,confidence,hits_recovered,broken_links!inner(url_state,http_status,approval_status,match_confidence)")
+      .eq("domain", domain).eq("source_path", body.brokenPath).eq("is_active", true)
+      .eq("broken_links.url_state", "404").eq("broken_links.http_status", 404)
+      .in("broken_links.approval_status", ["approved", "deployed"]).gte("broken_links.match_confidence", 70).maybeSingle();
     if (ruleError) throw ruleError;
 
     if (rule) {
@@ -222,65 +220,10 @@ export async function POST(request: Request) {
       return json({ redirectUrl: target });
     }
 
-    const embedding = await generateUrlEmbedding(urlPathKeywords(fullUrl.href));
-    const { data: matches, error: matchError } = await db.rpc("match_sitemap_url", {
-      query_embedding: JSON.stringify(embedding),
-      target_domain: domain,
-      match_threshold: MATCH_THRESHOLD,
-      match_count: 1,
-      query_model: urlEmbeddingModel(),
-    });
-    if (matchError) throw matchError;
-
-    const match = (matches ?? []).find(candidate => Number.isFinite(candidate.similarity)
-      && candidate.similarity >= MATCH_THRESHOLD && candidate.similarity <= 1);
-    const target = match ? safeTarget(match.url, domain, body.brokenPath) : null;
-    if (!target) {
-      await recordEvent(db, body, domain, null, request);
-      return json({ redirectUrl: null });
-    }
-
-    // Keep automatically published rules attached to an existing account/domain record.
-    const { data: audit, error: auditError } = await db.from("audits").select("user_id")
-      .eq("domain", domain).not("user_id", "is", null).order("created_at", { ascending: false }).limit(1).maybeSingle();
-    if (auditError) throw auditError;
-    if (!audit?.user_id) {
-      await recordEvent(db, body, domain, null, request);
-      return json({ redirectUrl: null });
-    }
-
-    const { data: created, error: insertError } = await db.from("redirect_rules").insert({
-      user_id: audit.user_id,
-      source_link_id: null,
-      source_host: domain,
-      source_path: body.brokenPath,
-      destination: target,
-      active: true,
-      domain,
-      target_url: target,
-      confidence: match!.similarity,
-      is_active: true,
-      hits_recovered: 1,
-    }).select("id,user_id,target_url,confidence,hits_recovered").single();
-
-    if (insertError) {
-      // A simultaneous first visit may have inserted the unique domain/path rule.
-      const { data: concurrentRule, error: concurrentError } = await db.from("redirect_rules")
-        .select("id,user_id,target_url,confidence,hits_recovered").eq("domain", domain).eq("source_path", body.brokenPath).eq("is_active", true).maybeSingle();
-      if (concurrentError) throw concurrentError;
-      const concurrentTarget = concurrentRule && safeTarget(concurrentRule.target_url, domain, body.brokenPath);
-      if (!concurrentRule || !concurrentTarget) throw insertError;
-      await Promise.allSettled([
-        incrementRecoveredHit(db, concurrentRule.id, concurrentRule.hits_recovered),
-        recordEvent(db, body, domain, concurrentTarget, request),
-      ]);
-      queueRecoveryWebhook(concurrentRule.user_id, domain, body.brokenPath, body.referrer, concurrentTarget, concurrentRule.confidence);
-      return json({ redirectUrl: concurrentTarget });
-    }
-
-    await recordEvent(db, body, domain, created.target_url, request);
-    queueRecoveryWebhook(created.user_id, domain, body.brokenPath, body.referrer, target, created.confidence);
-    return json({ redirectUrl: target });
+    // Semantic matches are a ranking signal only. A visitor is never redirected
+    // until the owner has reviewed and approved a stored 404 mapping.
+    await recordEvent(db, body, domain, null, request);
+    return json({ redirectUrl: null, approvalRequired: true });
   } catch {
     await recordEvent(db, body, domain, null, request).catch(() => undefined);
     return json({ error: "Redirect resolution is temporarily unavailable." }, 503);

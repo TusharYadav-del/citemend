@@ -161,13 +161,13 @@ test("scheduled persistence writes only confirmed 404s under the job ID and owne
     domain: "example.com", buyerPrompt: "Find docs", generatedText: "", groundingMetadata: null,
     extractedUrls: [], sitemapUrlCount: 0, warnings: [], status: "completed",
     findings: [
-      { url: "https://example.com/missing", httpStatus: 404, suggestedRedirect: null, error: null },
-      { url: "https://example.com/working", httpStatus: 200, suggestedRedirect: null, error: null },
+      { url: "https://example.com/missing", httpStatus: 404, urlState: "404", suggestedRedirect: null, error: null },
+      { url: "https://example.com/working", httpStatus: 200, urlState: "200", suggestedRedirect: null, error: null },
     ],
   };
   const saved = await persistAudit(report, "pro-user", undefined, jobId);
   assert.equal(saved.id, jobId);
-  assert.deepEqual(insertedLinks, [{ audit_id: jobId, cited_url: "https://example.com/missing", http_status: 404, suggested_redirect: null }]);
+  assert.deepEqual(insertedLinks, [{ audit_id: jobId, cited_url: "https://example.com/missing", http_status: 404, url_state: "404", approval_status: "pending_review", suggested_redirect: null, match_confidence: null, match_evidence_reason: "manual_mapping_required: no eligible live destination candidate was found." }]);
 });
 test("scheduled scans use the Groq/Tavily probe and save results to the job's owner and stable audit ID", async () => {
   const { runWeeklyAudit } = await import("../lib/weekly-scan");

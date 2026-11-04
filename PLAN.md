@@ -756,3 +756,16 @@ Final local verification: `npx tsc --noEmit`, `npm run lint`, `npm test` (175 te
 - [x] Verify `npx tsc --noEmit`, `npm run lint`, `npm test` (175 tests), `npm run build`, and 14 Playwright browser/PDF checks.
 
 The repository's checkout implementation supports Pro ($39/month) and Agency ($249/month). Starter is the existing free account with one saved audit; the separate free teaser is the no-account availability preview. No new billing product or subscription entitlement was introduced.
+
+### Days 85–88: Repository Truth Audit & Human-Approved Recovery (COMPLETED IN CODE)
+
+- [x] Add `AUDIT_INVENTORY.md` inventorying application features, API routes, Supabase tables, Clerk ownership checks, RLS posture, SSRF controls, rate limits, webhook signatures, and external verification gaps.
+- [x] Add an explicit eight-state URL verifier (`hallucinated`, `404`, `410`, `301`, `200`, `blocked`, `timeout`, `unknown`) while preserving the existing final-status API for older callers.
+- [x] Add additive migration `020_recovery_approval_lifecycle.sql` for broken-link URL state, approval lifecycle, match evidence/confidence, rollback fields, and Shopify redirect ID tracking; backfill existing broken URLs as pending review.
+- [x] Treat similarity as a ranking signal: >=85 is eligible for one-click approval, 70–84 requires HTTP 200 preview plus an owner-bound signed confirmation, and <70 requires an explicit manual destination and preview; pixel auto-redirects remain disabled for low/unscored matches.
+- [x] Add owner-authenticated approve/preview/rollback APIs, short-lived preview tokens, dashboard review controls, live destination revalidation, and Shopify deletion for redirects with a tracked remote ID.
+- [x] Gate pixel/interceptor, legacy resolver, dashboard rule toggles, redirect sync, and the public Cloudflare Worker RLS policy on approved eligible mappings; remove automatic redirect creation for newly discovered unapproved semantic matches.
+- [x] Add tests for eight URL states, migration/schema/RLS filtering, threshold policy, explicit manual mappings, signed preview confirmation, approval, Shopify rollback, and local rollback.
+- [x] Verify `npx tsc --noEmit`, `npm run lint`, `npm test` (186 passed), and `npm run build`.
+
+Migration 020 is present in the repository and locally applied/validated by the ordered PGlite migration test. It has not been applied to the hosted Supabase project during this task; hosted approval workflow activation requires applying it there. External Vercel/Cloudflare/Shopify behavior and production credentials remain outside this repository-only verification.

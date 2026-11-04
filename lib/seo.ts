@@ -24,14 +24,14 @@ function domainOrigin(domain: string): URL {
   return url;
 }
 
-async function request(url: URL, method: "HEAD" | "GET", signal: AbortSignal): Promise<Response> {
+async function request(url: URL, method: "HEAD" | "GET", signal: AbortSignal, followRedirects = true): Promise<Response> {
   for (let redirects = 0; redirects <= 5; redirects++) {
     signal.throwIfAborted();
     const response = await publicFetch(url, {
       method, signal, redirect: "manual", cache: "no-store",
       headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Citemend/1.0", Accept: "application/xml,text/plain,*/*" },
     });
-    if (![301, 302, 303, 307, 308].includes(response.status)) return response;
+    if (!followRedirects || ![301, 302, 303, 307, 308].includes(response.status)) return response;
     const location = response.headers.get("location");
     await response.body?.cancel();
     if (!location) throw new Error("Redirect response has no Location header.");
@@ -130,7 +130,45 @@ export async function fetchSitemapUrls(domain: string): Promise<string[]> {
   return [...pages];
 }
 
-/** Returns the final HTTP status; invalid URLs, timeouts, and network failures reject. */
+export type UrlState = "hallucinated" | "404" | "410" | "301" | "200" | "blocked" | "timeout" | "unknown";
+export type UrlVerification = { state: UrlState; httpStatus: number | null; finalUrl?: string; error?: string };
+
+function classifyStatus(status: number): UrlState {
+  if (status === 404) return "404";
+  if (status === 410) return "410";
+  if (status === 301) return "301";
+  if (status === 200) return "200";
+  return "unknown";
+}
+
+/** Checks a URL and returns an explicit state while retaining SSRF and timeout protections. */
+export async function verifyUrl(url: string, parentSignal?: AbortSignal): Promise<UrlVerification> {
+  let target: URL;
+  try { target = httpUrl(url); }
+  catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid URL.";
+    return { state: /private|localhost|link-local|not public|blocked/i.test(message) ? "blocked" : "hallucinated", httpStatus: null, error: message };
+  }
+  const signal = parentSignal ? AbortSignal.any([parentSignal, AbortSignal.timeout(8_000)]) : AbortSignal.timeout(8_000);
+  try {
+    let response = await request(target, "HEAD", signal, false);
+    let status = response.status;
+    await response.body?.cancel();
+    if ([403, 405, 501].includes(status)) {
+      response = await request(target, "GET", signal, false);
+      status = response.status;
+      await response.body?.cancel();
+    }
+    return { state: classifyStatus(status), httpStatus: status, ...(response.url ? { finalUrl: response.url } : {}) };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "URL verification failed.";
+    if (signal.aborted || error instanceof DOMException && error.name === "TimeoutError" || /timeout|timed out/i.test(message)) return { state: "timeout", httpStatus: null, error: message };
+    if (/private|localhost|link-local|not public|blocked|unsafe/i.test(message)) return { state: "blocked", httpStatus: null, error: message };
+    return { state: "unknown", httpStatus: null, error: message };
+  }
+}
+
+/** Returns the final HTTP status for existing callers, following bounded redirects. */
 export async function checkUrlStatus(url: string, parentSignal?: AbortSignal): Promise<number> {
   const target = httpUrl(url);
   const signal = parentSignal ? AbortSignal.any([parentSignal, AbortSignal.timeout(8_000)]) : AbortSignal.timeout(8_000);

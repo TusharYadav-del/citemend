@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { createServerDatabase } from "@/lib/supabase-server";
 import { hasProSubscription } from "@/lib/subscription";
 import { routingPair } from "@/lib/edge-redirect-rule";
+import { canDeployApproved } from "@/lib/recovery-policy";
 
 export async function POST(request: Request) {
   const { userId } = await auth();
@@ -22,13 +23,14 @@ export async function POST(request: Request) {
 
   try {
     const db = createServerDatabase();
-    const { data: link, error: linkError } = await db.from("broken_links").select("id,audit_id,cited_url,http_status,suggested_redirect").eq("id", input.linkId).maybeSingle();
+    const { data: link, error: linkError } = await db.from("broken_links").select("id,audit_id,cited_url,http_status,url_state,approval_status,match_confidence,suggested_redirect").eq("id", input.linkId).maybeSingle();
     if (linkError) throw linkError;
     if (!link) return Response.json({ error: "Link not found." }, { status: 404 });
     const { data: audit, error: auditError } = await db.from("audits").select("domain").eq("id", link.audit_id).eq("user_id", userId).maybeSingle();
     if (auditError) throw auditError;
     if (!audit) return Response.json({ error: "Link not found." }, { status: 404 });
     if (link.http_status !== 404 || !link.suggested_redirect) return Response.json({ error: "This link has no verified 301 destination." }, { status: 422 });
+    if (input.active && !canDeployApproved({ urlState: link.url_state, httpStatus: link.http_status, approvalStatus: link.approval_status, similarityPercent: link.match_confidence })) return Response.json({ error: "Preview and approve this eligible destination before publishing it." }, { status: 409 });
     const pair = routingPair(link.cited_url, link.suggested_redirect, audit.domain);
     if (!pair) return Response.json({ error: "The redirect must stay on this domain and use a distinct HTTPS destination." }, { status: 422 });
 

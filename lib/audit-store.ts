@@ -15,7 +15,12 @@ export async function persistAudit(report: AuditReport, userId?: string, reserva
   const broken = report.findings.filter((item) => item.httpStatus === 404);
   try {
     if (broken.length) {
-      const { error: linkError } = await db.from("broken_links").insert(broken.map((item) => ({ audit_id: audit.id, cited_url: item.url, http_status: 404, suggested_redirect: item.suggestedRedirect })));
+      const { error: linkError } = await db.from("broken_links").insert(broken.map((item) => ({
+        audit_id: audit.id, cited_url: item.url, http_status: 404, url_state: item.urlState,
+        approval_status: "pending_review", suggested_redirect: item.suggestedRedirect,
+        match_confidence: item.matchConfidence ?? null,
+        match_evidence_reason: item.matchEvidenceReason ?? (item.suggestedRedirect ? "A live destination candidate was found; human approval is required." : "manual_mapping_required: no eligible live destination candidate was found."),
+      })));
       if (linkError) throw new Error("Link insert failed.");
     }
     const updateStatus = (includePrompt: boolean, includeCompetitors: boolean) => {

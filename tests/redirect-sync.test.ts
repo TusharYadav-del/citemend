@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { exportSyncRules, pushShopifyRedirect, type SyncRule } from "../lib/redirect-sync";
+import { deleteShopifyRedirect, exportSyncRules, pushShopifyRedirect, type SyncRule } from "../lib/redirect-sync";
 import { alertPayload, sendWorkspaceWebhook } from "../lib/alerts";
 import { notifyWeeklyFindings } from "../lib/weekly-alerts";
 import type { AuditReport } from "../lib/audit-pipeline";
@@ -24,13 +24,26 @@ test("Shopify push sends the documented 301 payload and requires confirmation", 
     assert.equal(init?.method, "POST");
     assert.equal((init?.headers as Record<string, string>)["X-Shopify-Access-Token"], "test-secret");
     assert.deepEqual(JSON.parse(String(init?.body)), { redirect: { path: "/old-page", target: "/new-page" } });
-    return accepted ? Response.json({ redirect: { path: "/old-page", target: "/new-page" } }, { status: 201 }) : Response.json({ errors: "rejected" }, { status: 422 });
+    return accepted ? Response.json({ redirect: { id: 123, path: "/old-page", target: "/new-page" } }, { status: 201 }) : Response.json({ errors: "rejected" }, { status: 422 });
   };
   try {
-    await pushShopifyRedirect("shop.myshopify.com", "test-secret", rule);
+    assert.equal(await pushShopifyRedirect("shop.myshopify.com", "test-secret", rule), "123");
     accepted = false;
     await assert.rejects(pushShopifyRedirect("shop.myshopify.com", "test-secret", rule), /rejected/);
     await assert.rejects(pushShopifyRedirect("evil.example", "test-secret", rule), /Invalid/);
+  } finally { globalThis.fetch = original; }
+});
+
+test("Shopify rollback deletes only a validated numeric redirect identifier", async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    assert.equal(String(input), "https://shop.myshopify.com/admin/api/2026-01/redirects/123.json");
+    assert.equal(init?.method, "DELETE");
+    return new Response(null, { status: 200 });
+  };
+  try {
+    await deleteShopifyRedirect("shop.myshopify.com", "token", "123");
+    await assert.rejects(deleteShopifyRedirect("shop.myshopify.com", "token", "../1"), /Invalid/);
   } finally { globalThis.fetch = original; }
 });
 
@@ -64,8 +77,8 @@ test("weekly alerts include only newly discovered broken links and competitor ta
   };
   let sent: unknown;
   const report: AuditReport = { domain: "example.com", buyerPrompt: "test", generatedText: "", groundingMetadata: null, extractedUrls: [], sitemapUrlCount: 0, warnings: [], status: "completed", findings: [
-    { url: "https://example.com/old", httpStatus: 404, error: null, suggestedRedirect: null },
-    { url: "https://example.com/new", httpStatus: 404, error: null, suggestedRedirect: null },
+    { url: "https://example.com/old", httpStatus: 404, urlState: "404", error: null, suggestedRedirect: null },
+    { url: "https://example.com/new", httpStatus: 404, urlState: "404", error: null, suggestedRedirect: null },
   ] };
   const detect = async () => ({ opportunities: [
     { opportunity_type: "competitor_direct_404", dead_competitor_url: "https://competitor.com/old", target_url: "https://competitor.com/old" },
