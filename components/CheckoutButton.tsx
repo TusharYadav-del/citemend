@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useUser, SignInButton } from "@clerk/nextjs";
 import { toast } from "sonner";
 
-export default function CheckoutButton() {
+export default function CheckoutButton({ plan }: { plan?: "pro" | "agency" } = {}) {
   const { isSignedIn, isLoaded } = useUser();
   const [betaMode, setBetaMode] = useState<boolean | null>(null);
   const [subscription, setSubscription] = useState<{ state: string; plan?: string; currentPeriodEnd: string | null; daysRemaining: number | null } | null>(null);
@@ -93,6 +93,15 @@ export default function CheckoutButton() {
       setPending(false);
     }
   }
+
+  if (plan) return <div>
+    {!isLoaded ? <button type="button" disabled className="w-full rounded-full bg-emerald-300 px-4 py-3 text-sm font-bold text-[#06110b] opacity-60">Loading checkout…</button>
+      : !isSignedIn ? <SignInButton mode="modal"><button type="button" className="w-full rounded-full bg-emerald-300 px-4 py-3 text-sm font-bold text-[#06110b] hover:bg-emerald-200">Sign in to choose {plan === "agency" ? "Agency" : "Pro"}</button></SignInButton>
+        : betaMode === true ? plan === "pro" ? <button type="button" onClick={() => { setError(""); setBetaResult(null); setBetaOpen(true); }} className="w-full rounded-full bg-emerald-300 px-4 py-3 text-sm font-bold text-[#06110b]">Request free Pro beta</button> : <p className="rounded-xl border border-amber-300/15 bg-amber-300/[.05] p-3 text-xs leading-5 text-amber-100">Agency checkout is unavailable while the invite beta is active.</p>
+          : <button type="button" onClick={() => void startCheckout(plan)} disabled={pending || subscription?.state === "paid" && subscription.plan === plan} className="w-full rounded-full bg-emerald-300 px-4 py-3 text-sm font-bold text-[#06110b] hover:bg-emerald-200 disabled:opacity-60">{pending ? "Opening secure checkout…" : subscription?.state === "paid" && subscription.plan === plan ? `${plan === "agency" ? "Agency" : "Pro"} plan active` : `Choose ${plan === "agency" ? "Agency" : "Pro"}`}</button>}
+    {!betaMode && error && <p role="alert" className="mt-2 text-xs text-rose-300">{error}</p>}
+    {plan === "agency" && subscription?.state === "paid" && subscription.plan !== "agency" && <p className="mt-2 text-[10px] leading-5 text-slate-500">Agency checkout creates a separate subscription. Manage your existing Pro subscription to avoid overlapping charges.</p>}
+  </div>;
 
   return (
     <div>

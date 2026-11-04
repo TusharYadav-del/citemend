@@ -742,3 +742,17 @@ Lemon Squeezy reported variant `2336501` as a $249/month subscription in test mo
 | Live production readiness | Agency variant previously pending and test-mode | Rechecked variant 2336501: still pending, test-mode, $249/month | FAIL |
 
 Final local verification: `npx tsc --noEmit`, `npm run lint`, `npm test` (175 tests), `npm audit --omit=dev` (0 vulnerabilities), `npm run build`, and 14 browser/PDF tests passed. The browser/PDF checks use local development configuration and representative fixtures; provider synthesis is tested with mocked responses and is not a native query of the named engines. Competitor appearances in category comparisons do not establish competitor URL availability. Existing scores created by earlier shared-probe versions require a new audit. The configured hosted Supabase project passed 14 read-only, zero-row schema queries; the user subsequently confirmed applying migration 019. This does not establish that the production deployment uses that project. A live Agency billing variant remains open, so production readiness is not yet fully verified. The quota limits calls but does not authenticate referrer attribution.
+
+## Permanent CiteMend Design System Mission (COMPLETED)
+
+- [x] Inspect existing application routes, dashboard components, pricing, auth gates, and checkout flows before changing the presentation.
+- [x] Establish the dark CiteMend palette, Inter and JetBrains Mono typography, typed design tokens, spacing, surface, motion, focus, and layer primitives.
+- [x] Redesign the marketing page with the requested visibility headline, accessible sticky navigation, free preview, illustrative citation network, recovery sandbox, product capabilities, integrations, pricing, FAQ, and footer.
+- [x] Preserve the real audit form, free preview API, Pro and Agency checkout actions, invitation beta path, and current report and backend routes.
+- [x] Update the command center with shared page header, sidebar, metric card, empty state, responsive section navigation, an audit action, and a factual saved-audit 404 sparkline.
+- [x] Add reusable metric, data table, sidebar, header, skeleton, empty state, alert, code, and sparkline components; document the permanent reuse rule and feature page template.
+- [x] Add reduced-motion behavior, pointer-responsive SVG lighting and citation paths, subtle surface hover depth, and a scan beam for active audits.
+- [x] Update existing browser selectors for the new headline and audit CTA.
+- [x] Verify `npx tsc --noEmit`, `npm run lint`, `npm test` (175 tests), `npm run build`, and 14 Playwright browser/PDF checks.
+
+The repository's checkout implementation supports Pro ($39/month) and Agency ($249/month). Starter is the existing free account with one saved audit; the separate free teaser is the no-account availability preview. No new billing product or subscription entitlement was introduced.

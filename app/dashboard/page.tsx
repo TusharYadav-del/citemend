@@ -22,6 +22,11 @@ import RedirectSyncButton from "@/components/redirect-sync-button";
 import WorkspaceIntegrations from "@/components/workspace-integrations";
 import AgencyProfileSettings from "@/components/agency-profile-settings";
 import DomainSwitcher from "@/components/domain-switcher";
+import { MetricCard } from "@/components/ui/metric-card";
+import { PageHeader } from "@/components/ui/page-header";
+import { Sidebar } from "@/components/ui/sidebar";
+import { EmptyState } from "@/components/ui/empty-state";
+import { SparklineChart } from "@/components/ui/sparkline-chart";
 
 function HistoryLoading() {
   return <main className="min-h-screen bg-[#07090E] px-5 py-10 text-white sm:px-8 sm:py-14" role="status" aria-label="Loading your command center"><div className="h-8 w-52 animate-pulse rounded-lg bg-white/10" /><div className="mt-8 grid gap-4 sm:grid-cols-4">{[0, 1, 2, 3].map((item) => <div key={item} className="h-32 animate-pulse rounded-2xl bg-white/[0.04]" />)}</div><span className="sr-only">Loading your audit history...</span></main>;
@@ -32,13 +37,15 @@ function MetricCards({ audits, rescued }: { audits: UserAuditHistoryItem[]; resc
   const health = audits.length ? Math.max(0, 100 - metrics.active404s) : null;
   const verifiedScores = audits.filter(audit => hasVerifiedMatrix(audit.engine_matrix_json) && typeof audit.share_of_model_score === "number");
   const comparison = verifiedScores.length ? compareCategoryCitationRanks(verifiedScores[0].engine_matrix_json) : null;
+  const singleDomain = new Set(audits.map(audit => audit.domain)).size === 1;
+  const confirmed404Trend = singleDomain ? [...audits].reverse().slice(-8).map(audit => (audit.broken_links ?? []).filter(link => link.http_status === 404).length) : [];
   const cards = [
     { label: "AI Citation Health Score", value: health === null ? "—" : `${health}%`, detail: "100 minus unresolved saved 404s; citations are not stored" },
-    { label: "Own-Domain 404s Caught", value: metrics.active404s, detail: "Confirmed in latest audit per domain" },
+    { label: "Own-Domain 404s Caught", value: metrics.active404s, detail: "Confirmed in latest audit per domain", icon: confirmed404Trend.length > 1 ? <SparklineChart label="404 findings across saved audits" values={confirmed404Trend} /> : undefined },
     { label: "AI VISITORS RESCUED (30D)", value: rescued ?? "—", detail: rescued === null ? "Rescue telemetry unavailable" : `$${(rescued * 15).toLocaleString()} estimated pipeline at $15 per click` },
     { label: "SHARE OF MODEL (SoM %)", value: verifiedScores.length ? `${Math.round(verifiedScores.reduce((sum, audit) => sum + (audit.share_of_model_score ?? 0), 0) / verifiedScores.length)}%` : "—", detail: comparison ? `Latest audit: rank #${comparison.rank} of ${comparison.participants}; ${comparison.topCompetitor} cited in ${comparison.topCompetitorSlots} of ${comparison.totalSlots} modeled slots. Competitor URLs are not live-verified.` : "Modeled profiles; older results require a new audit" },
   ];
-  return <section aria-label="Live telemetry" className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map((card) => <div key={card.label} className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-sm sm:p-6"><p className="text-[10px] font-semibold uppercase tracking-[.12em] text-emerald-400">{card.label}</p><p className="mt-3 text-3xl font-semibold tabular-nums text-white">{typeof card.value === "number" ? card.value.toLocaleString() : card.value}</p><p className="mt-2 text-xs leading-5 text-slate-400">{card.detail}</p></div>)}</section>;
+  return <section aria-label="Live telemetry" className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map((card) => <MetricCard key={card.label} label={card.label} value={typeof card.value === "number" ? card.value.toLocaleString() : card.value} detail={card.detail} icon={card.icon} />)}</section>;
 }
 
 function HistoryUnavailable() {
@@ -157,12 +164,9 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
   return (
     <main className="min-h-screen bg-[#07090E] text-slate-100">
       <div className="mx-auto flex min-h-screen max-w-[1600px]">
-      <aside className="hidden w-64 shrink-0 border-r border-white/10 bg-black/20 px-5 py-8 lg:block"><Link href="/dashboard" className="text-sm font-bold tracking-wide text-white">CITEMEND <span className="text-emerald-400">/ COMMAND</span></Link><nav aria-label="Main navigation" className="mt-10 space-y-1 text-sm"><a href="#audit-history" className="block rounded-lg bg-emerald-400/10 px-3 py-2.5 font-semibold text-emerald-300">Dashboard</a><Link href="/dashboard/pixel" className="block rounded-lg px-3 py-2.5 text-slate-400 hover:bg-white/5 hover:text-white">404 Interceptor</Link><a href="#recovery-command" className="block rounded-lg px-3 py-2.5 text-slate-400 hover:bg-white/5 hover:text-white">Citation Hijacker</a><a href="#citation-gaps" className="block rounded-lg px-3 py-2.5 text-slate-400 hover:bg-white/5 hover:text-white">Citation Capsule</a><a href="#llms-txt-generator" className="block rounded-lg px-3 py-2.5 text-slate-400 hover:bg-white/5 hover:text-white">llms.txt &amp; Facts</a><a href="#settings" className="block rounded-lg px-3 py-2.5 text-slate-400 hover:bg-white/5 hover:text-white">Settings</a></nav><div className="mt-12 rounded-xl border border-emerald-400/15 bg-emerald-400/5 p-3 text-xs text-slate-400"><span className="mr-2 inline-block h-2 w-2 rounded-full bg-emerald-400" />Systems operational</div></aside>
+      <Sidebar items={[{ label: "Overview", href: "/dashboard#overview", active: true }, { label: "Citation Monitoring", href: "/dashboard#audit-history" }, { label: "Broken Citation 404s", href: "/dashboard#recovery-command" }, { label: "Competitor Hijack", href: "/dashboard#recovery-command" }, { label: "Listicles & Reddit", href: "/dashboard#recovery-command" }, { label: "404 Interceptor Pixel", href: "/dashboard/pixel" }, { label: "Capsules & llms.txt", href: "/dashboard#llms-txt-generator" }, { label: "Entity Truth & Schema", href: "/dashboard#recovery-command" }, { label: "Redirect Sync", href: "/dashboard#redirect-export" }, { label: "Reports & White-Label", href: "/dashboard#audit-history" }, { label: "Settings & Billing", href: "/dashboard#settings" }]} />
       <div className="min-w-0 flex-1 px-5 py-8 sm:px-8 sm:py-10">
-      <header className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-6">
-        <div><Link href="/" className="text-sm font-medium text-emerald-300 hover:underline">&larr; Back to Citemend</Link><p className="mt-4 text-[10px] font-semibold tracking-[.18em] text-emerald-400">LIVE TELEMETRY · {audits.length} SAVED SCANS</p><h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">Command Center</h1><p className="mt-2 text-sm text-slate-400">Monitor citations, recover links, and pursue hijack opportunities.</p></div>
-        <div className="flex flex-wrap items-center gap-3"><DomainSwitcher domains={allDomains} selected={selectedDomain} /><RedirectSyncButton domains={[...new Set(audits.map(audit => audit.domain))]} /><RedirectExportDrawer rules={exportRules} /><Link href="/dashboard/pixel" className="rounded-lg border border-white/10 px-3 py-2 text-sm font-medium text-emerald-300 hover:bg-white/5">Pixel &amp; traffic</Link><CheckoutButton /><UserButton /></div>
-      </header>
+      <div id="overview"><PageHeader eyebrow={`Live telemetry · ${audits.length} saved scans`} title="Command Center" description="Monitor citations, recover links, and pursue hijack opportunities." actions={<><Link href="/" className="rounded-full px-3 py-2 text-xs font-medium text-slate-400 hover:text-white">Public site</Link><DomainSwitcher domains={allDomains} selected={selectedDomain} /><RedirectSyncButton domains={[...new Set(audits.map(audit => audit.domain))]} /><RedirectExportDrawer rules={exportRules} /><Link href="/dashboard/pixel" className="rounded-lg border border-white/10 px-3 py-2 text-sm font-medium text-emerald-300 hover:bg-white/5">Pixel &amp; traffic</Link><Link href="/#audit" className="rounded-lg bg-emerald-300 px-3 py-2 text-sm font-semibold text-[#07110d]">Run live audit</Link><CheckoutButton /><UserButton /></>} /></div>
       <OnboardingChecklist progress={onboarding} />
       <MetricCards audits={audits} rescued={rescued} />
       {latestReport && <section aria-label="Quick tools" className="mb-6 rounded-xl border border-white/10 bg-white/[0.03] p-4"><h2 className="text-sm font-semibold text-white">Quick Tools</h2><a href={`/audit/${latestReport.id}?print=1`} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg border border-emerald-400/30 px-3 py-2 text-xs font-semibold text-emerald-300">Export Report / Save as PDF</a><p className="mt-2 text-xs text-slate-500">Opens the latest report for {latestReport.domain}.</p></section>}
@@ -172,7 +176,7 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
       <p id="redirect-export" className="mb-6 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-xs leading-5 text-slate-400">Pro users can publish or disable verified 301 suggestions below. Rules become active when the Cloudflare Worker is attached to the domain; edge lookups can retain a change for up to five seconds.</p>
       <WorkspaceIntegrations key={`workspace-${selectedDomain}`} domains={[...new Set(audits.map(audit => audit.domain))]} />
       <AgencyProfileSettings key={`agency-${selectedDomain}`} domains={[...new Set(audits.map(audit => audit.domain))]} isPro={isPro} />
-      {audits.length ? <div id="audit-history" className="space-y-4">{audits.map((audit) => <AuditCard key={audit.id} audit={audit} gap={gaps.get(audit.id)} isPro={isPro} activeRules={activeRules} syncedLinks={syncedLinks} />)}</div> : <section className="rounded-2xl border border-dashed border-white/15 px-6 py-14 text-center"><h2 className="text-base font-semibold text-white">No audits saved yet</h2><p className="mt-2 text-sm text-slate-400">Run an audit and it will appear here.</p><Link href="/#audit" className="mt-5 inline-flex rounded-lg bg-emerald-400 px-5 py-3 text-sm font-medium text-[#07110d]">Run an audit</Link></section>}
+      {audits.length ? <div id="audit-history" className="space-y-4">{audits.map((audit) => <AuditCard key={audit.id} audit={audit} gap={gaps.get(audit.id)} isPro={isPro} activeRules={activeRules} syncedLinks={syncedLinks} />)}</div> : <EmptyState title="No audits saved yet" description="Run an audit and it will appear here." action={<Link href="/#audit" className="inline-flex rounded-full bg-emerald-300 px-5 py-3 text-sm font-semibold text-[#07110d]">Run an audit</Link>} />}
       </div></div>
     </main>
   );

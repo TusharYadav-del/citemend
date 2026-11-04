@@ -13,7 +13,7 @@ test.afterEach(({ page }) => expect(browserErrors.get(page)).toEqual([]));
 
 test("public landing shows the sign-in gate without a fabricated audit score", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("AI sent them to your site. Did they hit a dead end?");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Own your visibility.");
   await expect(page.getByLabel("Domain for free preview")).toBeVisible();
   await expect(page.getByTestId("health-score")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Sign in to run your audit" })).toBeVisible();
@@ -42,7 +42,7 @@ test("mobile landing keeps the sign-in gate and navigation within the viewport",
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await expect(page.getByRole("button", { name: "Sign in or create an account" })).toBeVisible();
-  await page.getByRole("link", { name: "Open workspace" }).click();
+  await page.getByRole("link", { name: "Run an audit" }).click();
   await expect(page).toHaveURL(/#audit$/);
   await expect(page.getByRole("heading", { name: "Sign in to run your audit" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

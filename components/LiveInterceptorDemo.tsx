@@ -31,12 +31,12 @@ export default function LiveInterceptorDemo() {
         ? { label: "404 · visitor hits a dead end", color: "text-rose-700", icon: <CircleAlert className="size-4" /> }
         : { label: "Click the link to try the demo", color: "text-slate-500", icon: <ArrowDown className="size-4" /> };
 
-  return <section aria-labelledby="demo-heading" className="bg-[#f6f8f3] px-5 py-16 sm:px-8 sm:py-22">
+  return <section aria-labelledby="demo-heading" className="border-y border-white/[.06] bg-[#0a0e14] px-5 py-16 sm:px-8 sm:py-22">
     <div className="mx-auto max-w-7xl">
       <div className="mx-auto max-w-3xl text-center">
-        <p className="inline-flex items-center gap-2 rounded-full border border-[#dce8d4] bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-[.15em] text-[#517346]"><Sparkles className="size-3.5" /> Try the live sandbox</p>
-        <h2 id="demo-heading" className="mt-4 text-3xl font-semibold tracking-[-.045em] text-[#173126] sm:text-5xl">See a lost AI referral find its way.</h2>
-        <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-[#65756a] sm:text-base">A clickable, simulated journey shows how a broken recommendation can reach a live page when recovery is enabled.</p>
+        <p className="inline-flex items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/[.05] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[.15em] text-emerald-300"><Sparkles className="size-3.5" /> Try the sandbox</p>
+        <h2 id="demo-heading" className="mt-4 text-3xl font-semibold tracking-[-.045em] text-white sm:text-5xl">See a lost AI referral find its way.</h2>
+        <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-400 sm:text-base">A clickable, simulated journey shows how a broken recommendation can reach a live page when recovery is enabled.</p>
       </div>
 
       <div className="mt-9 grid overflow-hidden rounded-[1.75rem] border border-[#dce5d6] bg-white shadow-[0_24px_80px_-48px_#193c2a] lg:grid-cols-[1fr_1fr]">
@@ -55,8 +55,8 @@ export default function LiveInterceptorDemo() {
           <p className="text-xs font-semibold uppercase tracking-[.14em] text-[#748276]">Visitor experience</p>
           <div className="mt-4 rounded-2xl border border-[#e3e9e0] bg-[#fbfcfa] p-4 sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div><p className="text-sm font-semibold text-[#26372c]">{enabled ? "With CiteFix Pixel ✅" : "Without CiteFix ❌"}</p><p className="mt-1 text-xs text-[#78847a]">{enabled ? "180ms Semantic 301 Recovery + Slack Alert" : "Dead 404 Bounce"}</p></div>
-              <button type="button" role="switch" aria-checked={enabled} aria-label="Enable CiteFix recovery" onClick={() => changeMode(!enabled)} className={`relative inline-flex h-8 w-[3.65rem] shrink-0 items-center rounded-full p-1 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#426d48] ${enabled ? "bg-[#377148]" : "bg-[#a9b1aa]"}`}><span className={`size-6 rounded-full bg-white shadow transition-transform ${enabled ? "translate-x-[1.65rem]" : "translate-x-0"}`} /></button>
+              <div><p className="text-sm font-semibold text-[#26372c]">{enabled ? "With CiteMend Pixel ✅" : "Without CiteMend ❌"}</p><p className="mt-1 text-xs text-[#78847a]">{enabled ? "180ms Semantic 301 Recovery + Slack Alert" : "Dead 404 Bounce"}</p></div>
+              <button type="button" role="switch" aria-checked={enabled} aria-label="Enable CiteMend recovery" onClick={() => changeMode(!enabled)} className={`relative inline-flex h-8 w-[3.65rem] shrink-0 items-center rounded-full p-1 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#426d48] ${enabled ? "bg-[#377148]" : "bg-[#a9b1aa]"}`}><span className={`size-6 rounded-full bg-white shadow transition-transform ${enabled ? "translate-x-[1.65rem]" : "translate-x-0"}`} /></button>
             </div>
             <p className={`mt-4 flex min-h-6 items-center gap-2 text-sm font-semibold ${status.color}`} role="status" aria-live="polite">{status.icon}{status.label}</p>
             <div id="demo-result" className={`mt-3 rounded-xl border p-4 transition-all duration-500 ${state === "recovered" ? "border-emerald-200 bg-emerald-50" : state === "dead" ? "border-rose-200 bg-rose-50" : state === "matching" ? "border-amber-200 bg-amber-50" : "border-[#e5eae3] bg-white"}`}>

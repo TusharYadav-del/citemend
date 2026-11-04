@@ -24,7 +24,7 @@ export default function AuditProgress({ promptCount }: { promptCount: number }) 
   }, []);
   const progress = Math.min(92, 12 + elapsed * 2.5);
   const current = steps[step].replace("5 buyer intents", `${promptCount} buyer intent${promptCount === 1 ? "" : "s"}`);
-  return <div className="mt-7 rounded-xl border border-[#dce6d1] bg-[#f0f5e9] p-5" role="status" aria-live="polite" aria-label={`Audit in progress: ${current}`}>
+  return <div className="cm-audit-progress mt-7 rounded-xl border border-[#dce6d1] bg-[#f0f5e9] p-5" role="status" aria-live="polite" aria-label={`Audit in progress: ${current}`}>
     <div className="flex items-center justify-between gap-3"><p className="text-sm font-medium text-[#294b34]">Running {promptCount} buyer prompt{promptCount === 1 ? "" : "s"} in parallel</p><span className="text-xs tabular-nums text-[#6c7965]">{Math.round(progress)}%</span></div>
     <Progress value={progress} className="mt-3" aria-label="Audit progress" />
     <p className="mt-3 min-h-5 text-xs text-[#6c7965]">{current}</p>
