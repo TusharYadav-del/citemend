@@ -1,6 +1,12 @@
 ﻿export type Database = {
   public: {
     Tables: {
+      pixel_intercept_quotas: {
+        Row: { domain: string; window_started_at: string; request_count: number };
+        Insert: { domain: string; window_started_at?: string; request_count?: number };
+        Update: { domain?: string; window_started_at?: string; request_count?: number };
+        Relationships: [];
+      };
       workspace_integrations: {
         Row: { id: string; user_id: string; domain: string; slack_webhook_url: string | null; discord_webhook_url: string | null; shopify_store_domain: string | null; shopify_admin_token: string | null; vercel_project_id: string | null; agency_brand_name: string | null; agency_logo_url: string | null; agency_primary_color: string | null; agency_cta_text: string | null; agency_cta_url: string | null; updated_at: string | null };
         Insert: { id?: string; user_id: string; domain: string; slack_webhook_url?: string | null; discord_webhook_url?: string | null; shopify_store_domain?: string | null; shopify_admin_token?: string | null; vercel_project_id?: string | null; agency_brand_name?: string | null; agency_logo_url?: string | null; agency_primary_color?: string | null; agency_cta_text?: string | null; agency_cta_url?: string | null; updated_at?: string | null };
@@ -32,9 +38,9 @@
         Relationships: [];
       };
       citation_hijack_opportunities: {
-        Row: { id: string; audit_id: string | null; domain: string; opportunity_type: string; prompt_query: string; cited_engine: string; target_url: string; dead_competitor_url: string | null; competitor_domain: string | null; http_status: number | null; matched_user_live_url: string | null; similarity_score: number | null; brand_mentioned: boolean; contact_email_or_link: string | null; outreach_draft: string | null; corrective_schema_json: string | null; verification_status: string; last_checked_at: string; created_at: string };
-        Insert: { id?: string; audit_id?: string | null; domain: string; opportunity_type: string; prompt_query: string; cited_engine?: string; target_url: string; dead_competitor_url?: string | null; competitor_domain?: string | null; http_status?: number | null; matched_user_live_url?: string | null; similarity_score?: number | null; brand_mentioned?: boolean; contact_email_or_link?: string | null; outreach_draft?: string | null; corrective_schema_json?: string | null; verification_status?: string; last_checked_at?: string; created_at?: string };
-        Update: { id?: string; audit_id?: string | null; domain?: string; opportunity_type?: string; prompt_query?: string; cited_engine?: string; target_url?: string; dead_competitor_url?: string | null; competitor_domain?: string | null; http_status?: number | null; matched_user_live_url?: string | null; similarity_score?: number | null; brand_mentioned?: boolean; contact_email_or_link?: string | null; outreach_draft?: string | null; corrective_schema_json?: string | null; verification_status?: string; last_checked_at?: string; created_at?: string };
+        Row: { id: string; audit_id: string | null; domain: string; opportunity_type: string; prompt_query: string; cited_engine: string; target_url: string; dead_competitor_url: string | null; competitor_domain: string | null; http_status: number | null; matched_user_live_url: string | null; similarity_score: number | null; brand_mentioned: boolean | null; contact_email_or_link: string | null; outreach_draft: string | null; corrective_schema_json: string | null; verification_status: string | null; last_checked_at: string | null; created_at: string | null };
+        Insert: { id?: string; audit_id?: string | null; domain: string; opportunity_type: string; prompt_query: string; cited_engine?: string; target_url: string; dead_competitor_url?: string | null; competitor_domain?: string | null; http_status?: number | null; matched_user_live_url?: string | null; similarity_score?: number | null; brand_mentioned?: boolean | null; contact_email_or_link?: string | null; outreach_draft?: string | null; corrective_schema_json?: string | null; verification_status?: string | null; last_checked_at?: string | null; created_at?: string | null };
+        Update: { id?: string; audit_id?: string | null; domain?: string; opportunity_type?: string; prompt_query?: string; cited_engine?: string; target_url?: string; dead_competitor_url?: string | null; competitor_domain?: string | null; http_status?: number | null; matched_user_live_url?: string | null; similarity_score?: number | null; brand_mentioned?: boolean | null; contact_email_or_link?: string | null; outreach_draft?: string | null; corrective_schema_json?: string | null; verification_status?: string | null; last_checked_at?: string | null; created_at?: string | null };
         Relationships: [{ foreignKeyName: "citation_hijack_opportunities_audit_id_fkey"; columns: ["audit_id"]; isOneToOne: false; referencedRelation: "audits"; referencedColumns: ["id"] }];
       };
       cms_connections: {
@@ -88,6 +94,7 @@
     };
     Views: { [key in never]: never };
     Functions: {
+      claim_pixel_intercept_quota: { Args: { target_domain: string }; Returns: boolean };
       match_sitemap_url: {
         Args: { query_embedding: string; target_domain: string; match_threshold: number; match_count: number; query_model?: string };
         Returns: { url: string; similarity: number }[];

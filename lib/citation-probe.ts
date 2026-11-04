@@ -8,7 +8,7 @@ export interface CitationProbeResult {
   providerUsed: string;
   searchGrounding: {
     status: "available" | "unavailable" | "not_configured";
-    sources: { title: string; url: string }[];
+    sources: { title: string; url: string; content?: string; publishedAt?: string | null }[];
   };
   warnings: string[];
 }
@@ -36,7 +36,7 @@ export async function runCitationProbe(domain: string, buyerPrompt: string): Pro
   if (!apiKey) throw new CitationProviderError("Set GROQ_API_KEY in .env.local and restart the development server.");
 
   const discoveredUrls = new Set<string>();
-  const sources: { title: string; url: string }[] = [];
+  const sources: CitationProbeResult["searchGrounding"]["sources"] = [];
   const warnings: string[] = [];
   let status: CitationProbeResult["searchGrounding"]["status"] = "not_configured";
   let searchContext = "";
@@ -59,7 +59,8 @@ export async function runCitationProbe(domain: string, buyerPrompt: string): Pro
         if (!url) continue;
         const title = typeof entry.title === "string" ? entry.title.slice(0, 300) : url;
         const content = typeof entry.content === "string" ? entry.content.slice(0, 2000) : "";
-        if (!discoveredUrls.has(url)) sources.push({ title, url });
+        const publishedAt = typeof entry.published_date === "string" && Number.isFinite(Date.parse(entry.published_date)) ? entry.published_date.slice(0, 80) : null;
+        if (!discoveredUrls.has(url)) sources.push({ title, url, content: content.slice(0, 600), publishedAt });
         discoveredUrls.add(url);
         searchContext += `- ${title}: ${url}\n  ${content}\n`;
       }

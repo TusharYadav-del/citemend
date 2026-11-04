@@ -11,6 +11,7 @@ export const interceptOptions = () => new Response(null, { status: 204, headers:
 type Input = { domain: string; brokenPath: string; referrer: string; userAgent: string; utmSource: string; force: boolean; simulation: boolean };
 type Candidate = { url: string; score: number };
 type Deps = {
+  quota: (domain: string) => Promise<boolean>;
   cached: (domain: string, path: string) => Promise<Candidate | null>;
   semantic: (domain: string, path: string) => Promise<Candidate[]>;
   check: (url: string) => Promise<number>;
@@ -43,6 +44,11 @@ function parse(value: unknown): Input | null {
 }
 
 const defaults: Deps = {
+  quota: async domain => {
+    const { data, error } = await createServerDatabase().rpc("claim_pixel_intercept_quota", { target_domain: domain });
+    if (error) throw error;
+    return data === true;
+  },
   cached: async (domain, path) => {
     const db = createServerDatabase();
     const { data: audits, error } = await db.from("audits").select("id").eq("domain", domain).not("user_id", "is", null).order("created_at", { ascending: false }).limit(100);
@@ -82,6 +88,7 @@ export function createPixelInterceptHandler(overrides: Partial<Deps> = {}) {
     if (!input.force && !aiSource(input.referrer) && !aiSource(input.utmSource)) return reply({ rescued: false });
     try {
       if (input.simulation && !await deps.authorizeSimulation(input.domain)) return reply({ error: "Sign in to test an owned domain." }, 403);
+      if (!await deps.quota(input.domain)) return reply({ rescued: false, error: "Rescue lookup is unavailable for this domain or is temporarily rate limited." }, 429);
       const cached = await deps.cached(input.domain, input.brokenPath);
       let candidates = cached ? [cached] : [];
       let target: Candidate | null = null;

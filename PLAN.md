@@ -678,9 +678,9 @@ IndexNow submission requires the site's root key file to contain the exact confi
 - [x] Verify `npm run build` after the locked local `.next` directory was removed.
 - [x] User confirmed migration 017 applied successfully in hosted Supabase.
 
-Days 57–77 completed. Day 84 is not started.
+Batch 1, Batch 2, and Batch 3 (Days 1–84) are code-complete. The Day 84 scorecard separately tracks live-production prerequisites.
 
-Profiles reuse one live Tavily-grounded audit result to preserve the existing $0 provider path; they are comparative synthesis profiles, not independent calls to four engine APIs.
+The original implementation repeated one live grounded probe. Day 84 replaces that behavior with separate synthesis profiles over Tavily results; these remain modeled profiles, not direct calls to the named engine APIs.
 
 ### Days 64–70: Edge 404 AI Traffic Interceptor Pixel & Live Rescue Sandbox (COMPLETED)
 
@@ -722,3 +722,23 @@ Agency access follows the existing active Pro/VIP Beta/paid subscription check. 
 - [x] Test Agency checkout payloads, Agency webhook validation, and subscription entitlement.
 
 Lemon Squeezy reported variant `2336501` as a $249/month subscription in test mode with pending status. A published live variant and the existing API/store credentials and live billing switch are required for production; set `LEMON_SQUEEZY_AGENCY_VARIANT_ID` to that live variant. Production ignores test-mode subscription events. No live purchase was made during verification.
+
+### Day 84: Batch 3 Master QA (CODE QA COMPLETED; LIVE PREREQUISITES OPEN)
+
+| Check | Initial status | Fixes applied | Final status |
+| --- | --- | --- | --- |
+| TypeScript and lint | Passed | Corrected nullable opportunity types to match migration 016 | PASS |
+| Production dependency audit | Network blocked in sandbox | Re-ran with network access; zero vulnerabilities | PASS |
+| Migrations and schema | Nullability mismatch found | Applied 001–019 in PGlite; checked every TypeScript row field and nullability; fixed four nullable fields; 14 existing hosted schema checks returned HTTP 200 | PASS locally |
+| Public interceptor abuse controls | Public requests could trigger unlimited provider lookups | Added audited-domain checks and an atomic per-domain limit of 120 requests per minute in migration 019; tested denial and reset | PASS locally |
+| Hosted interceptor quota | New quota table absent during initial check | User confirmed migration 019 was applied | PASS: user confirmed |
+| Groq/Tavily, sitemap, SSRF, embeddings, capsules, hijacker, listicle and pricing tests | Existing automated tests | Re-ran complete suite with new regressions; provider responses mocked | PASS |
+| Pixel, redirect sync and alerts tests | Existing automated tests | Re-ran complete suite; external provider responses mocked | PASS |
+| Agency report and PDF | Print behavior not covered by browser tests | Added Chromium print-layout and PDF generation test using representative report data | PASS |
+| Browser suite | Sandbox blocked esbuild and page requests | Re-ran with required access; 13 existing browser tests and one PDF test passed | PASS |
+| SoM evidence integrity | Search-only and unchecked URLs counted as live citations; failed prompts mislabelled | Count only answer URLs with live 2xx status; mark unknown or failed probes; suppress legacy/incomplete scores and preserve prompt ordering | PASS |
+| Big-4 disagreement matrix | Four labels repeated the same probe | Added separate bounded Gemini/Groq synthesis profiles over Tavily sources, recency ordering, grounded URL validation, provider attribution, category comparison, and unavailable states | PASS |
+| Production bundle | OneDrive may lock the default build directory | Production build passed in an alternate output directory | PASS |
+| Live production readiness | Agency variant previously pending and test-mode | Rechecked variant 2336501: still pending, test-mode, $249/month | FAIL |
+
+Final local verification: `npx tsc --noEmit`, `npm run lint`, `npm test` (175 tests), `npm audit --omit=dev` (0 vulnerabilities), `npm run build`, and 14 browser/PDF tests passed. The browser/PDF checks use local development configuration and representative fixtures; provider synthesis is tested with mocked responses and is not a native query of the named engines. Competitor appearances in category comparisons do not establish competitor URL availability. Existing scores created by earlier shared-probe versions require a new audit. The configured hosted Supabase project passed 14 read-only, zero-row schema queries; the user subsequently confirmed applying migration 019. This does not establish that the production deployment uses that project. A live Agency billing variant remains open, so production readiness is not yet fully verified. The quota limits calls but does not authenticate referrer attribution.

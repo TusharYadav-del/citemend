@@ -10,7 +10,8 @@ import { detectCitationGap, type CitationGap } from "./citation-gap";
 import { saveAuditCitationGap } from "./citation-gap-store";
 import { persistAudit } from "./audit-store";
 import { matchSitemapUrls, SEMANTIC_MATCH_THRESHOLD } from "./sitemap-embeddings";
-import { buildEngineMatrix, type EngineCitation } from "./engine-matrix";
+import { buildEngineMatrix, type EngineCitation, type EngineName, type EnginePromptInput } from "./engine-matrix";
+import { synthesizeEngineProfiles, type SynthesizedProfile } from "./engine-synthesis";
 
 export class AuditInputError extends Error {}
 export type AuditFinding = { url: string; httpStatus: number | null; error: string | null; suggestedRedirect: string | null; matchConfidence?: number };
@@ -21,12 +22,13 @@ export type AuditReport = {
   extractedUrls: string[]; sitemapUrlCount: number;
   citationGap?: CitationGap;
   engineMatrixJson?: ReturnType<typeof buildEngineMatrix>["rows"];
-  shareOfModelScore?: number;
+  shareOfModelScore?: number | null;
   findings: AuditFinding[]; warnings: string[]; status: "completed" | "partial";
 };
 export type AuditDependencies = {
   probe: (domain: string, buyerPrompt: string) => Promise<ProbeResult>; sitemap: typeof fetchSitemapUrls; check: typeof checkUrlStatus;
   semantic: typeof matchSitemapUrls | null;
+  synthesize: typeof synthesizeEngineProfiles | null;
   saveGap: typeof saveAuditCitationGap;
   resolve: (url: string) => Promise<string | null>;
   save: (report: AuditReport, userId?: string) => Promise<{ id: string; createdAt: string }>;
@@ -142,7 +144,7 @@ function similarity(a: string, b: string): number {
 
 export async function runAudit(input: unknown, overrides: Partial<AuditDependencies> = {}, userId?: string) {
   const { domain, buyerPrompt, buyerPrompts = [buyerPrompt], competitorDomains: providedCompetitors, groundTruthPricing } = validateAuditInput(input);
-  const deps: AuditDependencies = { probe: runCitationProbe, sitemap: fetchSitemapUrls, check: checkUrlStatus, resolve: resolveGroundingRedirect, save: persistAudit, saveGap: saveAuditCitationGap, semantic: process.env.GEMINI_API_KEY ? matchSitemapUrls : null, ...overrides };
+  const deps: AuditDependencies = { probe: runCitationProbe, sitemap: fetchSitemapUrls, check: checkUrlStatus, resolve: resolveGroundingRedirect, save: persistAudit, saveGap: saveAuditCitationGap, semantic: process.env.GEMINI_API_KEY ? matchSitemapUrls : null, synthesize: overrides.probe && overrides.probe !== runCitationProbe ? null : synthesizeEngineProfiles, ...overrides };
   const [sitemapResults, probeResults] = await Promise.all([
     Promise.allSettled([deps.sitemap(domain)]),
     Promise.allSettled(buyerPrompts.map((prompt) => deps.probe(domain, prompt))),
@@ -158,7 +160,7 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
   const firstProbe = successfulProbes[0];
   const probe: ProbeResult = "searchGrounding" in firstProbe
     ? {
-      text: successfulProbes.map((item, index) => `Buyer intent ${index + 1}: ${buyerPrompts[index]}\n${item.text}`).join("\n\n"),
+      text: probeResults.flatMap((result, index) => result.status === "fulfilled" ? [`Buyer intent ${index + 1}: ${buyerPrompts[index]}\n${result.value.text}`] : []).join("\n\n"),
       citedUrls: allProbeUrls,
       providerUsed: [...new Set(successfulProbes.map((item) => "providerUsed" in item ? item.providerUsed : "gemini"))].join(", "),
       searchGrounding: {
@@ -168,7 +170,7 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
       warnings: [...new Set([...successfulProbes.flatMap((item) => "warnings" in item ? item.warnings : []), ...probeFailures])],
     }
     : {
-      text: successfulProbes.map((item, index) => `Buyer intent ${index + 1}: ${buyerPrompts[index]}\n${item.text}`).join("\n\n"),
+      text: probeResults.flatMap((result, index) => result.status === "fulfilled" ? [`Buyer intent ${index + 1}: ${buyerPrompts[index]}\n${result.value.text}`] : []).join("\n\n"),
       groundingMetadata: "groundingMetadata" in firstProbe ? firstProbe.groundingMetadata : null,
       sources: [...new Map([...successfulProbes.flatMap((item) => "sources" in item ? item.sources : []).map((source) => [source.url, source] as const), ...allProbeUrls.map((url, index) => [url, { index: index + 100, url, title: url }] as const)]).values()].slice(0, 140),
       citations: successfulProbes.flatMap((item) => "citations" in item ? item.citations : []),
@@ -185,6 +187,9 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
   const competitorDomains = providedCompetitors ?? (await import("./hijacker")).inferCompetitorDomains(domain, allUrls, probe.text);
   const targetUrls = allUrls.filter((url) => inDomain(url, domain));
   if (targetUrls.length > 50) throw new AuditInputError("More than 50 target-domain citations were found; narrow the buyer prompt.");
+  const profilesPromise: Promise<SynthesizedProfile[][] | null> = deps.synthesize
+    ? deps.synthesize(probeResults.map((result, index) => ({ prompt: buyerPrompts[index], sources: result.status === "fulfilled" && "searchGrounding" in result.value && result.value.searchGrounding.status === "available" ? result.value.searchGrounding.sources : [] }))).catch(() => null)
+    : Promise.resolve(null);
   let sitemap: string[] = [];
   if (sitemapResult.status === "fulfilled") sitemap = [...new Set(sitemapResult.value.map(normalizedUrl).filter((url): url is string => !!url && inDomain(url, domain)))];
   else warnings.push("Sitemap discovery failed; redirect suggestions may be unavailable.");
@@ -239,14 +244,21 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
   const verifiedFindings = findings.filter((finding) => finding.httpStatus !== null);
   const visibilityScore = verifiedFindings.length ? Math.round(100 * verifiedFindings.filter((finding) => finding.httpStatus! >= 200 && finding.httpStatus! < 300).length / verifiedFindings.length) : 0;
   const findingByUrl = new Map(findings.map((finding) => [finding.url, finding]));
+  const synthesized = await profilesPromise;
+  if (deps.synthesize && (!synthesized || synthesized.some(group => group.length !== 3 || group.some(profile => !profile.available)))) warnings.push("Some engine synthesis profiles were unavailable; the Share of Model score is not calculated.");
   const engineMatrix = buildEngineMatrix({
     domain,
     competitorDomains,
     prompts: buyerPrompts.map((prompt, index) => {
       const result = probeResults[index];
-      const promptUrls = result.status === "fulfilled" ? extractCitationUrls(result.value) : [];
+      const promptUrls = result.status === "fulfilled" ? extractTextUrls(result.value.text) : [];
       const citations: EngineCitation[] = promptUrls.map((url) => ({ url, httpStatus: findingByUrl.get(url)?.httpStatus ?? null }));
-      return { prompt, citations, responseText: result.status === "fulfilled" ? result.value.text : "" };
+      const primaryAvailable = result.status === "fulfilled" && (!("searchGrounding" in result.value) || result.value.searchGrounding.status === "available");
+      const profiles: EnginePromptInput["profiles"] = deps.synthesize ? {
+        "ChatGPT Search": { citations, available: primaryAvailable, provider: result.status === "fulfilled" && "providerUsed" in result.value ? result.value.providerUsed : "unavailable" },
+        ...Object.fromEntries((synthesized?.[index] ?? []).map(profile => [profile.engine as EngineName, { citations: profile.urls.map(url => ({ url, httpStatus: findingByUrl.get(url)?.httpStatus ?? null })), available: profile.available, provider: profile.provider }])),
+      } : undefined;
+      return { prompt, citations, responseText: result.status === "fulfilled" ? result.value.text : "", available: result.status === "fulfilled", profiles };
     }),
   });
   const report: AuditReport = { domain, buyerPrompt, ...(buyerPrompts.length > 1 ? { buyerPrompts } : {}), competitorDomains, ...(groundTruthPricing ? { groundTruthPricing } : {}), visibilityScore, shareOfModelScore: engineMatrix.shareOfModelScore, engineMatrixJson: engineMatrix.rows, generatedText: probe.text, groundingMetadata, providerUsed: "providerUsed" in probe ? probe.providerUsed : "gemini", ...("searchGrounding" in probe ? { searchGrounding: probe.searchGrounding } : {}), extractedUrls: allUrls, sitemapUrlCount: sitemap.length, findings, warnings: [...new Set(warnings)], status: warnings.length ? "partial" : "completed" };

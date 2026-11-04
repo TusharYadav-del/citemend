@@ -22,5 +22,5 @@ export async function getPublicAudit(id: string) {
   if (agency) query = query.eq("opportunity_type", "competitor_direct_404");
   const result = await query.limit(agency ? 100 : 2);
   if (!result.error) opportunities = (result.data ?? []).filter(item => item.opportunity_type === "competitor_direct_404");
-  return { ...data, agency, opportunities, share_of_model_score: data.share_of_model_score ?? 0, broken_links: data.broken_links.filter((link) => link.http_status === 404) };
+  return { ...data, agency, opportunities, broken_links: data.broken_links.filter((link) => link.http_status === 404) };
 }

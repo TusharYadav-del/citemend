@@ -6,7 +6,7 @@ import { GET } from "../app/api/audit/route";
 import { createAuditPostHandler } from "../lib/audit-handler";
 import { getUserAuditHistory } from "../lib/audit-history";
 import type { CitationProbeResult } from "../lib/gemini";
-import { buildEngineMatrix } from "../lib/engine-matrix";
+import { buildEngineMatrix, compareCategoryCitationRanks, describeEngineStatus, hasVerifiedMatrix } from "../lib/engine-matrix";
 
 const originalEnv = process.env;
 const originalFetch = globalThis.fetch;
@@ -64,10 +64,86 @@ test("engine matrix identifies Reddit citations and empty evidence without claim
     { prompt: "Community", citations: [{ url: "https://www.reddit.com/r/topic/123" }] },
     { prompt: "No evidence", citations: [] },
   ] });
-  assert.equal(result.rows[0].status, "omitted_competitor_won");
-  assert.equal(result.rows[0].competitor, "www.reddit.com");
+  assert.equal(result.rows[0].status, "cited_reddit_thread");
+  assert.equal(result.rows[0].competitor, null);
   assert.equal(result.shareOfModelScore, 0);
   assert.equal(result.rows[4].citedUrl, null);
+});
+
+test("engine matrix does not score unverified citations or invent a competitor", () => {
+  const matrix = buildEngineMatrix({ domain: "example.com", prompts: [
+    { prompt: "unknown", citations: [{ url: "https://example.com/a", httpStatus: null }] },
+    { prompt: "server error", citations: [{ url: "https://example.com/b", httpStatus: 500 }] },
+    { prompt: "third party", citations: [{ url: "https://news.example.net/post" }] },
+    { prompt: "failed", citations: [], available: false },
+  ] });
+  assert.equal(matrix.shareOfModelScore, null);
+  assert.equal(matrix.rows[0].status, "cited_unverified");
+  assert.equal(matrix.rows[4].status, "cited_unverified");
+  assert.equal(matrix.rows[8].status, "omitted_no_competitor");
+  assert.equal(matrix.rows[8].competitor, null);
+  assert.equal(matrix.rows[12].status, "not_evaluated");
+  assert.equal(hasVerifiedMatrix(matrix.rows), false);
+  const legacy = { ...matrix.rows[0], evidenceVersion: undefined };
+  assert.equal(hasVerifiedMatrix([legacy]), false);
+  assert.match(describeEngineStatus(legacy), /Legacy/);
+});
+
+test("a dead citation does not hide an additional citation with unknown status", () => {
+  const matrix = buildEngineMatrix({ domain: "example.com", prompts: [{ prompt: "mixed", citations: [
+    { url: "https://example.com/dead", httpStatus: 404 }, { url: "https://example.com/unchecked", httpStatus: null },
+  ] }] });
+  assert.equal(matrix.rows[0].status, "cited_unverified");
+  assert.equal(matrix.shareOfModelScore, null);
+});
+
+test("independent synthesis profiles can disagree and score only verified citations", () => {
+  const own = { url: "https://example.com/live", httpStatus: 200 };
+  const dead = { url: "https://example.com/dead", httpStatus: 404 };
+  const matrix = buildEngineMatrix({ domain: "example.com", competitorDomains: ["jira.com"], prompts: [{ prompt: "Compare", citations: [], profiles: {
+    "ChatGPT Search": { citations: [own], available: true, provider: "groq-120b" },
+    "Perplexity Sonar": { citations: [{ url: "https://jira.com/page" }], available: true, provider: "groq-20b" },
+    "Google Gemini": { citations: [dead], available: true, provider: "gemini" },
+    "Claude": { citations: [{ url: "https://reddit.com/r/example" }], available: true, provider: "groq-20b" },
+  } }] });
+  assert.deepEqual(matrix.rows.map(row => row.status), ["cited_rank_1", "omitted_competitor_won", "cited_dead_404_slug", "cited_reddit_thread"]);
+  assert.equal(matrix.shareOfModelScore, 25);
+  assert.equal(hasVerifiedMatrix(matrix.rows), true);
+  assert.equal(matrix.rows[0].provider, "groq-120b");
+  assert.deepEqual(compareCategoryCitationRanks(matrix.rows), { rank: 1, participants: 2, ownSlots: 1, topCompetitor: "jira.com", topCompetitorSlots: 1, totalSlots: 4 });
+  const competitorAhead = matrix.rows.map((row, index) => index === 3 ? { ...row, competitorsCited: ["jira.com"] } : row);
+  assert.deepEqual(compareCategoryCitationRanks(competitorAhead), { rank: 2, participants: 2, ownSlots: 1, topCompetitor: "jira.com", topCompetitorSlots: 2, totalSlots: 4 });
+});
+
+test("audit persists separate grounded profile results rather than repeating the first probe", async () => {
+  let stored: AuditReport | undefined;
+  const report = await runAudit({ domain: "example.com", buyerPrompt: "Compare", competitorDomains: ["jira.com"] }, {
+    probe: async () => ({ text: "See https://example.com/live", citedUrls: ["https://example.com/live", "https://example.com/dead", "https://jira.com/page", "https://reddit.com/r/example"], providerUsed: "groq-120b", searchGrounding: { status: "available", sources: [{ url: "https://example.com/live", title: "Live" }] }, warnings: [] }),
+    synthesize: async () => [[
+      { engine: "Perplexity Sonar", urls: ["https://jira.com/page"], available: true, provider: "groq-20b" },
+      { engine: "Google Gemini", urls: ["https://example.com/dead"], available: true, provider: "gemini" },
+      { engine: "Claude", urls: ["https://reddit.com/r/example"], available: true, provider: "groq-20b" },
+    ]],
+    sitemap: async () => [], check: async url => url.endsWith("/dead") ? 404 : 200,
+    save: async value => { stored = value; return save(); },
+  });
+  assert.deepEqual(report.engineMatrixJson?.map(row => row.status), ["cited_rank_1", "omitted_competitor_won", "cited_dead_404_slug", "cited_reddit_thread"]);
+  assert.equal(report.shareOfModelScore, 25);
+  assert.equal(stored?.shareOfModelScore, 25);
+  assert.equal(hasVerifiedMatrix(report.engineMatrixJson), true);
+});
+
+test("search-only sources do not count as citations and failed probes retain their prompt positions", async () => {
+  const report = await runAudit({ domain: "example.com", buyerPrompts: ["first", "second"] }, {
+    probe: async (_domain, prompt) => {
+      if (prompt === "first") throw new Error("unavailable");
+      return { text: "A response without URL citations.", citedUrls: ["https://example.com/docs"], providerUsed: "groq-test", searchGrounding: { status: "available", sources: [{ url: "https://example.com/docs", title: "Docs" }] }, warnings: [] };
+    }, sitemap: async () => [], check: async () => 200, save,
+  });
+  assert.equal(report.shareOfModelScore, null);
+  assert.equal(report.engineMatrixJson?.[0].status, "not_evaluated");
+  assert.equal(report.engineMatrixJson?.[4].status, "omitted_no_competitor");
+  assert.match(report.generatedText, /Buyer intent 2: second/);
 });
 
 test("checks only target-domain citations and verifies next-best live sitemap destination", async () => {
@@ -85,7 +161,7 @@ test("checks only target-domain citations and verifies next-best live sitemap de
   assert.ok(checked.every((url) => new URL(url).hostname === "example.com"));
   assert.equal(new Set(checked).size, checked.length);
   assert.ok(stored);
-  assert.equal(report.shareOfModelScore, 100);
+  assert.equal(report.shareOfModelScore, 0);
   assert.equal(report.engineMatrixJson?.length, 4);
 });
 
@@ -101,6 +177,8 @@ test("network failures remain unknown, unavailable sitemaps produce partial repo
   const report = await runAudit(input, { probe: async () => probe, sitemap: async () => { throw new Error("offline"); }, check: async () => { throw new Error("timeout"); }, save });
   assert.equal(report.status, "partial");
   assert.ok(report.findings.every((item) => item.httpStatus === null && item.suggestedRedirect === null));
+  assert.equal(report.shareOfModelScore, null);
+  assert.ok(report.engineMatrixJson?.every(row => row.status === "cited_unverified"));
   assert.ok(report.warnings.length >= 2);
 });
 
@@ -144,7 +222,10 @@ test("POST runs real SDK/parser/checker/store code against controlled HTTP fixtu
   mock.method(globalThis, "fetch", async (value: string | URL, options?: RequestInit) => {
     const url = String(value), method = options?.method ?? "GET";
     if (url.includes("api.tavily.com")) return Response.json({ results: [{ url: "https://example.com/docs/api", title: "API", content: "Official API docs" }] });
-    if (url.includes("api.groq.com")) return Response.json({ choices: [{ message: { content: probe.text } }] });
+    if (url.includes("api.groq.com")) {
+      const body = JSON.parse(String(options?.body));
+      return Response.json({ choices: [{ message: { content: body.model === "openai/gpt-oss-20b" ? JSON.stringify({ citations: ["https://example.com/docs/api"] }) : probe.text } }] });
+    }
     if (url === "https://example.com/sitemap.xml") return new Response('<urlset><url><loc>https://example.com/docs/setup</loc></url></urlset>');
     if (url.startsWith("https://example.com/")) return new Response(null, { status: url.endsWith("setup-old") ? 404 : 200 });
     if (url.startsWith("https://db.example.com/rest/v1/audits") && method === "POST") { persistedAudit = JSON.parse(String(options?.body)); insertCount++; return Response.json({ id, created_at: "2026-10-30T00:00:00Z" }); }

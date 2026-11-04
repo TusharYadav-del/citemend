@@ -1,13 +1,20 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createPixelInterceptHandler, interceptOptions } from "../lib/pixel-intercept";
+import { createPixelInterceptHandler as createHandler, interceptOptions } from "../lib/pixel-intercept";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { findPixelSearchMatch } from "../lib/pixel-search-match";
 
 const candidate = { url: "https://example.com/new", score: 1 };
+const createPixelInterceptHandler: typeof createHandler = overrides => createHandler({ quota: async () => true, ...overrides });
 const body = { domain: "example.com", brokenPath: "/old", referrer: "https://chatgpt.com/c/123", userAgent: "test" };
 function post(value: object) { return new Request("https://citemend.test/api/pixel/intercept", { method: "POST", body: JSON.stringify(value) }); }
+
+test("quota denial and database errors fail closed before lookup", async () => {
+  const cached = async () => { throw new Error("lookup must not run"); };
+  assert.equal((await createPixelInterceptHandler({ cached, quota: async () => false })(post(body))).status, 429);
+  assert.equal((await createPixelInterceptHandler({ cached, quota: async () => { throw new Error("database unavailable"); } })(post(body))).status, 503);
+});
 
 test("CORS supports GET, POST and preflight; unrelated traffic is ignored", async () => {
   const handler = createPixelInterceptHandler({ cached: async () => { throw new Error("should not query"); } });

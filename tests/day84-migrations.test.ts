@@ -1,0 +1,74 @@
+import assert from "node:assert/strict";
+import { readdir, readFile } from "node:fs/promises";
+import { test } from "node:test";
+import { PGlite } from "@electric-sql/pglite";
+import { vector } from "@electric-sql/pglite-pgvector";
+import ts from "typescript";
+
+test("migrations 001–019 apply in order and expose the columns used by the application", async () => {
+  const db = new PGlite({ extensions: { vector } });
+  try {
+    await db.exec("create role anon; create role authenticated; create role service_role bypassrls;");
+    const directory = new URL("../supabase/migrations/", import.meta.url);
+    const files = (await readdir(directory)).filter(name => /^\d{3}_.+\.sql$/.test(name)).sort();
+    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 19 }, (_, index) => String(index + 1).padStart(3, "0")));
+    for (const file of files) await db.exec(await readFile(new URL(file, directory), "utf8"));
+    const expected: Record<string, string[]> = {
+      audits: ["id", "user_id", "domain", "buyer_prompt", "status", "created_at", "competitor_domains", "ground_truth_pricing", "indexnow_key", "share_of_model_score", "engine_matrix_json", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text", "llms_txt_content", "webhook_url"],
+      broken_links: ["id", "audit_id", "cited_url", "http_status", "suggested_redirect", "created_at"],
+      subscriptions: ["id", "user_id", "store_id", "product_id", "variant_id", "status", "plan", "current_period_end", "ends_at", "cancelled", "provider_updated_at"],
+      weekly_scan_runs: ["id", "week_start", "status", "lease_token", "digests_prepared_at"],
+      weekly_scan_jobs: ["id", "run_id", "user_id", "domain", "buyer_prompt", "status", "attempts", "lease_token", "audit_id"],
+      weekly_scan_digests: ["id", "run_id", "user_id", "status", "lease_token", "provider_message_id"],
+      redirect_rules: ["id", "user_id", "source_link_id", "source_host", "source_path", "destination", "active", "domain", "target_url", "confidence", "is_active", "hits_recovered", "synced_to_cms"],
+      sitemap_pages: ["id", "domain", "url", "page_title", "embedding", "embedding_model", "updated_at"],
+      audit_citation_gaps: ["audit_id", "user_id", "domain", "buyer_prompt", "provider", "competitor_urls"],
+      ai_404_events: ["id", "domain", "broken_path", "ai_referrer", "redirected_to", "user_agent", "created_at"],
+      citation_hijack_opportunities: ["id", "audit_id", "domain", "opportunity_type", "target_url", "dead_competitor_url", "matched_user_live_url", "verification_status"],
+      cms_connections: ["id", "user_id", "domain", "platform", "shop_subdomain", "access_token"],
+      rescued_ai_visits: ["id", "domain", "broken_path", "rescued_target_url", "ai_referrer", "similarity_score", "latency_ms", "created_at"],
+      workspace_integrations: ["id", "user_id", "domain", "slack_webhook_url", "discord_webhook_url", "shopify_store_domain", "shopify_admin_token", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text"],
+      pixel_intercept_quotas: ["domain", "window_started_at", "request_count"],
+    };
+    const result = await db.query<{ table_name: string; column_name: string; is_nullable: string }>("select table_name, column_name, is_nullable from information_schema.columns where table_schema = 'public'");
+    for (const [table, columns] of Object.entries(expected)) {
+      const actual = new Set(result.rows.filter(row => row.table_name === table).map(row => row.column_name));
+      for (const column of columns) assert.ok(actual.has(column), `${table}.${column} is missing`);
+    }
+    const source = ts.createSourceFile("database.types.ts", await readFile(new URL("../lib/database.types.ts", import.meta.url), "utf8"), ts.ScriptTarget.Latest, true);
+    const alias = source.statements.find((item): item is ts.TypeAliasDeclaration => ts.isTypeAliasDeclaration(item) && item.name.text === "Database");
+    assert.ok(alias && ts.isTypeLiteralNode(alias.type));
+    function property(node: ts.TypeLiteralNode, name: string): ts.TypeNode {
+      const item = node.members.find((member): member is ts.PropertySignature => ts.isPropertySignature(member) && member.name.getText(source).replaceAll('"', "") === name);
+      assert.ok(item?.type, `Missing TypeScript property ${name}`);
+      return item.type;
+    }
+    const publicNode = property(alias.type, "public"); assert.ok(ts.isTypeLiteralNode(publicNode));
+    const tables = property(publicNode, "Tables"); assert.ok(ts.isTypeLiteralNode(tables));
+    for (const table of tables.members) {
+      if (!ts.isPropertySignature(table) || !table.type || !ts.isTypeLiteralNode(table.type)) continue;
+      const tableName = table.name.getText(source).replaceAll('"', "");
+      const row = property(table.type, "Row"); assert.ok(ts.isTypeLiteralNode(row));
+      for (const column of row.members) {
+        if (!ts.isPropertySignature(column) || !column.type) continue;
+        const columnName = column.name.getText(source).replaceAll('"', "");
+        const sql = result.rows.find(item => item.table_name === tableName && item.column_name === columnName);
+        assert.ok(sql, `TypeScript references missing ${tableName}.${columnName}`);
+        const nullable = column.type.kind === ts.SyntaxKind.UnknownKeyword || ts.isUnionTypeNode(column.type) && column.type.types.some(type => ts.isLiteralTypeNode(type) && type.literal.kind === ts.SyntaxKind.NullKeyword);
+        assert.equal(nullable, sql.is_nullable === "YES", `Nullability differs for ${tableName}.${columnName}`);
+      }
+    }
+    await db.exec("insert into public.audits (domain, user_id, status) values ('example.com', 'user_test', 'completed')");
+    for (let i = 0; i < 120; i++) assert.equal((await db.query<{ allowed: boolean }>("select public.claim_pixel_intercept_quota('example.com') as allowed")).rows[0].allowed, true);
+    assert.equal((await db.query<{ allowed: boolean }>("select public.claim_pixel_intercept_quota('example.com') as allowed")).rows[0].allowed, false);
+    assert.equal((await db.query<{ allowed: boolean }>("select public.claim_pixel_intercept_quota('unknown.example') as allowed")).rows[0].allowed, false);
+    await db.exec("update public.pixel_intercept_quotas set window_started_at = now() - interval '61 seconds'");
+    assert.equal((await db.query<{ allowed: boolean }>("select public.claim_pixel_intercept_quota('example.com') as allowed")).rows[0].allowed, true);
+    await db.exec("set role anon;");
+    await assert.rejects(db.query("select * from workspace_integrations"), /permission denied/);
+    await assert.rejects(db.query("select * from rescued_ai_visits"), /permission denied/);
+    await assert.rejects(db.query("select * from sitemap_pages"), /permission denied/);
+    await assert.rejects(db.query("select * from pixel_intercept_quotas"), /permission denied/);
+    await assert.rejects(db.query("select public.claim_pixel_intercept_quota('example.com')"), /permission denied/);
+  } finally { await db.close(); }
+});

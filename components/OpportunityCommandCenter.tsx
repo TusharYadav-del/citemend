@@ -5,7 +5,7 @@ import VerifyFixButton from "@/components/VerifyFixButton";
 import CopyRedirects from "@/components/copy-redirects";
 import RedirectSyncButton from "@/components/redirect-sync-button";
 
-type Opportunity = { id: string; audit_id: string | null; domain: string; opportunity_type: string; prompt_query: string; target_url: string; dead_competitor_url: string | null; competitor_domain: string | null; http_status: number | null; matched_user_live_url: string | null; similarity_score: number | null; contact_email_or_link: string | null; outreach_draft: string | null; corrective_schema_json: string | null; verification_status: string; };
+type Opportunity = { id: string; audit_id: string | null; domain: string; opportunity_type: string; prompt_query: string; target_url: string; dead_competitor_url: string | null; competitor_domain: string | null; http_status: number | null; matched_user_live_url: string | null; similarity_score: number | null; contact_email_or_link: string | null; outreach_draft: string | null; corrective_schema_json: string | null; verification_status: string | null; };
 type BrokenLink = { id: string; auditId: string; domain: string; cited_url: string; http_status: number; suggested_redirect: string | null };
 
 const tabs = ["Own-Domain 404 & Pricing Recovery", "Competitor 404 Citations to Hijack", "Cited Listicles & Reddit Threads Omitting You"] as const;
