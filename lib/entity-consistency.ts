@@ -43,6 +43,36 @@ export async function fetchCorePage(domain: string, type: CorePageType): Promise
   return { type, url: new URL(paths[type][0], origin).href, state: "unknown", canonical: null, title: "", prices: [], planNames: [], planPrices: {}, featureClaims: [], jsonLd: [], updatedAt: null };
 }
 
+/** Fetches the exact externally cited page through the same DNS-pinned public HTTP guard. */
+export async function fetchCitedPage(value: string): Promise<PageEntity> {
+  const empty = (url: string, state: string): PageEntity => ({ type: "homepage", url, state, canonical: null, title: "", prices: [], planNames: [], planPrices: {}, featureClaims: [], jsonLd: [], updatedAt: null });
+  try {
+    const initial = assertPublicUrl(value);
+    const trace = await tracePublicRedirects(initial.href);
+    const finalUrl = assertPublicUrl(trace.finalUrl);
+    if (trace.status !== 200) return empty(finalUrl.href, String(trace.status));
+    const response = await publicFetch(finalUrl, { method: "GET", cache: "no-store", redirect: "manual", signal: AbortSignal.timeout(8000), headers: { Accept: "text/html" } });
+    if (response.status !== 200 || !/text\/html/i.test(response.headers.get("content-type") ?? "")) { await response.body?.cancel(); return empty(finalUrl.href, String(response.status)); }
+    const reader = response.body?.getReader();
+    if (!reader) return empty(finalUrl.href, "unknown");
+    const chunks: Uint8Array[] = []; let size = 0;
+    try {
+      while (true) {
+        const { done, value: chunk } = await reader.read();
+        if (done) break;
+        size += chunk.byteLength;
+        if (size > CAP) { await reader.cancel(); return empty(finalUrl.href, "blocked"); }
+        chunks.push(chunk);
+      }
+    } finally { reader.releaseLock(); }
+    return extractPageEntity("homepage", finalUrl.href, Buffer.concat(chunks).toString("utf8"));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const state = error instanceof DOMException && error.name === "TimeoutError" || /timeout|timed out/i.test(message) ? "timeout" : /private|localhost|non-public|unsafe|standard port/i.test(message) ? "blocked" : "unknown";
+    return empty(value, state);
+  }
+}
+
 export async function checkRobotsAllows(url: string): Promise<boolean | null> {
   try {
     const target = new URL(assertPublicUrl(url));

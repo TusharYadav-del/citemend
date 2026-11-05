@@ -795,6 +795,14 @@ Migration 021 is present in the repository and passed the ordered local PGlite s
 - [x] Add focused tests for evidence normalization/job retries, milestone separation, public before/after report data, entity conflicts, onboarding progression, API key hashes, bulk interchange, quota decisions, webhook deduplication, all forensic categories, graph timeline/edges, and ordered migration/RLS/type integrity.
 - [x] Verify `npx tsc --noEmit`, `npm run lint`, the full `npm test` suite (202 passed), and `npm run build` (alternate output directory).
 
-Migrations 022 and 023 passed ordered local PGlite schema/type/RLS tests; apply both to hosted Supabase before deploying these features. The USD/INR six-tier figures are roadmap hypotheses, not new Lemon Squeezy products or entitlements. Hosted migration application and live third-party integrations were not performed as part of this repository implementation.
+Migrations 022 and 023 passed ordered local PGlite schema/type/RLS tests. The user reported successful hosted migration application; hosted schema state was not independently queried. The USD/INR six-tier figures are roadmap hypotheses, not new Lemon Squeezy products or entitlements. Live third-party integrations were not performed as part of this repository implementation.
 
 Dashboard follow-up: `AuditAnalysisTools` is now connected to the latest completed/partial owned audit, exposing the entity consistency audit, citation forensics, and intelligence graph controls. The user reported successful migration application; hosted schema state was not independently queried. Provider integrations remain subject to their production credentials and external services.
+
+### Days 113–120: AI Citation Forensics & 9-Object Recovery Intelligence Graph (COMPLETED)
+
+- [x] Compare each saved buyer prompt and its actual recorded AI citations against the audited page and the exact cited public URLs, using DNS-pinned fetches, robots/sitemap checks, HTTP status, visible prices/claims, timestamps, canonicals, and structured data.
+- [x] Classify discoverability, retrieval, citation selection, stale content, and broken destination with observable evidence separated from diagnostic hypotheses; lexical prompt coverage is explicitly not represented as semantic similarity or private model reasoning.
+- [x] Build the nine-object tenant-scoped timeline with observation evidence, publisher/URL edges, opportunity stage-history actions, verified outcomes, and evidence-backed citation appearance/disappearance/replacement events across sequential observations for the same prompt.
+- [x] Test all five forensic classes and evidence/hypothesis separation, page fact comparisons, lexical coverage labeling, nine graph object types, source replacement/disappearance, and timestamped action history.
+- [x] Verify `npx tsc --noEmit`, `npm run lint`, `npm test` (202 passed), and `npm run build` (alternate output directory).

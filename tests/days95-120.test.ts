@@ -6,7 +6,7 @@ import { buildBeforeAfterReport } from "../lib/before-after-report";
 import { getOnboardingProgress, AUDIT_TEMPLATES } from "../lib/onboarding";
 import { exportRedirectRecords, parseRedirectImport, generateWorkspaceApiKey, verifyWorkspaceApiKey, withinTierQuota, webhookEventIdentity } from "../lib/integrations-workflow";
 import { extractPageEntity, comparePageEntities } from "../lib/entity-consistency";
-import { classifyCitationForensics, type ForensicInput } from "../lib/citation-forensics";
+import { classifyCitationForensics, compareCitationPageFacts, measureBuyerPromptCoverage, type ForensicInput } from "../lib/citation-forensics";
 import { buildIntelligenceGraph, buildIntelligenceTimeline } from "../lib/intelligence-graph";
 import { planTier } from "../lib/audit-quota";
 
@@ -61,12 +61,19 @@ test("all forensic issue types keep observable evidence distinct from hypotheses
   const findings = classifyCitationForensics(input); const kinds = new Set(findings.map(item => item.kind));
   for (const kind of ["discoverability", "retrieval", "citation_selection", "stale_content", "broken_destination"] as const) assert.ok(kinds.has(kind));
   for (const finding of findings) { assert.ok(finding.observableEvidence.length > 0); assert.ok(finding.diagnosticHypotheses.length > 0); assert.ok(!finding.observableEvidence.some(value => /caused|private weights|reasoning/i.test(value))); }
+  assert.match(findings.find(item => item.kind === "retrieval")?.observableEvidence.join(" ") ?? "", /word-overlap measure, not semantic similarity/);
+  assert.equal(measureBuyerPromptCoverage("best CRM for startups", "CRM", ["A customer relationship management platform for startups"]), 1);
+  const facts = compareCitationPageFacts({ prices: ["$49/mo"], featureClaims: ["Built for small teams"], jsonLd: [], updatedAt: "2020-01-01" }, { prices: ["$79/mo"], featureClaims: ["Built for large teams"], jsonLd: ["Offer"], updatedAt: "2026-01-01" });
+  assert.deepEqual(facts.targetPricesNotSeenOnCitedPage, ["$49/mo"]); assert.deepEqual(facts.citedClaimsNotSeenOnTarget, ["Built for large teams"]); assert.equal(facts.citedStructuredDataCount, 1);
 });
 
 test("nine-object graph builds a chronological evidence timeline", () => {
-  const timeline = buildIntelligenceTimeline({ domain: "acme.test", prompt: "best crm", observations: [{ id: "obs-1", domain: "acme.test", prompt_query: "best crm", provider: "Groq", model_name: "model", extracted_urls_json: ["https://publisher.test/review"], observed_at: "2026-01-01T00:00:00Z" }], actions: [{ id: "act-1", action_type: "redirect_approval", created_at: "2026-01-02T00:00:00Z" }], outcomes: [{ id: "out-1", technical_deployment_verified_at: "2026-01-03T00:00:00Z" }] });
+  const timeline = buildIntelligenceTimeline({ domain: "acme.test", prompt: "best crm", observations: [{ id: "obs-1", domain: "acme.test", prompt_query: "best crm", provider: "Groq", model_name: "model", extracted_urls_json: ["https://publisher.test/review"], observed_at: "2026-01-01T00:00:00Z" }, { id: "obs-2", domain: "acme.test", prompt_query: "best crm", provider: "Groq", model_name: "model", extracted_urls_json: ["https://acme.test/guide"], observed_at: "2026-01-03T00:00:00Z" }], opportunities: [{ id: "opp-1", opportunity_type: "competitor replacement", prompt_query: "best crm", created_at: "2026-01-01T12:00:00Z", stage_history_json: [{ stage: "reviewed", at: "2026-01-02T00:00:00Z", actor_user_id: "user-1", note: "approved source replacement" }] }], actions: [{ id: "act-1", action_type: "redirect_approval", created_at: "2026-01-02T00:00:00Z" }], outcomes: [{ id: "out-1", technical_deployment_verified_at: "2026-01-03T00:00:00Z" }] });
   assert.deepEqual(new Set(timeline.map(item => item.type)), new Set(["Brand", "Prompt", "Model", "Observation", "Publisher", "URL", "Evidence", "Action", "Outcome"]));
   assert.deepEqual([...timeline].sort((a, b) => a.at.localeCompare(b.at) || a.type.localeCompare(b.type)), timeline);
-  const graph = buildIntelligenceGraph({ domain: "acme.test", prompt: "best crm", observations: [{ id: "obs-1", prompt_query: "best crm", model_name: "model", extracted_urls_json: ["https://publisher.test/review"] }], actions: [{ id: "act", action_type: "approve" }], outcomes: [{ id: "out", technical_deployment_verified_at: "2026-01-03T00:00:00Z" }] });
-  assert.ok(graph.edges.some(edge => edge.relation === "cites")); assert.ok(graph.edges.some(edge => edge.relation === "resulted_in"));
+  assert.ok(timeline.some(item => item.label.includes("Citation disappeared: https://publisher.test/review")));
+  assert.ok(timeline.some(item => item.label.includes("Citation appeared: https://acme.test/guide")));
+  assert.ok(timeline.some(item => item.label.includes("Opportunity reviewed: approved source replacement")));
+  const graph = buildIntelligenceGraph({ domain: "acme.test", prompt: "best crm", observations: [{ id: "obs-1", prompt_query: "best crm", model_name: "model", extracted_urls_json: ["https://publisher.test/review"], observed_at: "2026-01-01T00:00:00Z" }, { id: "obs-2", prompt_query: "best crm", model_name: "model", extracted_urls_json: ["https://acme.test/guide"], observed_at: "2026-01-03T00:00:00Z" }], opportunities: [{ id: "opp", prompt_query: "best crm", stage_history_json: [{ stage: "reviewed", at: "2026-01-02T00:00:00Z", actor_user_id: "user-1", note: "reviewed" }] }], actions: [{ id: "act", action_type: "approve" }], outcomes: [{ id: "out", technical_deployment_verified_at: "2026-01-03T00:00:00Z" }] });
+  assert.ok(graph.edges.some(edge => edge.relation === "cites")); assert.ok(graph.edges.some(edge => edge.relation === "resulted_in")); assert.ok(graph.edges.some(edge => edge.relation === "disappeared")); assert.ok(graph.edges.some(edge => edge.relation === "replaced")); assert.ok(graph.edges.some(edge => edge.from === "Action:opp" && edge.to.startsWith("Action:opp:reviewed:")));
 });
