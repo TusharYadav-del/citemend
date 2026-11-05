@@ -22,6 +22,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     </html>
   );
 }
-const Inter = (_config: Record<string, unknown>) => ({ variable: "font-inter-local" });
-const JetBrains_Mono = (_config: Record<string, unknown>) => ({ variable: "font-mono-local" });
 
+function Inter(_config: Record<string, unknown>) {
+  return { variable: "font-inter-local" };
+}
+
+function JetBrains_Mono(_config: Record<string, unknown>) {
+  return { variable: "font-mono-local" };
+}
