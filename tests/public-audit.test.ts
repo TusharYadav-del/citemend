@@ -49,6 +49,21 @@ test("branded reports show safe saved agency details and audit-specific competit
   assert.equal(report?.opportunities.length, 1);
 });
 
+test("public customer report keeps technical deployment separate from a later citation and renders its diff data", async () => {
+  process.env = { ...originalEnv, NEXT_PUBLIC_SUPABASE_URL: "https://db.example.com", SUPABASE_SECRET_KEY: "test-secret" };
+  globalThis.fetch = async input => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith("/citation_hijack_opportunities")) return Response.json([]);
+    if (url.pathname.endsWith("/recovery_outcomes")) return Response.json([{ broken_link_id: "broken", canonical_destination_url: "https://example.com/new", technical_deployment_verified_at: "2026-10-31T01:00:00Z", ai_citation_observed_at: "2026-10-31T02:00:00Z", created_at: "2026-10-31T01:00:00Z" }]);
+    if (url.pathname.endsWith("/ai_observation_evidence")) return Response.json([{ prompt_query: "best tools", extracted_urls_json: ["https://example.com/old"], observed_at: "2026-10-31T00:00:00Z" }, { prompt_query: "best tools", extracted_urls_json: ["https://example.com/new"], observed_at: "2026-10-31T02:00:00Z" }]);
+    return Response.json({ id, domain: "example.com", status: "completed", created_at: "2026-10-31T00:00:00Z", broken_links: [{ id: "broken", cited_url: "https://example.com/old", http_status: 404, suggested_redirect: "https://example.com/new" }] });
+  };
+  const report = await getPublicAudit(id);
+  assert.equal(report?.beforeAfterReports[0].technicalDeploymentVerified, true);
+  assert.equal(report?.beforeAfterReports[0].subsequentCitationObserved, true);
+  assert.deepEqual(report?.beforeAfterReports[0].diff?.addedCitations, ["https://example.com/new"]);
+});
+
 test("missing audits return null; database failures remain errors", async () => {
   process.env = { ...originalEnv, NEXT_PUBLIC_SUPABASE_URL: "https://db.example.com", SUPABASE_SECRET_KEY: "test-secret" };
   globalThis.fetch = async () => Response.json(null);

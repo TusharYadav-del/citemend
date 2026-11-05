@@ -5,16 +5,16 @@ import { PGlite } from "@electric-sql/pglite";
 import { vector } from "@electric-sql/pglite-pgvector";
 import ts from "typescript";
 
-test("migrations 001 through 021 apply in order and expose the columns used by the application", async () => {
+test("migrations 001 through 023 apply in order and expose the columns used by the application", async () => {
   const db = new PGlite({ extensions: { vector } });
   try {
     await db.exec("create role anon; create role authenticated; create role service_role bypassrls;");
     const directory = new URL("../supabase/migrations/", import.meta.url);
     const files = (await readdir(directory)).filter(name => /^\d{3}_.+\.sql$/.test(name)).sort();
-    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 21 }, (_, index) => String(index + 1).padStart(3, "0")));
+    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 23 }, (_, index) => String(index + 1).padStart(3, "0")));
     for (const file of files) await db.exec(await readFile(new URL(file, directory), "utf8"));
     const expected: Record<string, string[]> = {
-      audits: ["id", "user_id", "domain", "buyer_prompt", "status", "created_at", "competitor_domains", "ground_truth_pricing", "indexnow_key", "share_of_model_score", "engine_matrix_json", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text", "llms_txt_content", "webhook_url"],
+      audits: ["id", "user_id", "domain", "buyer_prompt", "status", "created_at", "competitor_domains", "ground_truth_pricing", "indexnow_key", "share_of_model_score", "engine_matrix_json", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text", "llms_txt_content", "webhook_url", "sitemap_url_count"],
       broken_links: ["id", "audit_id", "cited_url", "http_status", "suggested_redirect", "url_state", "approval_status", "approved_by", "approved_at", "previous_destination_url", "deployed_at", "rolled_back_at", "match_evidence_reason", "match_confidence", "created_at"],
       subscriptions: ["id", "user_id", "store_id", "product_id", "variant_id", "status", "plan", "current_period_end", "ends_at", "cancelled", "provider_updated_at"],
       weekly_scan_runs: ["id", "week_start", "status", "lease_token", "digests_prepared_at"],
@@ -30,6 +30,10 @@ test("migrations 001 through 021 apply in order and expose the columns used by t
       rescued_ai_visits: ["id", "domain", "broken_path", "rescued_target_url", "ai_referrer", "similarity_score", "latency_ms", "created_at"],
       workspace_integrations: ["id", "user_id", "domain", "slack_webhook_url", "discord_webhook_url", "shopify_store_domain", "shopify_admin_token", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text"],
       pixel_intercept_quotas: ["domain", "window_started_at", "request_count"],
+      ai_observation_evidence: ["id", "audit_id", "domain", "prompt_query", "prompt_version", "provider", "model_name", "search_method", "locale", "raw_answer", "extracted_urls_json", "sample_size", "observation_confidence", "job_status", "retry_count", "error_message", "observed_at"],
+      recovery_outcomes: ["id", "audit_id", "domain", "broken_link_id", "canonical_destination_url", "technical_deployment_verified_at", "ai_citation_observed_at", "evidence_id", "created_at"],
+      webhook_events_log: ["id", "event_id", "provider", "event_type", "delivery_status", "retry_count", "last_error", "received_at", "completed_at"],
+      workspace_api_keys: ["id", "user_id", "workspace_domain", "key_hash", "key_prefix", "permissions_json", "rate_limit_per_minute", "last_used_at", "created_at", "revoked_at"],
     };
     const result = await db.query<{ table_name: string; column_name: string; is_nullable: string }>("select table_name, column_name, is_nullable from information_schema.columns where table_schema = 'public'");
     for (const [table, columns] of Object.entries(expected)) {
@@ -80,5 +84,6 @@ test("migrations 001 through 021 apply in order and expose the columns used by t
     await assert.rejects(db.query("select * from pixel_intercept_quotas"), /permission denied/);
     await assert.rejects(db.query("select * from action_audit_logs"), /permission denied/);
     await assert.rejects(db.query("select public.claim_pixel_intercept_quota('example.com')"), /permission denied/);
+    for (const table of ["ai_observation_evidence", "recovery_outcomes", "webhook_events_log", "workspace_api_keys"]) await assert.rejects(db.query(`select * from ${table}`), /permission denied/);
   } finally { await db.close(); }
 });

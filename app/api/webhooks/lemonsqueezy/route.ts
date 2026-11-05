@@ -1,11 +1,14 @@
 import { isValidLemonSqueezySignature } from "@/lib/lemonsqueezy-webhook";
 import { createServerDatabase } from "@/lib/supabase-server";
 import { agencyVariantId } from "@/lib/lemonsqueezy";
+import { createHash } from "node:crypto";
+import { claimWebhookEvent, finishWebhookEvent } from "@/lib/webhook-idempotency";
+import { webhookEventIdentity } from "@/lib/integrations-workflow";
 
 const MAX_WEBHOOK_BYTES = 64 * 1024;
 
 type SubscriptionEvent = {
-  meta?: { event_name?: unknown; custom_data?: { user_id?: unknown } };
+  meta?: { event_name?: unknown; event_id?: unknown; custom_data?: { user_id?: unknown } };
   data?: { type?: unknown; id?: unknown; attributes?: Record<string, unknown> };
 };
 
@@ -95,6 +98,14 @@ export async function POST(request: Request) {
 
   const numericString = (value: unknown) => value === null || value === undefined ? null : String(value);
   const cancelled = eventName === "subscription_cancelled" || attributes.cancelled === true || attributes.status === "cancelled";
+  let eventId: string;
+  try { eventId = typeof event.meta?.event_id === "string" ? webhookEventIdentity("lemonsqueezy", event.meta.event_id) : `lemonsqueezy:${createHash("sha256").update(rawBody).digest("hex")}`; }
+  catch { return Response.json({ error: "Invalid webhook event ID." }, { status: 400 }); }
+  try {
+    const claim = await claimWebhookEvent(db, eventId, eventName);
+    if (!claim.claimed) return Response.json({ received: true, duplicate: true });
+  } catch { return Response.json({ error: "Webhook idempotency storage is unavailable." }, { status: 503 }); }
+  const done = async (status: "completed" | "failed" | "ignored", error?: string) => { await finishWebhookEvent(db, eventId, status, error); };
 
   // Compare-and-swap avoids a delayed webhook overwriting newer billing state.
   try {
@@ -103,18 +114,18 @@ export async function POST(request: Request) {
         .select("user_id,provider_updated_at,cancelled")
         .eq("id", subscriptionId)
         .maybeSingle();
-      if (readError) return Response.json({ error: "Subscription storage is unavailable." }, { status: 503 });
+      if (readError) { await done("failed", "Subscription lookup failed."); return Response.json({ error: "Subscription storage is unavailable." }, { status: 503 }); }
       if (existing && suppliedUserId && suppliedUserId !== existing.user_id) {
-        return Response.json({ error: "Subscription owner does not match." }, { status: 400 });
+        { await done("failed", "Subscription owner did not match."); return Response.json({ error: "Subscription owner does not match." }, { status: 400 }); }
       }
       const userId = existing?.user_id ?? suppliedUserId;
-      if (!userId) return Response.json({ error: "Subscription owner is missing." }, { status: 400 });
+      if (!userId) { await done("failed", "Subscription owner is missing."); return Response.json({ error: "Subscription owner is missing." }, { status: 400 }); }
 
       if (existing?.provider_updated_at) {
         const previousTime = Date.parse(existing.provider_updated_at);
         const incomingTime = Date.parse(providerUpdatedAt);
         if (previousTime > incomingTime || (previousTime === incomingTime && existing.cancelled && !cancelled)) {
-          return Response.json({ received: true, ignored: true });
+          await done("ignored"); return Response.json({ received: true, ignored: true });
         }
       }
 
@@ -137,8 +148,9 @@ export async function POST(request: Request) {
 
       if (!existing) {
         const { error } = await db.from("subscriptions").insert(row);
-        if (!error) return Response.json({ received: true });
+        if (!error) { await done("completed"); return Response.json({ received: true }); }
         if (error.code === "23505") continue;
+        await done("failed", "Subscription insert failed.");
         return Response.json({ error: "Subscription storage is unavailable." }, { status: 503 });
       }
 
@@ -147,11 +159,13 @@ export async function POST(request: Request) {
         ? update.eq("provider_updated_at", existing.provider_updated_at).lte("provider_updated_at", providerUpdatedAt)
         : update.is("provider_updated_at", null);
       const { data: updated, error } = await update.select("id").maybeSingle();
-      if (error) return Response.json({ error: "Subscription storage is unavailable." }, { status: 503 });
-      if (updated) return Response.json({ received: true });
+      if (error) { await done("failed", "Subscription update failed."); return Response.json({ error: "Subscription storage is unavailable." }, { status: 503 }); }
+      if (updated) { await done("completed"); return Response.json({ received: true }); }
     }
   } catch {
+    await done("failed", "Subscription update threw an error.").catch(() => {});
     return Response.json({ error: "Subscription storage is unavailable." }, { status: 503 });
   }
+  await done("failed", "Subscription compare-and-swap needs retry.").catch(() => {});
   return Response.json({ error: "Subscription update needs retry." }, { status: 503 });
 }

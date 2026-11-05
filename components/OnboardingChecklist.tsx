@@ -2,17 +2,17 @@ import Link from "next/link";
 import { Check, Circle, ArrowRight } from "lucide-react";
 
 export type OnboardingProgress = {
+  domainConnected: boolean;
   firstAudit: boolean;
-  redirects: boolean;
-  llmsAndCapsule: boolean;
-  recovery: boolean;
+  recoveryApproved: boolean;
+  resultVerified: boolean;
 };
 
 const steps = [
-  { key: "firstAudit", title: "Run your first 5-prompt AI Citation & 404 Audit", detail: "Start with a saved audit in your workspace.", href: "/#audit", action: "Run an audit" },
-  { key: "redirects", title: "Export 301 Redirects or Sync with Shopify", detail: "Prepare a verified redirect for your site.", href: "#redirect-export", action: "View redirect tools" },
-  { key: "llmsAndCapsule", title: "Generate your llms.txt & First Citation Capsule", detail: "Create crawler guidance and review citation opportunities.", href: "#llms-heading", action: "Generate llms.txt" },
-  { key: "recovery", title: "Install the 1-Line Real-Time 404 Recovery Pixel (or Slack Webhook)", detail: "Connect recovery tools for one of your domains.", href: "/dashboard/pixel", action: "Set up recovery" },
+  { key: "domainConnected", title: "1. Connect a domain", detail: "A domain is connected when an audit is saved to this workspace.", href: "/#audit", action: "Connect domain" },
+  { key: "firstAudit", title: "2. Run your first audit", detail: "Review buyer-prompt observations and checked URLs.", href: "#audit-history", action: "View audit" },
+  { key: "recoveryApproved", title: "3. Preview & approve a recovery action", detail: "Review the destination and explicitly approve it.", href: "#recovery-command", action: "Review recovery" },
+  { key: "resultVerified", title: "4. Verify the result", detail: "Technical deployment and later AI citation are reported separately.", href: "#overview", action: "View verification" },
 ] as const;
 
 export default function OnboardingChecklist({ progress }: { progress: OnboardingProgress }) {
@@ -20,7 +20,7 @@ export default function OnboardingChecklist({ progress }: { progress: Onboarding
   return (
     <section aria-labelledby="onboarding-title" className="mb-8 rounded-2xl border border-white/10 bg-white/[0.03] p-5 shadow-sm sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div><p className="text-[10px] font-semibold uppercase tracking-[.18em] text-emerald-400">YOUR FIRST 3 MINUTES</p><h2 id="onboarding-title" className="mt-2 text-xl font-semibold text-white">Get your workspace set up</h2><p className="mt-1 text-sm text-slate-400">Complete these steps to get more from Citemend.</p></div>
+        <div><p className="text-[10px] font-semibold uppercase tracking-[.18em] text-emerald-400">GUIDED FIRST AUDIT</p><h2 id="onboarding-title" className="mt-2 text-xl font-semibold text-white">Your first recovery, step by step</h2><p className="mt-1 text-sm text-slate-400">The checklist tracks saved workspace evidence; completing it does not guarantee AI recrawling.</p></div>
         <p className="rounded-full border border-emerald-400/20 bg-emerald-400/5 px-3 py-1.5 text-sm font-semibold tabular-nums text-emerald-300">{completed}/4 complete</p>
       </div>
       <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-label="Onboarding progress" aria-valuemin={0} aria-valuemax={4} aria-valuenow={completed}>

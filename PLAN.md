@@ -780,3 +780,21 @@ Migration 020 is locally applied/validated and the user confirmed it was applied
 - [x] Verify `npx tsc --noEmit`, `npm run lint`, `npm test` (193 tests), and `npm run build` (alternate output directory).
 
 Migration 021 is present in the repository and passed the ordered local PGlite schema/RLS tests. The user confirmed migration 021 was applied to hosted Supabase. Live Shopify operations remain to be verified externally.
+
+### Days 95–120: Evidence Engine, Guided Workspace, Integrations, Forensics & Intelligence Graph (COMPLETED IN CODE)
+
+- [x] Additive migration 022 stores reproducible AI observations with provider/model/prompt provenance, bounded retry/job states, recovery outcomes, and saved crawl-volume usage; migration 023 adds unique webhook delivery logs and hashed, scoped workspace API keys. Migrations 012 and 013 were already occupied in repository history, so these changes use forward-only migration numbers 022 and 023.
+- [x] Save per-prompt probe evidence with audits, permit explicit bounded job-state transitions/retries, and separate production technical deployment verification from later AI citation observations in `/api/verify-fix` and `recovery_outcomes`.
+- [x] Add customer/agency before-and-after evidence diffs to shareable audit reports; show deployment and subsequent citation milestones independently and keep IndexNow's search-engine notification limitation clear.
+- [x] Add SSRF-safe entity audits for homepage, pricing, product/features, and docs/FAQ pages; compare visible prices, plan names, canonical URLs, structured prices, feature claims, and recorded AI answer text with evidence-based copy-ready fixes.
+- [x] Add the 12-workspace dashboard navigation, first-audit progression checklist, SaaS buyer-intent and agency pitch prompt templates, and machine-readable `llms.txt`/structured-data guidance without ranking guarantees.
+- [x] Add owner-scoped bulk redirect CSV/JSON import/export, append-only export logging, API-key create/list/revoke controls with one-time raw key display, signed Lemon Squeezy webhook idempotency/retry tracking, and the six-tier USD/INR roadmap pricing toggle. Keep current Pro/Agency checkout products distinct from planning-only tier ranges.
+- [x] Enforce monthly audit/model/page budgets by tier; persist sitemap scan counts and cap each audit's candidate sitemap pages to the workspace's remaining allowance.
+- [x] Add citation forensics with five issue classes and explicit observable evidence vs diagnostic hypotheses, comparing actual recorded third-party citations through SSRF-safe HTTP and structured-data checks.
+- [x] Add an owner-checked nine-object intelligence graph with chronological objects and relationship edges for observations, publishers, URLs, actions, evidence, and outcomes.
+- [x] Add focused tests for evidence normalization/job retries, milestone separation, public before/after report data, entity conflicts, onboarding progression, API key hashes, bulk interchange, quota decisions, webhook deduplication, all forensic categories, graph timeline/edges, and ordered migration/RLS/type integrity.
+- [x] Verify `npx tsc --noEmit`, `npm run lint`, the full `npm test` suite (202 passed), and `npm run build` (alternate output directory).
+
+Migrations 022 and 023 passed ordered local PGlite schema/type/RLS tests; apply both to hosted Supabase before deploying these features. The USD/INR six-tier figures are roadmap hypotheses, not new Lemon Squeezy products or entitlements. Hosted migration application and live third-party integrations were not performed as part of this repository implementation.
+
+Dashboard follow-up: `AuditAnalysisTools` is now connected to the latest completed/partial owned audit, exposing the entity consistency audit, citation forensics, and intelligence graph controls. The user reported successful migration application; hosted schema state was not independently queried. Provider integrations remain subject to their production credentials and external services.

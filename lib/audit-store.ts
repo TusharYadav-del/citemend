@@ -8,9 +8,13 @@ export async function persistAudit(report: AuditReport, userId?: string, reserva
   if (!userId?.trim()) throw new AuditStorageError("An authenticated Clerk user ID is required to save an audit.");
   let db: ReturnType<typeof createServerDatabase>;
   try { db = createServerDatabase(); } catch { throw new AuditStorageError("Configure the server-only Supabase key and project URL."); }
-  const { data: audit, error } = reservation
+  let created = reservation
     ? await db.from("audits").update({ status: "free_saving" }).eq("id", reservation.id).eq("user_id", userId).eq("status", "free_pending").eq("created_at", reservation.createdAt).select("id,created_at").single()
-    : await db.from("audits").insert({ ...(scheduledId ? { id: scheduledId } : {}), user_id: userId, domain: report.domain, status: "pending", ...(report.competitorDomains?.length ? { competitor_domains: report.competitorDomains } : {}), ...(report.groundTruthPricing ? { ground_truth_pricing: report.groundTruthPricing } : {}) }).select("id,created_at").single();
+    : await db.from("audits").insert({ ...(scheduledId ? { id: scheduledId } : {}), user_id: userId, domain: report.domain, status: "pending", sitemap_url_count: report.sitemapUrlCount, ...(report.competitorDomains?.length ? { competitor_domains: report.competitorDomains } : {}), ...(report.groundTruthPricing ? { ground_truth_pricing: report.groundTruthPricing } : {}) }).select("id,created_at").single();
+  if (!reservation && created.error && ["PGRST204", "42703"].includes(created.error.code) && created.error.message.includes("sitemap_url_count")) {
+    created = await db.from("audits").insert({ ...(scheduledId ? { id: scheduledId } : {}), user_id: userId, domain: report.domain, status: "pending", ...(report.competitorDomains?.length ? { competitor_domains: report.competitorDomains } : {}), ...(report.groundTruthPricing ? { ground_truth_pricing: report.groundTruthPricing } : {}) }).select("id,created_at").single();
+  }
+  const { data: audit, error } = created;
   if (error || !audit) throw new AuditStorageError("Supabase could not create the audit.");
   const broken = report.findings.filter((item) => item.httpStatus === 404);
   try {
@@ -23,8 +27,13 @@ export async function persistAudit(report: AuditReport, userId?: string, reserva
       })));
       if (linkError) throw new Error("Link insert failed.");
     }
-    const updateStatus = (includePrompt: boolean, includeCompetitors: boolean) => {
-      let query = db.from("audits").update({ status: report.status, ...(includePrompt ? { buyer_prompt: report.buyerPrompt } : {}), ...(includeCompetitors && report.competitorDomains?.length ? { competitor_domains: report.competitorDomains } : {}), ...(report.groundTruthPricing ? { ground_truth_pricing: report.groundTruthPricing } : {}), ...(report.shareOfModelScore !== undefined ? { share_of_model_score: report.shareOfModelScore } : {}), ...(report.engineMatrixJson ? { engine_matrix_json: report.engineMatrixJson } : {}) }).eq("id", audit.id).eq("user_id", userId);
+    if (report.observationEvidence?.length) {
+      const observations = report.observationEvidence.map(item => ({ audit_id: audit.id, domain: report.domain, prompt_query: item.prompt, prompt_version: "v1", provider: item.provider, model_name: item.model, search_method: "live-citation-probe", locale: "en-US", raw_answer: item.answer, extracted_urls_json: item.urls, sample_size: 1, observation_confidence: null, job_status: "completed", retry_count: 0 }));
+      const { error: evidenceError } = await db.from("ai_observation_evidence").insert(observations);
+      if (evidenceError) throw new Error("Observation evidence insert failed.");
+    }
+    const updateStatus = (includePrompt: boolean, includeCompetitors: boolean, includeCrawl = true) => {
+      let query = db.from("audits").update({ status: report.status, ...(includeCrawl ? { sitemap_url_count: report.sitemapUrlCount } : {}), ...(includePrompt ? { buyer_prompt: report.buyerPrompt } : {}), ...(includeCompetitors && report.competitorDomains?.length ? { competitor_domains: report.competitorDomains } : {}), ...(report.groundTruthPricing ? { ground_truth_pricing: report.groundTruthPricing } : {}), ...(report.shareOfModelScore !== undefined ? { share_of_model_score: report.shareOfModelScore } : {}), ...(report.engineMatrixJson ? { engine_matrix_json: report.engineMatrixJson } : {}) }).eq("id", audit.id).eq("user_id", userId);
       if (reservation) query = query.eq("status", "free_saving").eq("created_at", reservation.createdAt);
       return query;
     };
@@ -35,6 +44,9 @@ export async function persistAudit(report: AuditReport, userId?: string, reserva
     }
     if (statusError && ["PGRST204", "42703"].includes(statusError.code) && statusError.message.includes("competitor_domains")) {
       ({ error: statusError } = await updateStatus(false, false));
+    }
+    if (statusError && ["PGRST204", "42703"].includes(statusError.code) && statusError.message.includes("sitemap_url_count")) {
+      ({ error: statusError } = await updateStatus(false, false, false));
     }
     if (statusError && ["PGRST204", "42703"].includes(statusError.code) && /share_of_model_score|engine_matrix_json/.test(statusError.message)) {
       const fallback = await db.from("audits").update({ status: report.status, ...(report.groundTruthPricing ? { ground_truth_pricing: report.groundTruthPricing } : {}) }).eq("id", audit.id).eq("user_id", userId);

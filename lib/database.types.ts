@@ -1,6 +1,30 @@
 ﻿export type Database = {
   public: {
     Tables: {
+      ai_observation_evidence: {
+        Row: { id: string; audit_id: string; domain: string; prompt_query: string; prompt_version: string; provider: string; model_name: string; search_method: string; locale: string; raw_answer: string; extracted_urls_json: string[]; sample_size: number; observation_confidence: number | null; job_status: string; retry_count: number; error_message: string | null; observed_at: string };
+        Insert: { id?: string; audit_id: string; domain: string; prompt_query: string; prompt_version?: string; provider: string; model_name: string; search_method: string; locale?: string; raw_answer: string; extracted_urls_json?: string[]; sample_size?: number; observation_confidence?: number | null; job_status?: string; retry_count?: number; error_message?: string | null; observed_at?: string };
+        Update: { id?: string; audit_id?: string; domain?: string; prompt_query?: string; prompt_version?: string; provider?: string; model_name?: string; search_method?: string; locale?: string; raw_answer?: string; extracted_urls_json?: string[]; sample_size?: number; observation_confidence?: number | null; job_status?: string; retry_count?: number; error_message?: string | null; observed_at?: string };
+        Relationships: [];
+      };
+      recovery_outcomes: {
+        Row: { id: string; audit_id: string; domain: string; broken_link_id: string | null; canonical_destination_url: string; technical_deployment_verified_at: string | null; ai_citation_observed_at: string | null; evidence_id: string | null; created_at: string };
+        Insert: { id?: string; audit_id: string; domain: string; broken_link_id?: string | null; canonical_destination_url: string; technical_deployment_verified_at?: string | null; ai_citation_observed_at?: string | null; evidence_id?: string | null; created_at?: string };
+        Update: { id?: string; audit_id?: string; domain?: string; broken_link_id?: string | null; canonical_destination_url?: string; technical_deployment_verified_at?: string | null; ai_citation_observed_at?: string | null; evidence_id?: string | null; created_at?: string };
+        Relationships: [];
+      };
+      webhook_events_log: {
+        Row: { id: string; event_id: string; provider: string; event_type: string; delivery_status: string; retry_count: number; last_error: string | null; received_at: string; completed_at: string | null };
+        Insert: { id?: string; event_id: string; provider: string; event_type: string; delivery_status?: string; retry_count?: number; last_error?: string | null; received_at?: string; completed_at?: string | null };
+        Update: { id?: string; event_id?: string; provider?: string; event_type?: string; delivery_status?: string; retry_count?: number; last_error?: string | null; received_at?: string; completed_at?: string | null };
+        Relationships: [];
+      };
+      workspace_api_keys: {
+        Row: { id: string; user_id: string; workspace_domain: string; key_hash: string; key_prefix: string; permissions_json: string[]; rate_limit_per_minute: number; last_used_at: string | null; created_at: string; revoked_at: string | null };
+        Insert: { id?: string; user_id: string; workspace_domain: string; key_hash: string; key_prefix: string; permissions_json?: string[]; rate_limit_per_minute?: number; last_used_at?: string | null; created_at?: string; revoked_at?: string | null };
+        Update: { id?: string; user_id?: string; workspace_domain?: string; key_hash?: string; key_prefix?: string; permissions_json?: string[]; rate_limit_per_minute?: number; last_used_at?: string | null; created_at?: string; revoked_at?: string | null };
+        Relationships: [];
+      };
       action_audit_logs: {
         Row: { id: string; workspace_domain: string; actor_user_id: string; action_type: string; target_url: string | null; previous_state_json: unknown; new_state_json: unknown; safety_check_passed: boolean; created_at: string };
         Insert: { id?: string; workspace_domain: string; actor_user_id: string; action_type: string; target_url?: string | null; previous_state_json?: unknown; new_state_json?: unknown; safety_check_passed: boolean; created_at?: string };
@@ -38,9 +62,9 @@
         Relationships: [];
       };
       audits: {
-        Row: { id: string; user_id: string | null; domain: string; buyer_prompt: string | null; webhook_url: string | null; llms_txt_content: string | null; competitor_domains: string[]; ground_truth_pricing: string | null; indexnow_key: string | null; share_of_model_score: number | null; engine_matrix_json: unknown; agency_brand_name: string | null; agency_logo_url: string | null; agency_primary_color: string | null; agency_cta_url: string | null; agency_cta_text: string | null; status: string; created_at: string };
-        Insert: { id?: string; user_id?: string | null; domain: string; buyer_prompt?: string | null; webhook_url?: string | null; llms_txt_content?: string | null; competitor_domains?: string[]; ground_truth_pricing?: string | null; indexnow_key?: string | null; share_of_model_score?: number | null; engine_matrix_json?: unknown; agency_brand_name?: string | null; agency_logo_url?: string | null; agency_primary_color?: string | null; agency_cta_url?: string | null; agency_cta_text?: string | null; status?: string; created_at?: string };
-        Update: { id?: string; user_id?: string | null; domain?: string; buyer_prompt?: string | null; webhook_url?: string | null; llms_txt_content?: string | null; competitor_domains?: string[]; ground_truth_pricing?: string | null; indexnow_key?: string | null; share_of_model_score?: number | null; engine_matrix_json?: unknown; agency_brand_name?: string | null; agency_logo_url?: string | null; agency_primary_color?: string | null; agency_cta_url?: string | null; agency_cta_text?: string | null; status?: string; created_at?: string };
+        Row: { id: string; user_id: string | null; domain: string; buyer_prompt: string | null; webhook_url: string | null; llms_txt_content: string | null; competitor_domains: string[]; ground_truth_pricing: string | null; indexnow_key: string | null; share_of_model_score: number | null; engine_matrix_json: unknown; agency_brand_name: string | null; agency_logo_url: string | null; agency_primary_color: string | null; agency_cta_url: string | null; agency_cta_text: string | null; sitemap_url_count: number; status: string; created_at: string };
+        Insert: { id?: string; user_id?: string | null; domain: string; buyer_prompt?: string | null; webhook_url?: string | null; llms_txt_content?: string | null; competitor_domains?: string[]; ground_truth_pricing?: string | null; indexnow_key?: string | null; share_of_model_score?: number | null; engine_matrix_json?: unknown; agency_brand_name?: string | null; agency_logo_url?: string | null; agency_primary_color?: string | null; agency_cta_url?: string | null; agency_cta_text?: string | null; sitemap_url_count?: number; status?: string; created_at?: string };
+        Update: { id?: string; user_id?: string | null; domain?: string; buyer_prompt?: string | null; webhook_url?: string | null; llms_txt_content?: string | null; competitor_domains?: string[]; ground_truth_pricing?: string | null; indexnow_key?: string | null; share_of_model_score?: number | null; engine_matrix_json?: unknown; agency_brand_name?: string | null; agency_logo_url?: string | null; agency_primary_color?: string | null; agency_cta_url?: string | null; agency_cta_text?: string | null; sitemap_url_count?: number; status?: string; created_at?: string };
         Relationships: [];
       };
       citation_hijack_opportunities: {

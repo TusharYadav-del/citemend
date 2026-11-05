@@ -1,10 +1,12 @@
 import "server-only";
 import { runCitationProbe, type CitationProbeResult } from "./citation-probe";
 import { extractTextUrls } from "./citation-urls";
-import { checkUrlStatus } from "./seo";
+import { checkUrlStatus, tracePublicRedirects } from "./seo";
 import { publicFetch } from "./public-http";
 import { createServerDatabase } from "./supabase-server";
 import { readRequestJson } from "./read-request-json";
+import { recordObservation } from "./evidence-engine";
+import { assessTechnicalDeployment, observationCitesCanonical } from "./outcome-verifier";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PRIVATE = { "Cache-Control": "private, no-store" };
@@ -15,6 +17,8 @@ type Dependencies = {
   probe?: typeof runCitationProbe;
   fetch?: typeof publicFetch;
   readJson?: typeof readRequestJson;
+  trace?: typeof tracePublicRedirects;
+  record?: typeof recordObservation;
 };
 
 function sameUrl(left: string, right: string) {
@@ -73,10 +77,11 @@ async function pingIndexNow(domain: string, key: string | null, canonicalUrl: st
 export function createVerifyFixHandler(dependencies: Dependencies = {}) {
   const getUserId = dependencies.getUserId ?? (async () => (await (await import("@clerk/nextjs/server")).auth()).userId);
   const database = dependencies.database ?? createServerDatabase;
-  const check = dependencies.check ?? checkUrlStatus;
   const probe = dependencies.probe ?? runCitationProbe;
   const fetcher = dependencies.fetch ?? publicFetch;
   const readJson = dependencies.readJson ?? readRequestJson;
+  const trace = dependencies.trace ?? tracePublicRedirects;
+  const record = dependencies.record ?? recordObservation;
   return async function handle(request: Request): Promise<Response> {
     let userId: string | null;
     try { userId = await getUserId(); } catch { return Response.json({ error: "Authentication is temporarily unavailable." }, { status: 503, headers: PRIVATE }); }
@@ -93,7 +98,7 @@ export function createVerifyFixHandler(dependencies: Dependencies = {}) {
     try {
       const db = database();
       const { data: link, error } = await db.from("broken_links")
-        .select("id,audit_id,cited_url,suggested_redirect,audits!inner(user_id,domain,buyer_prompt,indexnow_key)")
+        .select("id,audit_id,cited_url,suggested_redirect,approval_status,deployed_at,audits!inner(user_id,domain,buyer_prompt,indexnow_key)")
         .eq("id", input.brokenLinkId).eq("audit_id", input.auditId).eq("audits.user_id", userId).maybeSingle();
       if (error) throw error;
       if (!link?.suggested_redirect) return Response.json({ error: "A verified same-domain redirect destination is required before re-verification." }, { status: 404, headers: PRIVATE });
@@ -110,28 +115,51 @@ export function createVerifyFixHandler(dependencies: Dependencies = {}) {
         if (keyError) throw keyError;
       }
 
-      const [sourceStatus, targetStatus] = await Promise.all([
-        check(link.cited_url).catch(() => null), check(target.href).catch(() => null),
-      ]);
+      const [sourceChain, destinationChain] = await Promise.all([trace(link.cited_url).catch(() => null), trace(target.href).catch(() => null)]);
+      const sourceStatus = sourceChain?.status ?? null;
+      const targetStatus = destinationChain?.status ?? null;
+      const { data: activeRule, error: ruleError } = await db.from("redirect_rules").select("id,source_link_id,destination,target_url,active,is_active").eq("source_link_id", link.id).maybeSingle();
+      if (ruleError) throw ruleError;
+      const activeSameRule = !!activeRule && activeRule.source_link_id === link.id && activeRule.active === true && activeRule.is_active === true && (activeRule.destination === target.href || activeRule.target_url === target.href);
+      const deployed = link.approval_status === "deployed" && !!link.deployed_at || activeSameRule;
+      const chainSameHost = !!destinationChain && destinationChain.visitedUrls.every(url => { try { return [domain, `www.${domain}`].includes(new URL(url).hostname); } catch { return false; } });
+      const sourceEndsAtDestination = !!sourceChain && sameUrl(sourceChain.finalUrl, target.href);
+      const noLoops = !!sourceChain && sourceChain.visitedUrls.length <= 6 && new Set(sourceChain.visitedUrls).size === sourceChain.visitedUrls.length;
+      const technicalDeploymentVerified = assessTechnicalDeployment({ approved: deployed, source404: sourceEndsAtDestination, destinationStatus: targetStatus, sameDomain: chainSameHost && [domain, `www.${domain}`].includes(target.hostname), noLoop: noLoops, noConflict: !activeRule || activeSameRule });
+      const technicalVerifiedAt = technicalDeploymentVerified ? new Date().toISOString() : null;
+      if (technicalDeploymentVerified) {
+        const outcome = await db.from("recovery_outcomes").upsert({ audit_id: input.auditId, domain, broken_link_id: link.id, canonical_destination_url: target.href, technical_deployment_verified_at: technicalVerifiedAt }, { onConflict: "audit_id,broken_link_id,canonical_destination_url" }).select("id").single();
+        if (outcome.error) throw outcome.error;
+      }
       const indexNow = await pingIndexNow(domain, key, target.href, fetcher);
       let probeCitedLiveUrl = false;
       let probeWarning: string | null = null;
       try {
         const result: CitationProbeResult = await probe(domain, audit.buyer_prompt);
         const cited = [...new Set([...result.citedUrls, ...extractTextUrls(result.text)])];
-        probeCitedLiveUrl = cited.some(url => sameUrl(url, target.href));
+        const evidence = await record({ audit_id: input.auditId, domain, prompt_query: audit.buyer_prompt, provider: result.providerUsed, model_name: "configured-citation-probe", search_method: "verify-fix-follow-up", locale: "en-US", raw_answer: result.text, extracted_urls: cited, job_status: "completed" });
+        const observationAt = new Date().toISOString();
+        probeCitedLiveUrl = technicalDeploymentVerified && observationCitesCanonical({ technicalVerified: true, observationAt, technicalVerifiedAt: technicalVerifiedAt!, extractedUrls: cited, canonicalUrl: target.href });
+        if (probeCitedLiveUrl) {
+          const updateOutcome = await db.from("recovery_outcomes").update({ ai_citation_observed_at: observationAt, evidence_id: evidence.id }).eq("audit_id", input.auditId).eq("broken_link_id", link.id).eq("canonical_destination_url", target.href);
+          if (updateOutcome.error) throw updateOutcome.error;
+        }
       } catch { probeWarning = "The AI citation re-check was unavailable; a successful HTTP check can still verify the redirect."; }
-      const redirectResolves = sourceStatus !== null && sourceStatus >= 200 && sourceStatus < 300;
-      const verified = probeCitedLiveUrl || redirectResolves;
-      if (verified) {
+      const redirectResolves = technicalDeploymentVerified;
+      const verified = technicalDeploymentVerified;
+      if (probeCitedLiveUrl) {
         const { error: updateError } = await db.from("citation_hijack_opportunities").update({ verification_status: "verified_won", last_checked_at: new Date().toISOString() })
           .eq("audit_id", input.auditId).eq("matched_user_live_url", target.href);
         if (updateError && updateError.code !== "42P01") throw updateError;
       }
       return Response.json({
-        verified, badge: verified ? "✅ Verified Recovered in AI Search" : null,
+        verified,
+        technical_deployment_verified: technicalDeploymentVerified,
+        ai_citation_observed: probeCitedLiveUrl,
+        milestones: { technicalDeploymentVerified, aiCitationObserved: probeCitedLiveUrl },
+        badge: technicalDeploymentVerified ? "✅ Technical deployment verified" : null,
         http: { formerUrlStatus: sourceStatus, canonicalUrlStatus: targetStatus, redirectResolves },
-        probeCitedLiveUrl, indexNow, ...(probeWarning ? { warning: probeWarning } : {}),
+        probeCitedLiveUrl, indexNow, indexNowNote: "IndexNow notifies participating search engines such as Bing; it does not force immediate LLM recrawls.", aiCitationNote: probeCitedLiveUrl ? "A subsequent recorded observation cited the canonical destination." : "No subsequent AI citation was observed in this probe. Technical deployment is reported separately.", ...(probeWarning ? { warning: probeWarning } : {}),
       }, { headers: PRIVATE });
     } catch {
       return Response.json({ error: "Fix verification is temporarily unavailable. Please retry." }, { status: 503, headers: PRIVATE });

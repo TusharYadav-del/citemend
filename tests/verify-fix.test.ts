@@ -12,7 +12,9 @@ function databaseSpy() {
   const db = { from(table: string) {
     const query = {
       select() { return query; }, eq() { return query; },
-      maybeSingle: async () => ({ data: { id: brokenLinkId, audit_id: auditId, cited_url: "https://acme.com/old", suggested_redirect: "https://acme.com/new", audits: { user_id: "user-1", domain: "acme.com", buyer_prompt: "best acme product", indexnow_key: key } }, error: null }),
+      maybeSingle: async () => table === "broken_links" ? ({ data: { id: brokenLinkId, audit_id: auditId, cited_url: "https://acme.com/old", suggested_redirect: "https://acme.com/new", approval_status: "deployed", deployed_at: "2026-11-01T00:00:00Z", audits: { user_id: "user-1", domain: "acme.com", buyer_prompt: "best acme product", indexnow_key: key } }, error: null }) : ({ data: null, error: null }),
+      upsert(value: unknown) { updates.push({ table, value }); return query; },
+      single: async () => ({ data: { id: "outcome-1" }, error: null }),
       update(value: unknown) { updates.push({ table, value }); return query; },
       then(resolve: (value: unknown) => unknown) { return Promise.resolve({ error: null }).then(resolve); },
     };
@@ -28,6 +30,8 @@ test("verifies owner fix, checks citations, and submits IndexNow after key-file 
   const requests: string[] = [];
   const handler = createVerifyFixHandler({
     getUserId: async () => "user-1", database: () => db,
+    trace: async () => ({ status: 200, finalUrl: "https://acme.com/new", visitedUrls: ["https://acme.com/old", "https://acme.com/new"] }),
+    record: async () => ({ id: "observation-1", audit_id: auditId, domain: "acme.com", prompt_query: "best acme product", provider: "groq-test", model_name: "configured-citation-probe", job_status: "completed", retry_count: 0, observed_at: new Date().toISOString() }),
     check: async url => url.endsWith("/old") ? 200 : 200,
     probe: async () => ({ text: "Acme: https://acme.com/new", citedUrls: ["https://acme.com/new"], providerUsed: "groq-test", searchGrounding: { status: "available", sources: [] }, warnings: [] }),
     fetch: async (url, init) => { requests.push(`${init?.method ?? "GET"} ${String(url)}`); return new Response(String(url).endsWith(`${key}.txt`) ? key : null, { status: 200 }); },
@@ -36,7 +40,9 @@ test("verifies owner fix, checks citations, and submits IndexNow after key-file 
   const result = await response.json();
   assert.equal(response.status, 200);
   assert.equal(result.verified, true);
-  assert.equal(result.badge, "✅ Verified Recovered in AI Search");
+  assert.equal(result.badge, "✅ Technical deployment verified");
+  assert.equal(result.technical_deployment_verified, true);
+  assert.equal(result.ai_citation_observed, true);
   assert.equal(result.indexNow.status, "submitted");
   assert.ok(requests.includes("POST https://api.indexnow.org/indexnow"));
   assert.ok(updates.some(row => row.table === "citation_hijack_opportunities"));
@@ -47,6 +53,7 @@ test("reports a missing IndexNow key file without blocking successful fix verifi
   let indexNowCalls = 0;
   const handler = createVerifyFixHandler({
     getUserId: async () => "user-1", database: () => db,
+    trace: async () => ({ status: 200, finalUrl: "https://acme.com/new", visitedUrls: ["https://acme.com/old", "https://acme.com/new"] }),
     check: async () => 200,
     probe: async () => { throw new Error("provider down"); },
     fetch: async () => { indexNowCalls++; return new Response("missing", { status: 404 }); },

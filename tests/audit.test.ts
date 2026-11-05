@@ -230,6 +230,7 @@ test("POST runs real SDK/parser/checker/store code against controlled HTTP fixtu
     if (url.startsWith("https://example.com/")) return new Response(null, { status: url.endsWith("setup-old") ? 404 : 200 });
     if (url.startsWith("https://db.example.com/rest/v1/audits") && method === "POST") { persistedAudit = JSON.parse(String(options?.body)); insertCount++; return Response.json({ id, created_at: "2026-10-30T00:00:00Z" }); }
     if (url.startsWith("https://db.example.com/rest/v1/broken_links")) { persistedLinks = JSON.parse(String(options?.body)); return new Response(null, { status: 201 }); }
+    if (url.startsWith("https://db.example.com/rest/v1/ai_observation_evidence")) return new Response(null, { status: 201 });
     if (url.startsWith("https://db.example.com/rest/v1/audits") && method === "GET") return Response.json({ id, user_id: "user_test_123", status: "completed", broken_links: [{ id: "child-id" }] });
     if (url.startsWith("https://db.example.com/rest/v1/audits") && method === "PATCH") return new Response(null, { status: 204 });
     throw new Error(`Unexpected fixture request: ${method} ${url}`);

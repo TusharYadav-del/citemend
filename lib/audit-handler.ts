@@ -8,6 +8,7 @@ import { findCompetitor404Opportunities } from "./hijacker";
 import { inspectThirdPartyCitations } from "./listicle-crawler";
 import { detectEntityPricingTruth } from "./entity-truth";
 import { stampAgencyProfile } from "./agency-store";
+import { getAuditQuota } from "./audit-quota";
 
 type AuditPostDependencies = {
   isConfigured?: () => boolean;
@@ -83,6 +84,13 @@ export function createAuditPostHandler(dependencies: AuditPostDependencies = {})
     try { isPro = await hasPro(userId); }
     catch { return Response.json({ error: "Subscription status is temporarily unavailable." }, { status: 503 }); }
 
+    let quota: Awaited<ReturnType<typeof getAuditQuota>> | null = null;
+    if (!dependencies.hasPro) {
+      try { quota = await getAuditQuota(userId, validateAuditInput(input).buyerPrompts?.length ?? 1); }
+      catch { return Response.json({ error: "Tier usage is temporarily unavailable. Apply the current evidence and quota migration, then retry." }, { status: 503 }); }
+      if (!quota.allowed) return Response.json({ error: `This audit would exceed the ${quota.tier.replaceAll("_", " ")} ${quota.reason.replaceAll("_", " ")} quota.`, code: "TIER_QUOTA_EXCEEDED", tier: quota.tier, quota: quota.reason }, { status: 429 });
+    }
+
     let reservation: { id: string; createdAt: string } | undefined;
     if (!isPro) {
       if (process.env.AUDIT_PERSISTENCE_MODE === "local") {
@@ -101,9 +109,7 @@ export function createAuditPostHandler(dependencies: AuditPostDependencies = {})
     }
 
     try {
-      const report = await execute(input, reservation
-        ? { save: (value, owner) => persistAudit(value, owner, reservation) }
-        : {}, userId);
+      const report = await execute(input, { ...(quota ? { sitemapPageLimit: quota.maxSitemapPages } : {}), ...(reservation ? { save: (value, owner) => persistAudit(value, owner, reservation) } : {}) }, userId);
       let hijackResult: Awaited<ReturnType<typeof findCompetitor404Opportunities>> | null = null;
       let listicleResult: Awaited<ReturnType<typeof inspectThirdPartyCitations>> | null = null;
       let entityTruthResult: Awaited<ReturnType<typeof detectEntityPricingTruth>> | null = null;

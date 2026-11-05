@@ -24,6 +24,7 @@ export type AuditReport = {
   engineMatrixJson?: ReturnType<typeof buildEngineMatrix>["rows"];
   shareOfModelScore?: number | null;
   findings: AuditFinding[]; warnings: string[]; status: "completed" | "partial";
+  observationEvidence?: { prompt: string; answer: string; urls: string[]; provider: string; model: string }[];
 };
 export type AuditDependencies = {
   probe: (domain: string, buyerPrompt: string) => Promise<ProbeResult>; sitemap: typeof fetchSitemapUrls; check: typeof checkUrlStatus; verify?: typeof verifyUrl;
@@ -32,6 +33,7 @@ export type AuditDependencies = {
   saveGap: typeof saveAuditCitationGap;
   resolve: (url: string) => Promise<string | null>;
   save: (report: AuditReport, userId?: string) => Promise<{ id: string; createdAt: string }>;
+  sitemapPageLimit?: number;
 };
 
 export function validateAuditInput(input: unknown): { domain: string; buyerPrompt: string; buyerPrompts?: string[]; competitorDomains?: string[]; groundTruthPricing?: string } {
@@ -146,7 +148,7 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
   const { domain, buyerPrompt, buyerPrompts = [buyerPrompt], competitorDomains: providedCompetitors, groundTruthPricing } = validateAuditInput(input);
   const deps: AuditDependencies = { probe: runCitationProbe, sitemap: fetchSitemapUrls, check: checkUrlStatus, resolve: resolveGroundingRedirect, save: persistAudit, saveGap: saveAuditCitationGap, semantic: process.env.GEMINI_API_KEY ? matchSitemapUrls : null, synthesize: overrides.probe && overrides.probe !== runCitationProbe ? null : synthesizeEngineProfiles, ...overrides };
   const [sitemapResults, probeResults] = await Promise.all([
-    Promise.allSettled([deps.sitemap(domain)]),
+    Promise.allSettled([deps.sitemap(domain).then(urls => urls.slice(0, Math.max(0, deps.sitemapPageLimit ?? 20_000)))]),
     Promise.allSettled(buyerPrompts.map((prompt) => deps.probe(domain, prompt))),
   ]);
   const sitemapResult = sitemapResults[0];
@@ -274,7 +276,8 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
       return { prompt, citations, responseText: result.status === "fulfilled" ? result.value.text : "", available: result.status === "fulfilled", profiles };
     }),
   });
-  const report: AuditReport = { domain, buyerPrompt, ...(buyerPrompts.length > 1 ? { buyerPrompts } : {}), competitorDomains, ...(groundTruthPricing ? { groundTruthPricing } : {}), visibilityScore, shareOfModelScore: engineMatrix.shareOfModelScore, engineMatrixJson: engineMatrix.rows, generatedText: probe.text, groundingMetadata, providerUsed: "providerUsed" in probe ? probe.providerUsed : "gemini", ...("searchGrounding" in probe ? { searchGrounding: probe.searchGrounding } : {}), extractedUrls: allUrls, sitemapUrlCount: sitemap.length, findings, warnings: [...new Set(warnings)], status: warnings.length ? "partial" : "completed" };
+  const providerName = "providerUsed" in probe ? probe.providerUsed : "gemini";
+  const report: AuditReport = { domain, buyerPrompt, ...(buyerPrompts.length > 1 ? { buyerPrompts } : {}), competitorDomains, ...(groundTruthPricing ? { groundTruthPricing } : {}), visibilityScore, shareOfModelScore: engineMatrix.shareOfModelScore, engineMatrixJson: engineMatrix.rows, generatedText: probe.text, groundingMetadata, providerUsed: providerName, ...("searchGrounding" in probe ? { searchGrounding: probe.searchGrounding } : {}), extractedUrls: allUrls, sitemapUrlCount: sitemap.length, findings, warnings: [...new Set(warnings)], status: warnings.length ? "partial" : "completed", observationEvidence: probeResults.flatMap((result, index) => result.status === "fulfilled" ? [{ prompt: buyerPrompts[index], answer: result.value.text, urls: extractCitationUrls(result.value), provider: "providerUsed" in result.value ? result.value.providerUsed : "gemini", model: "modelName" in result.value && typeof result.value.modelName === "string" ? result.value.modelName : "provider-default" }] : []) };
   const gap = detectCitationGap(domain, buyerPrompt, probe.text, report.providerUsed ?? "unknown");
   if (gap) report.citationGap = gap;
   if (process.env.AUDIT_PERSISTENCE_MODE === "local") {

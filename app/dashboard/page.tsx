@@ -28,12 +28,17 @@ import { Sidebar } from "@/components/ui/sidebar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SparklineChart } from "@/components/ui/sparkline-chart";
 import { RecoveryApprovalControls } from "@/components/RecoveryApprovalControls";
+import AuditTemplates from "@/components/AuditTemplates";
+import { getOnboardingProgress } from "@/lib/onboarding";
+import WorkspaceApiKeys from "@/components/WorkspaceApiKeys";
+import BulkRedirectManager from "@/components/BulkRedirectManager";
+import AuditAnalysisTools from "@/components/AuditAnalysisTools";
 
 function HistoryLoading() {
   return <main className="min-h-screen bg-[#07090E] px-5 py-10 text-white sm:px-8 sm:py-14" role="status" aria-label="Loading your command center"><div className="h-8 w-52 animate-pulse rounded-lg bg-white/10" /><div className="mt-8 grid gap-4 sm:grid-cols-4">{[0, 1, 2, 3].map((item) => <div key={item} className="h-32 animate-pulse rounded-2xl bg-white/[0.04]" />)}</div><span className="sr-only">Loading your audit history...</span></main>;
 }
 
-function MetricCards({ audits, rescued }: { audits: UserAuditHistoryItem[]; rescued: number | null }) {
+function MetricCards({ audits, rescued, deployments, citations, activeWorkspaces }: { audits: UserAuditHistoryItem[]; rescued: number | null; deployments: number | null; citations: number | null; activeWorkspaces: number }) {
   const metrics = historyMetrics(audits);
   const health = audits.length ? Math.max(0, 100 - metrics.active404s) : null;
   const verifiedScores = audits.filter(audit => hasVerifiedMatrix(audit.engine_matrix_json) && typeof audit.share_of_model_score === "number");
@@ -46,7 +51,8 @@ function MetricCards({ audits, rescued }: { audits: UserAuditHistoryItem[]; resc
     { label: "AI VISITORS RESCUED (30D)", value: rescued ?? "—", detail: rescued === null ? "Rescue telemetry unavailable" : `$${(rescued * 15).toLocaleString()} estimated pipeline at $15 per click` },
     { label: "SHARE OF MODEL (SoM %)", value: verifiedScores.length ? `${Math.round(verifiedScores.reduce((sum, audit) => sum + (audit.share_of_model_score ?? 0), 0) / verifiedScores.length)}%` : "—", detail: comparison ? `Latest audit: rank #${comparison.rank} of ${comparison.participants}; ${comparison.topCompetitor} cited in ${comparison.topCompetitorSlots} of ${comparison.totalSlots} modeled slots. Competitor URLs are not live-verified.` : "Modeled profiles; older results require a new audit" },
   ];
-  return <section aria-label="Live telemetry" className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map((card) => <MetricCard key={card.label} label={card.label} value={typeof card.value === "number" ? card.value.toLocaleString() : card.value} detail={card.detail} icon={card.icon} />)}</section>;
+  const northStar = deployments === null ? "—" : (deployments / Math.max(activeWorkspaces, 1)).toFixed(2);
+  return <><section aria-label="Live telemetry" className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map((card) => <MetricCard key={card.label} label={card.label} value={typeof card.value === "number" ? card.value.toLocaleString() : card.value} detail={card.detail} icon={card.icon} />)}</section><section aria-label="Verified AI Search Recoveries per Active Workspace" className="mb-6 rounded-2xl border border-white/10 bg-white/[0.03] p-5"><h2 className="text-sm font-semibold text-white">Verified AI Search Recoveries per Active Workspace</h2><p className="mt-1 text-xs text-slate-400">Evidence milestones shown separately; an HTTP deployment does not imply an AI citation.</p><div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><MetricCard label="Recoveries / Active Workspace" value={northStar} detail={`${activeWorkspaces} owned domain${activeWorkspaces === 1 ? "" : "s"}; technical deployments divided by workspaces`} /><MetricCard label="Technical Deployments Verified" value={deployments === null ? "—" : deployments.toLocaleString()} detail="Production redirect and destination checks passed" /><MetricCard label="Subsequent AI Citations Observed" value={citations === null ? "—" : citations.toLocaleString()} detail="A later saved observation cited the canonical URL" /><MetricCard label="Rescued Pixel Visits (30D)" value={rescued === null ? "—" : rescued.toLocaleString()} detail="Live rescue telemetry; $15/click pipeline is an estimate" /></div></section></>;
 }
 
 function HistoryUnavailable() {
@@ -114,6 +120,8 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
   let activeRules = new Set<string>();
   let syncedLinks: string[] = [];
   let rescued: number | null = null;
+  let deploymentCount: number | null = null;
+  let citationCount: number | null = null;
   try {
     const domains = [...new Set(audits.map(audit => audit.domain))];
     if (!domains.length) rescued = 0;
@@ -125,11 +133,19 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
   let exportRules: { source_path: string; target_url: string }[] = [];
   let opportunities: { id: string; audit_id: string | null; domain: string; opportunity_type: string; prompt_query: string; target_url: string; dead_competitor_url: string | null; competitor_domain: string | null; http_status: number | null; matched_user_live_url: string | null; similarity_score: number | null; contact_email_or_link: string | null; outreach_draft: string | null; corrective_schema_json: string | null; verification_status: string | null; lifecycle_stage: "discovered" | "reviewed" | "contacted" | "replied" | "link_updated" | "ai_citation_observed"; relevance_score: number; buyer_intent_score: number; citation_evidence_score: number; replacement_quality_score: number; composite_priority_score: number }[] = [];
   let actionLogs: { id: string; workspace_domain: string; actor_user_id: string; action_type: string; target_url: string | null; safety_check_passed: boolean; created_at: string }[] = [];
-  let onboarding: OnboardingProgress = { firstAudit: audits.some((audit) => ["completed", "partial"].includes(audit.status)), redirects: false, llmsAndCapsule: false, recovery: false };
+  let onboarding: OnboardingProgress = getOnboardingProgress({ ownedDomains: allDomains.length, savedAudit: audits.some((audit) => ["completed", "partial"].includes(audit.status)), approvedRecovery: audits.some(audit => audit.broken_links.some(link => ["approved", "deployed"].includes(link.approval_status))), technicalDeploymentVerified: false });
   try {
     const db = createServerDatabase();
     const domains = [...new Set(audits.map((audit) => audit.domain))];
     const auditIds = audits.map(audit => audit.id);
+    if (auditIds.length) {
+      const outcomes = await db.from("recovery_outcomes").select("technical_deployment_verified_at,ai_citation_observed_at").in("audit_id", auditIds);
+      if (!outcomes.error) {
+        deploymentCount = (outcomes.data ?? []).filter(row => row.technical_deployment_verified_at).length;
+        citationCount = (outcomes.data ?? []).filter(row => row.ai_citation_observed_at).length;
+        onboarding.resultVerified = deploymentCount > 0;
+      }
+    } else { deploymentCount = 0; citationCount = 0; }
     const [rulesResult, cmsResult, llmsResult, webhookResult, eventResult, opportunityResult, actionLogResult] = await Promise.all([
       db.from("redirect_rules").select("source_host,source_path,target_url,synced_to_cms,source_link_id").eq("user_id", userId).eq("active", true).eq("is_active", true).limit(500),
       db.from("cms_connections").select("id").eq("user_id", userId).eq("platform", "shopify").limit(1),
@@ -161,27 +177,30 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
     });
     onboarding = {
       ...onboarding,
-      redirects: rules.length > 0 || (cmsResult.data?.length ?? 0) > 0,
-      llmsAndCapsule: (llmsResult.data?.length ?? 0) > 0 && gaps.size > 0,
-      recovery: (eventResult.data?.length ?? 0) > 0 || (webhookResult.data?.length ?? 0) > 0,
+      ...getOnboardingProgress({ ownedDomains: domains.length, savedAudit: audits.some(audit => ["completed", "partial"].includes(audit.status)), approvedRecovery: audits.some(audit => audit.broken_links.some(link => ["approved", "deployed"].includes(link.approval_status))), technicalDeploymentVerified: onboarding.resultVerified }),
     };
   } catch {}
 
   return (
     <main className="min-h-screen bg-[#07090E] text-slate-100">
       <div className="mx-auto flex min-h-screen max-w-[1600px]">
-      <Sidebar items={[{ label: "Overview", href: "/dashboard#overview", active: true }, { label: "Citation Monitoring", href: "/dashboard#audit-history" }, { label: "Broken Citation 404s", href: "/dashboard#recovery-command" }, { label: "Competitor Hijack", href: "/dashboard#recovery-command" }, { label: "Listicles & Reddit", href: "/dashboard#recovery-command" }, { label: "404 Interceptor Pixel", href: "/dashboard/pixel" }, { label: "Capsules & llms.txt", href: "/dashboard#llms-txt-generator" }, { label: "Entity Truth & Schema", href: "/dashboard#recovery-command" }, { label: "Redirect Sync", href: "/dashboard#redirect-export" }, { label: "Reports & White-Label", href: "/dashboard#audit-history" }, { label: "Settings & Billing", href: "/dashboard#settings" }]} />
+      <Sidebar items={[{ label: "Overview", href: "/dashboard#overview", active: true }, { label: "AI Scanner", href: "/dashboard#ai-scanner" }, { label: "Recovery Center", href: "/dashboard#recovery-command" }, { label: "Traffic Interceptor", href: "/dashboard/pixel" }, { label: "Competitor Intelligence", href: "/dashboard#competitor-intelligence" }, { label: "Outreach", href: "/dashboard#outreach" }, { label: "GEO Optimizer", href: "/dashboard#geo-optimizer" }, { label: "AI Visibility", href: "/dashboard#ai-visibility" }, { label: "Reports", href: "/dashboard#audit-history" }, { label: "Automations", href: "/dashboard#automations" }, { label: "Workspaces", href: "/dashboard#workspaces" }, { label: "Billing", href: "/dashboard#billing" }]} />
       <div className="min-w-0 flex-1 px-5 py-8 sm:px-8 sm:py-10">
       <div id="overview"><PageHeader eyebrow={`Live telemetry · ${audits.length} saved scans`} title="Command Center" description="Monitor citations, recover links, and pursue hijack opportunities." actions={<><Link href="/" className="rounded-full px-3 py-2 text-xs font-medium text-slate-400 hover:text-white">Public site</Link><DomainSwitcher domains={allDomains} selected={selectedDomain} /><RedirectSyncButton domains={[...new Set(audits.map(audit => audit.domain))]} /><RedirectExportDrawer rules={exportRules} /><Link href="/dashboard/pixel" className="rounded-lg border border-white/10 px-3 py-2 text-sm font-medium text-emerald-300 hover:bg-white/5">Pixel &amp; traffic</Link><Link href="/#audit" className="rounded-lg bg-emerald-300 px-3 py-2 text-sm font-semibold text-[#07110d]">Run live audit</Link><CheckoutButton /><UserButton /></>} /></div>
       <OnboardingChecklist progress={onboarding} />
-      <MetricCards audits={audits} rescued={rescued} />
+      <AuditTemplates />
+      <MetricCards audits={audits} rescued={rescued} deployments={deploymentCount} citations={citationCount} activeWorkspaces={new Set(audits.map(audit => audit.domain)).size} />
       {latestReport && <section aria-label="Quick tools" className="mb-6 rounded-xl border border-white/10 bg-white/[0.03] p-4"><h2 className="text-sm font-semibold text-white">Quick Tools</h2><a href={`/audit/${latestReport.id}?print=1`} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg border border-emerald-400/30 px-3 py-2 text-xs font-semibold text-emerald-300">Export Report / Save as PDF</a><p className="mt-2 text-xs text-slate-500">Opens the latest report for {latestReport.domain}.</p></section>}
-      <OpportunityCommandCenter opportunities={opportunities} brokenLinks={audits.flatMap(audit => audit.broken_links.map(link => ({ ...link, auditId: audit.id, domain: audit.domain }))) } syncedLinks={syncedLinks} actionLogs={actionLogs} />
-      <WeeklyMonitoring isPro={isPro} />
-      <div id="llms-txt-generator"><LlmsTxtGenerator domains={[...new Set(audits.map((audit) => audit.domain))]} /></div>
+      <AuditAnalysisTools auditId={latestReport?.id} />
+      <div id="ai-scanner" className="mb-3 scroll-mt-8 rounded-xl border border-white/10 bg-white/[0.02] p-4"><h2 className="text-sm font-semibold">AI Scanner</h2><p className="mt-1 text-xs text-slate-400">Run a saved, search-grounded buyer prompt audit and review its recorded sources.</p><Link href="/#audit" className="mt-2 inline-block text-xs text-emerald-300">Start an audit →</Link></div>
+      <div id="recovery-command"><div id="competitor-intelligence"><div id="outreach"><OpportunityCommandCenter opportunities={opportunities} brokenLinks={audits.flatMap(audit => audit.broken_links.map(link => ({ ...link, auditId: audit.id, domain: audit.domain }))) } syncedLinks={syncedLinks} actionLogs={actionLogs} /></div></div></div>
+      <div id="automations"><WeeklyMonitoring isPro={isPro} /></div>
+      <div id="geo-optimizer"><div id="llms-txt-generator"><LlmsTxtGenerator domains={[...new Set(audits.map((audit) => audit.domain))]} /><p className="mt-3 rounded-xl border border-cyan-300/10 bg-cyan-300/[.035] p-4 text-xs leading-5 text-slate-400">llms.txt and structured data are machine-readable conventions that clarify your content. They are not guaranteed ranking or citation levers.</p></div></div>
+      <div id="ai-visibility" className="mb-5 rounded-xl border border-white/10 bg-white/[0.02] p-4"><h2 className="text-sm font-semibold">AI Visibility</h2><p className="mt-1 text-xs text-slate-400">Share of Model and engine profiles appear on each saved audit report. Profile results are modeled from shared grounding sources.</p></div>
+      <BulkRedirectManager domain={selectedDomain || allDomains[0] || ""} auditId={latestReport?.id} />
       <p id="redirect-export" className="mb-6 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-xs leading-5 text-slate-400">Pro users can publish or disable verified 301 suggestions below. Rules become active when the Cloudflare Worker is attached to the domain; edge lookups can retain a change for up to five seconds.</p>
-      <WorkspaceIntegrations key={`workspace-${selectedDomain}`} domains={[...new Set(audits.map(audit => audit.domain))]} />
-      <AgencyProfileSettings key={`agency-${selectedDomain}`} domains={[...new Set(audits.map(audit => audit.domain))]} isPro={isPro} />
+      <div id="workspaces"><WorkspaceIntegrations key={`workspace-${selectedDomain}`} domains={[...new Set(audits.map(audit => audit.domain))]} /><WorkspaceApiKeys domains={[...new Set(audits.map(audit => audit.domain))]} /><AgencyProfileSettings key={`agency-${selectedDomain}`} domains={[...new Set(audits.map(audit => audit.domain))]} isPro={isPro} /></div>
+      <div id="billing" className="mb-5 rounded-xl border border-white/10 bg-white/[0.02] p-4"><h2 className="text-sm font-semibold">Billing</h2><p className="mt-1 text-xs text-slate-400">Manage your current Pro or Agency subscription through the account checkout settings.</p><CheckoutButton /></div>
       {audits.length ? <div id="audit-history" className="space-y-4">{audits.map((audit) => <AuditCard key={audit.id} audit={audit} gap={gaps.get(audit.id)} isPro={isPro} activeRules={activeRules} syncedLinks={syncedLinks} />)}</div> : <EmptyState title="No audits saved yet" description="Run an audit and it will appear here." action={<Link href="/#audit" className="inline-flex rounded-full bg-emerald-300 px-5 py-3 text-sm font-semibold text-[#07110d]">Run an audit</Link>} />}
       </div></div>
     </main>

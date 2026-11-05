@@ -1,0 +1,12 @@
+export type ForensicKind = "discoverability" | "retrieval" | "citation_selection" | "stale_content" | "broken_destination";
+export type ForensicInput = { targetUrl: string; targetStatus: number | null; inSitemap: boolean; robotsAllows: boolean | null; intentSimilarity: number | null; targetHasStructuredProof: boolean; citedThirdPartyHasStructuredProof: boolean; targetUpdatedAt: string | null; citedStatus: number | null; observedCitationUrl: string | null };
+export type ForensicFinding = { kind: ForensicKind; observableEvidence: string[]; diagnosticHypotheses: string[] };
+export function classifyCitationForensics(input: ForensicInput): ForensicFinding[] {
+  const findings: ForensicFinding[] = [];
+  if (!input.inSitemap || input.robotsAllows === false) findings.push({ kind: "discoverability", observableEvidence: [!input.inSitemap ? "Target URL was not found in the checked sitemap." : "Robots policy disallows the target URL."], diagnosticHypotheses: ["Reduced crawler discovery may contribute to fewer retrieval opportunities."] });
+  if (input.intentSimilarity !== null && input.intentSimilarity < 0.55) findings.push({ kind: "retrieval", observableEvidence: [`Measured semantic similarity to buyer prompt was ${input.intentSimilarity.toFixed(2)}.`], diagnosticHypotheses: ["The page may use language that is less aligned with the observed query intent."] });
+  if (input.citedThirdPartyHasStructuredProof && !input.targetHasStructuredProof) findings.push({ kind: "citation_selection", observableEvidence: ["Checked third-party cited page contains structured proof; target page did not."], diagnosticHypotheses: ["Structured proof or external validation may have helped the cited page; selection causality is unknown."] });
+  if (input.targetUpdatedAt && Date.now() - Date.parse(input.targetUpdatedAt) > 365 * 86400000) findings.push({ kind: "stale_content", observableEvidence: [`Target page timestamp is ${input.targetUpdatedAt}.`], diagnosticHypotheses: ["The visible content may be stale; the timestamp alone does not establish factual inaccuracy."] });
+  if (input.targetStatus === 404 || input.targetStatus === 410 || input.citedStatus !== null && input.citedStatus >= 300 && input.citedStatus !== 304) findings.push({ kind: "broken_destination", observableEvidence: [`Target status: ${input.targetStatus ?? "unknown"}; cited source status: ${input.citedStatus ?? "unknown"}.`], diagnosticHypotheses: ["A broken destination can prevent successful retrieval or citation."] });
+  return findings;
+}

@@ -10,10 +10,18 @@ afterEach(() => { globalThis.fetch = oldFetch; process.env = oldEnv; });
 test("signed subscription events cannot replace newer billing state or change its owner", async () => {
   process.env = { ...oldEnv, NEXT_PUBLIC_SUPABASE_URL: "https://db.example.com", SUPABASE_SECRET_KEY: "test-server-key", LEMON_SQUEEZY_WEBHOOK_SECRET: "webhook-secret", LEMON_SQUEEZY_STORE_ID: "123", LEMON_SQUEEZY_PRODUCT_ID: "456" };
   let row: Record<string, unknown> | null = null;
+  const deliveryLogs = new Map<string, Record<string, unknown>>();
   let calls = 0;
   globalThis.fetch = async (input, init) => {
     calls++;
     const method = init?.method ?? "GET";
+    const url = new URL(String(input));
+    if (url.pathname.endsWith("/webhook_events_log")) {
+      const eventId = url.searchParams.get("event_id")?.replace(/^eq\./, "") ?? "";
+      if (method === "GET") return Response.json(deliveryLogs.has(eventId) ? [deliveryLogs.get(eventId)] : []);
+      if (method === "POST") { const value = JSON.parse(String(init?.body)); if (deliveryLogs.has(value.event_id)) return Response.json({ code: "23505", message: "duplicate" }, { status: 409 }); deliveryLogs.set(value.event_id, value); return new Response(null, { status: 201 }); }
+      if (method === "PATCH") { const value = JSON.parse(String(init?.body)); deliveryLogs.set(eventId, { ...deliveryLogs.get(eventId), ...value }); return new Response(null, { status: 204 }); }
+    }
     if (method === "GET") return Response.json(row ? [row] : []);
     if (method === "POST") { row = JSON.parse(String(init?.body)); return new Response(null, { status: 201 }); }
     if (method === "PATCH") {
@@ -35,7 +43,9 @@ test("signed subscription events cannot replace newer billing state or change it
   assert.equal(calls, 0);
   assert.equal((await send("subscription_created", "2026-11-01T10:00:00Z", "active", false)).status, 200);
   assert.equal((await send("subscription_cancelled", "2026-11-01T11:00:00Z", "cancelled", true, null)).status, 200);
-  assert.equal((await send("subscription_created", "2026-11-01T10:00:00Z", "active", false)).status, 200);
+  const duplicate = await send("subscription_created", "2026-11-01T10:00:00Z", "active", false);
+  assert.equal(duplicate.status, 200);
+  assert.equal((await duplicate.json()).duplicate, true);
   assert.equal((row as Record<string, unknown> | null)?.status, "cancelled");
   assert.equal((await send("subscription_updated", "2026-11-01T12:00:00Z", "active", false, null)).status, 200);
   assert.equal((row as Record<string, unknown> | null)?.status, "active");
@@ -46,7 +56,9 @@ test("signed subscription events cannot replace newer billing state or change it
 test("signed Agency variant is accepted for its store and records the actual product and Agency plan", async () => {
   process.env = { ...oldEnv, NEXT_PUBLIC_SUPABASE_URL: "https://db.example.com", SUPABASE_SECRET_KEY: "test-server-key", LEMON_SQUEEZY_WEBHOOK_SECRET: "webhook-secret", LEMON_SQUEEZY_STORE_ID: "123", LEMON_SQUEEZY_PRODUCT_ID: "456", LEMON_SQUEEZY_AGENCY_VARIANT_ID: "2336501" };
   let stored: Record<string, unknown> | undefined;
-  globalThis.fetch = async (_input, init) => {
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith("/webhook_events_log")) return new Response(null, { status: init?.method === "PATCH" ? 204 : 201 });
     if ((init?.method ?? "GET") === "GET") return Response.json([]);
     stored = JSON.parse(String(init?.body));
     return new Response(null, { status: 201 });
