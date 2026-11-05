@@ -1,0 +1,3 @@
+(()=>{"use strict";module.exports=[23637,a=>{a.S([27607,"0020f241fc3ab2527278306caf4cee25ee4c14b23c,f",0,26022,"001cd66dfa3947bd53e70f5e0397e5c456aeb927a3,f"])},27607,a=>{var b=a.i(37936),c=a.i(5246);async function d(){(await (0,c.cookies)()).delete(`__clerk_invalidate_cache_cookie_${Date.now()}`)}(0,a.i(13095).ensureServerEntryExports)([d]),(0,b.registerServerReference)(d,"0020f241fc3ab2527278306caf4cee25ee4c14b23c",null),a.s(["f",0,d])}]})();
+
+//# sourceMappingURL=_169udq7j1c725._.js.map

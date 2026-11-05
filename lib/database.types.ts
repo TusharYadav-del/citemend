@@ -25,6 +25,42 @@
         Update: { id?: string; user_id?: string; workspace_domain?: string; key_hash?: string; key_prefix?: string; permissions_json?: string[]; rate_limit_per_minute?: number; last_used_at?: string | null; created_at?: string; revoked_at?: string | null };
         Relationships: [];
       };
+      autonomous_agent_runs: {
+        Row: { id: string; user_id: string; workspace_domain: string; audit_id: string; opportunity_id: string | null; broken_link_id: string | null; action_type: string; risk_level: string; current_step: string; run_status: string; human_approved_by: string | null; human_approved_at: string | null; evidence_json: Record<string, unknown>; recommendation_json: Record<string, unknown>; result_json: Record<string, unknown>; stage_history_json: unknown[]; rollback_snapshot_json: unknown | null; rollback_completed_at: string | null; error_message: string | null; created_at: string; updated_at: string };
+        Insert: { id?: string; user_id: string; workspace_domain: string; audit_id: string; opportunity_id?: string | null; broken_link_id?: string | null; action_type: string; risk_level: string; current_step?: string; run_status?: string; human_approved_by?: string | null; human_approved_at?: string | null; evidence_json?: Record<string, unknown>; recommendation_json?: Record<string, unknown>; result_json?: Record<string, unknown>; stage_history_json?: unknown[]; rollback_snapshot_json?: unknown | null; rollback_completed_at?: string | null; error_message?: string | null; created_at?: string; updated_at?: string };
+        Update: { id?: string; user_id?: string; workspace_domain?: string; audit_id?: string; opportunity_id?: string | null; broken_link_id?: string | null; action_type?: string; risk_level?: string; current_step?: string; run_status?: string; human_approved_by?: string | null; human_approved_at?: string | null; evidence_json?: Record<string, unknown>; recommendation_json?: Record<string, unknown>; result_json?: Record<string, unknown>; stage_history_json?: unknown[]; rollback_snapshot_json?: unknown | null; rollback_completed_at?: string | null; error_message?: string | null; updated_at?: string };
+        Relationships: [];
+      };
+      ecommerce_catalog_items: {
+        Row: { id: string; user_id: string; workspace_domain: string; platform: string; external_item_id: string; canonical_url: string | null; product_json: Record<string, unknown>; synced_at: string };
+        Insert: { id?: string; user_id: string; workspace_domain: string; platform: string; external_item_id: string; canonical_url?: string | null; product_json?: Record<string, unknown>; synced_at?: string };
+        Update: { id?: string; user_id?: string; workspace_domain?: string; platform?: string; external_item_id?: string; canonical_url?: string | null; product_json?: Record<string, unknown>; synced_at?: string };
+        Relationships: [];
+      };
+      organization_members: {
+        Row: { id: string; organization_id: string; owner_user_id: string; member_user_id: string; role: string; created_at: string };
+        Insert: { id?: string; organization_id: string; owner_user_id: string; member_user_id: string; role?: string; created_at?: string };
+        Update: { id?: string; organization_id?: string; owner_user_id?: string; member_user_id?: string; role?: string; created_at?: string };
+        Relationships: [];
+      };
+      workspace_governance_policies: {
+        Row: { id: string; user_id: string; workspace_domain: string; monthly_scan_quota: number; scans_used_this_month: number; usage_month: string; entity_truth_baseline_json: Record<string, unknown>; created_at: string; updated_at: string };
+        Insert: { id?: string; user_id: string; workspace_domain: string; monthly_scan_quota?: number; scans_used_this_month?: number; usage_month?: string; entity_truth_baseline_json?: Record<string, unknown>; created_at?: string; updated_at?: string };
+        Update: { id?: string; user_id?: string; workspace_domain?: string; monthly_scan_quota?: number; scans_used_this_month?: number; usage_month?: string; entity_truth_baseline_json?: Record<string, unknown>; updated_at?: string };
+        Relationships: [];
+      };
+      scheduled_reports: {
+        Row: { id: string; user_id: string; workspace_domain: string; report_type: string; schedule_at: string; status: string; payload_json: Record<string, unknown>; created_at: string; updated_at: string };
+        Insert: { id?: string; user_id: string; workspace_domain: string; report_type?: string; schedule_at: string; status?: string; payload_json?: Record<string, unknown>; created_at?: string; updated_at?: string };
+        Update: { id?: string; user_id?: string; workspace_domain?: string; report_type?: string; schedule_at?: string; status?: string; payload_json?: Record<string, unknown>; updated_at?: string };
+        Relationships: [];
+      };
+      citation_change_events: {
+        Row: { id: string; user_id: string; workspace_domain: string; audit_id: string | null; previous_observation_id: string | null; current_observation_id: string | null; prompt_query: string; event_type: string; source_url: string; replacement_url: string | null; evidence_json: Record<string, unknown>; detected_at: string };
+        Insert: { id?: string; user_id: string; workspace_domain: string; audit_id?: string | null; previous_observation_id?: string | null; current_observation_id?: string | null; prompt_query: string; event_type: string; source_url: string; replacement_url?: string | null; evidence_json?: Record<string, unknown>; detected_at?: string };
+        Update: { id?: string; user_id?: string; workspace_domain?: string; audit_id?: string | null; previous_observation_id?: string | null; current_observation_id?: string | null; prompt_query?: string; event_type?: string; source_url?: string; replacement_url?: string | null; evidence_json?: Record<string, unknown>; detected_at?: string };
+        Relationships: [];
+      };
       action_audit_logs: {
         Row: { id: string; workspace_domain: string; actor_user_id: string; action_type: string; target_url: string | null; previous_state_json: unknown; new_state_json: unknown; safety_check_passed: boolean; created_at: string };
         Insert: { id?: string; workspace_domain: string; actor_user_id: string; action_type: string; target_url?: string | null; previous_state_json?: unknown; new_state_json?: unknown; safety_check_passed: boolean; created_at?: string };
@@ -125,6 +161,7 @@
     Views: { [key in never]: never };
     Functions: {
       claim_pixel_intercept_quota: { Args: { target_domain: string }; Returns: boolean };
+      reserve_workspace_agent_scan: { Args: { p_user_id: string; p_workspace_domain: string }; Returns: boolean };
       match_sitemap_url: {
         Args: { query_embedding: string; target_domain: string; match_threshold: number; match_count: number; query_model?: string };
         Returns: { url: string; similarity: number }[];

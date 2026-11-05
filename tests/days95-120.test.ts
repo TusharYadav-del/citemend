@@ -9,6 +9,7 @@ import { extractPageEntity, comparePageEntities } from "../lib/entity-consistenc
 import { classifyCitationForensics, compareCitationPageFacts, measureBuyerPromptCoverage, type ForensicInput } from "../lib/citation-forensics";
 import { buildIntelligenceGraph, buildIntelligenceTimeline } from "../lib/intelligence-graph";
 import { planTier } from "../lib/audit-quota";
+import { canExecuteAgentAction, nextAgentStep, rollbackAgentSnapshot, riskForAgentAction } from "../lib/autonomous-agent";
 
 test("observation evidence normalization is reproducible, bounded and records job state", () => {
   const row = normalizeObservation({ audit_id: "audit-1", domain: "Example.com", prompt_query: "  best tools  ", provider: " Groq ", model_name: "model", search_method: "search", raw_answer: "answer", extracted_urls: ["https://example.com/a", "https://example.com/a"], job_status: "failed", retry_count: 2, error_message: "retry me", observed_at: "2026-01-01T00:00:00.000Z" });
@@ -76,4 +77,24 @@ test("nine-object graph builds a chronological evidence timeline", () => {
   assert.ok(timeline.some(item => item.label.includes("Opportunity reviewed: approved source replacement")));
   const graph = buildIntelligenceGraph({ domain: "acme.test", prompt: "best crm", observations: [{ id: "obs-1", prompt_query: "best crm", model_name: "model", extracted_urls_json: ["https://publisher.test/review"], observed_at: "2026-01-01T00:00:00Z" }, { id: "obs-2", prompt_query: "best crm", model_name: "model", extracted_urls_json: ["https://acme.test/guide"], observed_at: "2026-01-03T00:00:00Z" }], opportunities: [{ id: "opp", prompt_query: "best crm", stage_history_json: [{ stage: "reviewed", at: "2026-01-02T00:00:00Z", actor_user_id: "user-1", note: "reviewed" }] }], actions: [{ id: "act", action_type: "approve" }], outcomes: [{ id: "out", technical_deployment_verified_at: "2026-01-03T00:00:00Z" }] });
   assert.ok(graph.edges.some(edge => edge.relation === "cites")); assert.ok(graph.edges.some(edge => edge.relation === "resulted_in")); assert.ok(graph.edges.some(edge => edge.relation === "disappeared")); assert.ok(graph.edges.some(edge => edge.relation === "replaced")); assert.ok(graph.edges.some(edge => edge.from === "Action:opp" && edge.to.startsWith("Action:opp:reviewed:")));
+});
+
+test("high-risk agent actions require explicit approval, safety and a rollback snapshot", () => {
+  const snapshot = { previous_state: { destination: "https://acme.test/old" } };
+  assert.equal(riskForAgentAction("shopify_301_deploy"), "high_risk_external_approval");
+  assert.equal(canExecuteAgentAction({ action: "shopify_301_deploy", humanApproved: false, safetyChecksPassed: true, rollbackSnapshot: snapshot }), false);
+  assert.equal(canExecuteAgentAction({ action: "shopify_301_deploy", humanApproved: true, safetyChecksPassed: false, rollbackSnapshot: snapshot }), false);
+  assert.equal(canExecuteAgentAction({ action: "shopify_301_deploy", humanApproved: true, safetyChecksPassed: true, rollbackSnapshot: null }), false);
+  assert.equal(canExecuteAgentAction({ action: "shopify_301_deploy", humanApproved: true, safetyChecksPassed: true, rollbackSnapshot: snapshot }), true);
+  assert.equal(canExecuteAgentAction({ action: "publisher_outreach_draft", humanApproved: true, safetyChecksPassed: false, rollbackSnapshot: snapshot }), true);
+  assert.equal(canExecuteAgentAction({ action: "capsule_draft", humanApproved: false, safetyChecksPassed: false, rollbackSnapshot: null }), true);
+  assert.equal(nextAgentStep("request_approval", "execute"), true); assert.equal(nextAgentStep("discover", "execute"), false);
+});
+
+test("agent rollback restores a defensive copy of the saved previous state", () => {
+  const snapshot = { previous_state: { baseline: { price: "$49" }, redirect: null } };
+  const restored = rollbackAgentSnapshot(snapshot);
+  assert.deepEqual(restored, { baseline: { price: "$49" }, redirect: null });
+  assert.notEqual(restored, snapshot.previous_state);
+  assert.throws(() => rollbackAgentSnapshot({ previous_state: null }), /must be a JSON object/);
 });

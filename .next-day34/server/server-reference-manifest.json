@@ -1,0 +1,68 @@
+{
+  "node": {
+    "000f2a2c5ef897bc583abc30fdf64dc0ca3d08c093": {
+      "workers": {
+        "app/_not-found/page": {
+          "moduleId": 9101,
+          "async": false
+        },
+        "app/audit/[id]/page": {
+          "moduleId": 23637,
+          "async": false
+        },
+        "app/dashboard/page": {
+          "moduleId": 40520,
+          "async": false
+        },
+        "app/dev/citation-probe/page": {
+          "moduleId": 5576,
+          "async": false
+        },
+        "app/page": {
+          "moduleId": 63731,
+          "async": false
+        }
+      },
+      "filename": "node_modules/@clerk/nextjs/dist/esm/app-router/server-actions.js",
+      "exportedName": "invalidateCacheAction"
+    },
+    "00dfc7f418a58092a5d565e8c8a7ecd6d89fbd5339": {
+      "workers": {
+        "app/_not-found/page": {
+          "moduleId": 9101,
+          "async": false
+        },
+        "app/audit/[id]/page": {
+          "moduleId": 23637,
+          "async": false
+        },
+        "app/dashboard/page": {
+          "moduleId": 40520,
+          "async": false
+        },
+        "app/dev/citation-probe/page": {
+          "moduleId": 5576,
+          "async": false
+        },
+        "app/page": {
+          "moduleId": 63731,
+          "async": false
+        }
+      },
+      "filename": "node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js",
+      "exportedName": "deleteKeylessAction"
+    },
+    "602860edd8dd18ac4d9a004a3ea63dae92857fdaf8": {
+      "workers": {
+        "app/dev/citation-probe/page": {
+          "moduleId": 5576,
+          "async": false
+        }
+      },
+      "filename": "app/dev/citation-probe/actions.ts",
+      "exportedName": "probeCitationAction"
+    }
+  },
+  "edge": {},
+  "encryptionKey": "1DJdLmt/3R0FsPCk38tGo7Nvall6QVihc7VG3aFG+og="
+}

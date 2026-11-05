@@ -1,0 +1,3 @@
+module.exports=[33899,t=>{"use strict";t.s(["f",0,function(t){let e=t.trim(),s=new URL(e.includes("://")?e:`https://${e}`);if(!["http:","https:"].includes(s.protocol)||s.username||s.password||s.port||"/"!==s.pathname||s.search||s.hash||!s.hostname.includes("."))throw Error("Enter a domain only, such as stripe.com, without a page path.");let o=s.hostname.toLowerCase();if(o.length>253||!/^[a-z0-9.-]+$/.test(o)||/\.\d+$/.test(o)||/\.(local|localhost|internal)$/.test(o)||o.split(".").some(t=>!t||t.length>63||t.startsWith("-")||t.endsWith("-")))throw Error("Enter a valid public domain, not a private address or malformed hostname.");return o}])}];
+
+//# sourceMappingURL=lib_audit-dashboard_ts_0hxl92kv_12q5._.js.map

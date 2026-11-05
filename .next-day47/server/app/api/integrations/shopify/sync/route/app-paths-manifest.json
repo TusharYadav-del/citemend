@@ -1,0 +1,3 @@
+{
+  "/api/integrations/shopify/sync/route": "app/api/integrations/shopify/sync/route.js"
+}

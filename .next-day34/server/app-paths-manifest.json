@@ -1,0 +1,20 @@
+{
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/audit/route": "app/api/audit/route.js",
+  "/api/beta-request/route": "app/api/beta-request/route.js",
+  "/api/capsule/route": "app/api/capsule/route.js",
+  "/api/cron/weekly-scan/route": "app/api/cron/weekly-scan/route.js",
+  "/api/lemonsqueezy/checkout/route": "app/api/lemonsqueezy/checkout/route.js",
+  "/api/preview/route": "app/api/preview/route.js",
+  "/api/prompts/suggest/route": "app/api/prompts/suggest/route.js",
+  "/api/redirect-export/route": "app/api/redirect-export/route.js",
+  "/api/redirect-rules/route": "app/api/redirect-rules/route.js",
+  "/api/subscription/status/route": "app/api/subscription/status/route.js",
+  "/api/webhooks/lemonsqueezy/route": "app/api/webhooks/lemonsqueezy/route.js",
+  "/audit/[id]/page": "app/audit/[id]/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/dev/citation-probe/page": "app/dev/citation-probe/page.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/page": "app/page.js"
+}

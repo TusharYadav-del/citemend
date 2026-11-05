@@ -1,0 +1,3 @@
+{
+  "/api/llms-txt/[domain]/route": "app/api/llms-txt/[domain]/route.js"
+}

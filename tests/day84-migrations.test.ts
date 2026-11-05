@@ -5,13 +5,13 @@ import { PGlite } from "@electric-sql/pglite";
 import { vector } from "@electric-sql/pglite-pgvector";
 import ts from "typescript";
 
-test("migrations 001 through 023 apply in order and expose the columns used by the application", async () => {
+test("migrations 001 through 024 apply in order and expose the columns used by the application", async () => {
   const db = new PGlite({ extensions: { vector } });
   try {
     await db.exec("create role anon; create role authenticated; create role service_role bypassrls;");
     const directory = new URL("../supabase/migrations/", import.meta.url);
     const files = (await readdir(directory)).filter(name => /^\d{3}_.+\.sql$/.test(name)).sort();
-    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 23 }, (_, index) => String(index + 1).padStart(3, "0")));
+    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 24 }, (_, index) => String(index + 1).padStart(3, "0")));
     for (const file of files) await db.exec(await readFile(new URL(file, directory), "utf8"));
     const expected: Record<string, string[]> = {
       audits: ["id", "user_id", "domain", "buyer_prompt", "status", "created_at", "competitor_domains", "ground_truth_pricing", "indexnow_key", "share_of_model_score", "engine_matrix_json", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text", "llms_txt_content", "webhook_url", "sitemap_url_count"],
@@ -34,6 +34,12 @@ test("migrations 001 through 023 apply in order and expose the columns used by t
       recovery_outcomes: ["id", "audit_id", "domain", "broken_link_id", "canonical_destination_url", "technical_deployment_verified_at", "ai_citation_observed_at", "evidence_id", "created_at"],
       webhook_events_log: ["id", "event_id", "provider", "event_type", "delivery_status", "retry_count", "last_error", "received_at", "completed_at"],
       workspace_api_keys: ["id", "user_id", "workspace_domain", "key_hash", "key_prefix", "permissions_json", "rate_limit_per_minute", "last_used_at", "created_at", "revoked_at"],
+      autonomous_agent_runs: ["id", "user_id", "workspace_domain", "audit_id", "opportunity_id", "broken_link_id", "action_type", "risk_level", "current_step", "run_status", "human_approved_by", "human_approved_at", "evidence_json", "recommendation_json", "result_json", "stage_history_json", "rollback_snapshot_json", "rollback_completed_at", "error_message", "created_at", "updated_at"],
+      ecommerce_catalog_items: ["id", "user_id", "workspace_domain", "platform", "external_item_id", "canonical_url", "product_json", "synced_at"],
+      organization_members: ["id", "organization_id", "owner_user_id", "member_user_id", "role", "created_at"],
+      workspace_governance_policies: ["id", "user_id", "workspace_domain", "monthly_scan_quota", "scans_used_this_month", "usage_month", "entity_truth_baseline_json", "created_at", "updated_at"],
+      scheduled_reports: ["id", "user_id", "workspace_domain", "report_type", "schedule_at", "status", "payload_json", "created_at", "updated_at"],
+      citation_change_events: ["id", "user_id", "workspace_domain", "audit_id", "previous_observation_id", "current_observation_id", "prompt_query", "event_type", "source_url", "replacement_url", "evidence_json", "detected_at"],
     };
     const result = await db.query<{ table_name: string; column_name: string; is_nullable: string }>("select table_name, column_name, is_nullable from information_schema.columns where table_schema = 'public'");
     for (const [table, columns] of Object.entries(expected)) {
@@ -69,6 +75,12 @@ test("migrations 001 through 023 apply in order and expose the columns used by t
     assert.equal((await db.query<{ allowed: boolean }>("select public.claim_pixel_intercept_quota('unknown.example') as allowed")).rows[0].allowed, false);
     await db.exec("update public.pixel_intercept_quotas set window_started_at = now() - interval '61 seconds'");
     assert.equal((await db.query<{ allowed: boolean }>("select public.claim_pixel_intercept_quota('example.com') as allowed")).rows[0].allowed, true);
+    assert.equal((await db.query<{ allowed: boolean }>("select public.reserve_workspace_agent_scan('user_test','example.com') as allowed")).rows[0].allowed, true);
+    await db.exec("update public.workspace_governance_policies set monthly_scan_quota=1,scans_used_this_month=0 where user_id='user_test' and workspace_domain='example.com'");
+    assert.equal((await db.query<{ allowed: boolean }>("select public.reserve_workspace_agent_scan('user_test','example.com') as allowed")).rows[0].allowed, true);
+    assert.equal((await db.query<{ allowed: boolean }>("select public.reserve_workspace_agent_scan('user_test','example.com') as allowed")).rows[0].allowed, false);
+    await db.exec("update public.workspace_governance_policies set usage_month=(date_trunc('month',now()) - interval '1 month')::date where user_id='user_test' and workspace_domain='example.com'");
+    assert.equal((await db.query<{ allowed: boolean }>("select public.reserve_workspace_agent_scan('user_test','example.com') as allowed")).rows[0].allowed, true);
     await db.exec("insert into public.audits(id,domain,user_id,status) values ('10000000-0000-4000-8000-000000000001','example.com','user_test','completed')");
     await db.exec("insert into public.broken_links(id,audit_id,cited_url,http_status,suggested_redirect,url_state,approval_status,match_confidence) values ('20000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001','https://example.com/pending',404,'https://example.com/new-pending','404','pending_review',94),('20000000-0000-4000-8000-000000000002','10000000-0000-4000-8000-000000000001','https://example.com/approved',404,'https://example.com/new-approved','404','approved',85)");
     await db.exec("insert into public.redirect_rules(user_id,source_link_id,source_host,source_path,destination,active) values ('user_test','20000000-0000-4000-8000-000000000001','example.com','/pending','https://example.com/new-pending',true),('user_test','20000000-0000-4000-8000-000000000002','example.com','/approved','https://example.com/new-approved',true)");
@@ -84,6 +96,7 @@ test("migrations 001 through 023 apply in order and expose the columns used by t
     await assert.rejects(db.query("select * from pixel_intercept_quotas"), /permission denied/);
     await assert.rejects(db.query("select * from action_audit_logs"), /permission denied/);
     await assert.rejects(db.query("select public.claim_pixel_intercept_quota('example.com')"), /permission denied/);
-    for (const table of ["ai_observation_evidence", "recovery_outcomes", "webhook_events_log", "workspace_api_keys"]) await assert.rejects(db.query(`select * from ${table}`), /permission denied/);
+    for (const table of ["ai_observation_evidence", "recovery_outcomes", "webhook_events_log", "workspace_api_keys", "autonomous_agent_runs", "ecommerce_catalog_items", "organization_members", "workspace_governance_policies", "scheduled_reports", "citation_change_events"]) await assert.rejects(db.query(`select * from ${table}`), /permission denied/);
+    await assert.rejects(db.query("select public.reserve_workspace_agent_scan('user_test','example.com')"), /permission denied/);
   } finally { await db.close(); }
 });

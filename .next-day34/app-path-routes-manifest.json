@@ -1,0 +1,20 @@
+{
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/api/audit/route": "/api/audit",
+  "/api/beta-request/route": "/api/beta-request",
+  "/api/capsule/route": "/api/capsule",
+  "/api/cron/weekly-scan/route": "/api/cron/weekly-scan",
+  "/api/lemonsqueezy/checkout/route": "/api/lemonsqueezy/checkout",
+  "/api/preview/route": "/api/preview",
+  "/api/prompts/suggest/route": "/api/prompts/suggest",
+  "/api/redirect-export/route": "/api/redirect-export",
+  "/api/redirect-rules/route": "/api/redirect-rules",
+  "/api/subscription/status/route": "/api/subscription/status",
+  "/api/webhooks/lemonsqueezy/route": "/api/webhooks/lemonsqueezy",
+  "/audit/[id]/page": "/audit/[id]",
+  "/dashboard/page": "/dashboard",
+  "/dev/citation-probe/page": "/dev/citation-probe",
+  "/favicon.ico/route": "/favicon.ico",
+  "/page": "/"
+}

@@ -1,0 +1,76 @@
+{
+  "node": {
+    "0020f241fc3ab2527278306caf4cee25ee4c14b23c": {
+      "workers": {
+        "app/_not-found/page": {
+          "moduleId": 9101,
+          "async": false
+        },
+        "app/audit/[id]/page": {
+          "moduleId": 23637,
+          "async": false
+        },
+        "app/dashboard/page": {
+          "moduleId": 40520,
+          "async": false
+        },
+        "app/dashboard/pixel/page": {
+          "moduleId": 36420,
+          "async": false
+        },
+        "app/dev/citation-probe/page": {
+          "moduleId": 5576,
+          "async": false
+        },
+        "app/page": {
+          "moduleId": 63731,
+          "async": false
+        }
+      },
+      "filename": "node_modules/@clerk/nextjs/dist/esm/app-router/server-actions.js",
+      "exportedName": "invalidateCacheAction"
+    },
+    "001cd66dfa3947bd53e70f5e0397e5c456aeb927a3": {
+      "workers": {
+        "app/_not-found/page": {
+          "moduleId": 9101,
+          "async": false
+        },
+        "app/audit/[id]/page": {
+          "moduleId": 23637,
+          "async": false
+        },
+        "app/dashboard/page": {
+          "moduleId": 40520,
+          "async": false
+        },
+        "app/dashboard/pixel/page": {
+          "moduleId": 36420,
+          "async": false
+        },
+        "app/dev/citation-probe/page": {
+          "moduleId": 5576,
+          "async": false
+        },
+        "app/page": {
+          "moduleId": 63731,
+          "async": false
+        }
+      },
+      "filename": "node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js",
+      "exportedName": "deleteKeylessAction"
+    },
+    "60060ebb3ebffaf8e7fceeee3c71f773565fc48e6c": {
+      "workers": {
+        "app/dev/citation-probe/page": {
+          "moduleId": 5576,
+          "async": false
+        }
+      },
+      "filename": "app/dev/citation-probe/actions.ts",
+      "exportedName": "probeCitationAction"
+    }
+  },
+  "edge": {},
+  "encryptionKey": "SGgrZTSyIHE8Sf2NXYWsN2yjL+ES7O+2+LpI39uhbPo="
+}

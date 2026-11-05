@@ -1,0 +1,35 @@
+{
+  "node": {
+    "0020f241fc3ab2527278306caf4cee25ee4c14b23c": {
+      "workers": {
+        "app/dev/citation-probe/page": {
+          "moduleId": 5576,
+          "async": false
+        }
+      },
+      "exportedName": "invalidateCacheAction",
+      "filename": "node_modules/@clerk/nextjs/dist/esm/app-router/server-actions.js"
+    },
+    "001cd66dfa3947bd53e70f5e0397e5c456aeb927a3": {
+      "workers": {
+        "app/dev/citation-probe/page": {
+          "moduleId": 5576,
+          "async": false
+        }
+      },
+      "exportedName": "deleteKeylessAction",
+      "filename": "node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js"
+    },
+    "60060ebb3ebffaf8e7fceeee3c71f773565fc48e6c": {
+      "workers": {
+        "app/dev/citation-probe/page": {
+          "moduleId": 5576,
+          "async": false
+        }
+      },
+      "exportedName": "probeCitationAction",
+      "filename": "app/dev/citation-probe/actions.ts"
+    }
+  },
+  "edge": {}
+}

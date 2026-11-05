@@ -1,0 +1,245 @@
+{
+  "version": 3,
+  "pages404": true,
+  "appType": "app",
+  "caseSensitive": false,
+  "basePath": "",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "internal": true,
+      "priority": true,
+      "statusCode": 308,
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/citefix-pixel.js",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=300, s-maxage=86400, stale-while-revalidate=604800"
+        }
+      ],
+      "regex": "^/citefix-pixel\\.js(?:/)?$"
+    },
+    {
+      "source": "/api/pixel/resolve",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ],
+      "regex": "^/api/pixel/resolve(?:/)?$"
+    }
+  ],
+  "onMatchHeaders": [],
+  "rewrites": {
+    "beforeFiles": [],
+    "afterFiles": [],
+    "fallback": []
+  },
+  "dynamicRoutes": [
+    {
+      "page": "/api/llms-txt/[domain]",
+      "regex": "^/api/llms\\-txt/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPdomain": "nxtPdomain"
+      },
+      "namedRegex": "^/api/llms\\-txt/(?<nxtPdomain>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/audit/[id]",
+      "regex": "^/audit/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/audit/(?<nxtPid>[^/]+?)(?:/)?$",
+      "prefetchSegmentDataRoutes": [
+        {
+          "destination": "/audit/[id].segments/audit/$d$id$segment",
+          "source": "^/audit/(?<nxtPid>[^/]+?)\\.segments/audit/\\$d\\$id(?<segment>/__PAGE__\\.segment\\.rsc|\\.segment\\.rsc)(?:/)?$",
+          "routeKeys": {
+            "nxtPid": "nxtPid"
+          }
+        }
+      ]
+    }
+  ],
+  "staticRoutes": [
+    {
+      "page": "/",
+      "regex": "^/(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/(?:/)?$"
+    },
+    {
+      "page": "/_global-error",
+      "regex": "^/_global\\-error(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_global\\-error(?:/)?$"
+    },
+    {
+      "page": "/_not-found",
+      "regex": "^/_not\\-found(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/api/audit",
+      "regex": "^/api/audit(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/audit(?:/)?$"
+    },
+    {
+      "page": "/api/beta-request",
+      "regex": "^/api/beta\\-request(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/beta\\-request(?:/)?$"
+    },
+    {
+      "page": "/api/capsule",
+      "regex": "^/api/capsule(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/capsule(?:/)?$"
+    },
+    {
+      "page": "/api/cron/weekly-scan",
+      "regex": "^/api/cron/weekly\\-scan(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/cron/weekly\\-scan(?:/)?$"
+    },
+    {
+      "page": "/api/integrations/shopify/connect",
+      "regex": "^/api/integrations/shopify/connect(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/integrations/shopify/connect(?:/)?$"
+    },
+    {
+      "page": "/api/integrations/shopify/sync",
+      "regex": "^/api/integrations/shopify/sync(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/integrations/shopify/sync(?:/)?$"
+    },
+    {
+      "page": "/api/lemonsqueezy/checkout",
+      "regex": "^/api/lemonsqueezy/checkout(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/lemonsqueezy/checkout(?:/)?$"
+    },
+    {
+      "page": "/api/llms-txt",
+      "regex": "^/api/llms\\-txt(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/llms\\-txt(?:/)?$"
+    },
+    {
+      "page": "/api/pixel/dashboard",
+      "regex": "^/api/pixel/dashboard(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/pixel/dashboard(?:/)?$"
+    },
+    {
+      "page": "/api/pixel/resolve",
+      "regex": "^/api/pixel/resolve(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/pixel/resolve(?:/)?$"
+    },
+    {
+      "page": "/api/preview",
+      "regex": "^/api/preview(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/preview(?:/)?$"
+    },
+    {
+      "page": "/api/prompts/suggest",
+      "regex": "^/api/prompts/suggest(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/prompts/suggest(?:/)?$"
+    },
+    {
+      "page": "/api/redirect-export",
+      "regex": "^/api/redirect\\-export(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/redirect\\-export(?:/)?$"
+    },
+    {
+      "page": "/api/redirect-rules",
+      "regex": "^/api/redirect\\-rules(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/redirect\\-rules(?:/)?$"
+    },
+    {
+      "page": "/api/subscription/status",
+      "regex": "^/api/subscription/status(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/subscription/status(?:/)?$"
+    },
+    {
+      "page": "/api/webhooks/lemonsqueezy",
+      "regex": "^/api/webhooks/lemonsqueezy(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/webhooks/lemonsqueezy(?:/)?$"
+    },
+    {
+      "page": "/dashboard",
+      "regex": "^/dashboard(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard(?:/)?$"
+    },
+    {
+      "page": "/dashboard/pixel",
+      "regex": "^/dashboard/pixel(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/pixel(?:/)?$"
+    },
+    {
+      "page": "/dev/citation-probe",
+      "regex": "^/dev/citation\\-probe(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dev/citation\\-probe(?:/)?$"
+    },
+    {
+      "page": "/favicon.ico",
+      "regex": "^/favicon\\.ico(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/favicon\\.ico(?:/)?$"
+    }
+  ],
+  "dataRoutes": [],
+  "rsc": {
+    "header": "rsc",
+    "varyHeader": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+    "prefetchHeader": "next-router-prefetch",
+    "didPostponeHeader": "x-nextjs-postponed",
+    "contentTypeHeader": "text/x-component",
+    "suffix": ".rsc",
+    "prefetchSegmentHeader": "next-router-segment-prefetch",
+    "prefetchSegmentSuffix": ".segment.rsc",
+    "prefetchSegmentDirSuffix": ".segments",
+    "clientParamParsing": true,
+    "dynamicRSCPrerender": true
+  },
+  "rewriteHeaders": {
+    "pathHeader": "x-nextjs-rewritten-path",
+    "queryHeader": "x-nextjs-rewritten-query"
+  },
+  "ppr": {
+    "chain": {
+      "headers": {
+        "next-resume": "1"
+      }
+    }
+  }
+}

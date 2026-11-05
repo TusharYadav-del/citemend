@@ -806,3 +806,6 @@ Dashboard follow-up: `AuditAnalysisTools` is now connected to the latest complet
 - [x] Build the nine-object tenant-scoped timeline with observation evidence, publisher/URL edges, opportunity stage-history actions, verified outcomes, and evidence-backed citation appearance/disappearance/replacement events across sequential observations for the same prompt.
 - [x] Test all five forensic classes and evidence/hypothesis separation, page fact comparisons, lexical coverage labeling, nine graph object types, source replacement/disappearance, and timestamped action history.
 - [x] Verify `npx tsc --noEmit`, `npm run lint`, `npm test` (202 passed), and `npm run build` (alternate output directory).
+## Days 121–130 — Month 7 Controlled Autonomous Recovery Agents
+
+**Status: Complete.** The additive scale migration was applied successfully, autonomous agent runs now enforce action risk and human approval gates, rollback snapshots are supported, and the dashboard queue exposes run evidence and controls. The implementation and focused/full test suites were completed. Offline font configuration was updated to remove `next/font/google` network fetching; production build verification remains unconfirmed in this environment.

@@ -1,0 +1,3 @@
+module.exports=[2157,(e,r,s)=>{r.exports=e.x("node:fs",()=>require("node:fs"))},52929,e=>{e.v(r=>Promise.all(["server/chunks/[externals]_node_fs_1t1l-4-zroh_0._.js","server/chunks/[root-of-the-server]__1rl_2nw6cikbw._.js","server/chunks/node_modules_node-fetch_src_utils_multipart-parser_0a9aeam58e52_.js"].map(r=>e.l(r))).then(()=>r(55057)))}];
+
+//# sourceMappingURL=%5Broot-of-the-server%5D__0pwc_vid-j2ba._.js.map

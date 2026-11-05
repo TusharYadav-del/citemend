@@ -1,0 +1,3 @@
+module.exports=[16428,e=>{"use strict";e.s(["f",0,function(e,t,s){if(!/^[a-z0-9.-]{1,253}$/.test(s))return null;try{let r=new URL(e),n=new URL(t),o=new URL(`https://${s}`).hostname;if(o!==s||!["http:","https:"].includes(r.protocol)||r.hostname!==o||r.port||r.username||r.password||"https:"!==n.protocol||n.hostname!==o||n.port||n.username||n.password||n.hash||n.pathname===r.pathname)return null;return{source_host:o,source_path:r.pathname,destination:n.href}}catch{return null}}])},29652,e=>{e.v(t=>Promise.all(["server/chunks/[root-of-the-server]__1uzegtnoco6hi._.js"].map(t=>e.l(t))).then(()=>t(26445)))},6878,e=>{e.v(t=>Promise.all(["server/chunks/node_modules_next_1_14bcs2pb4w8._.js"].map(t=>e.l(t))).then(()=>t(93458)))}];
+
+//# sourceMappingURL=_0zk8s48oz1_1u._.js.map

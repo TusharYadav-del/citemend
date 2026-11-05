@@ -1,0 +1,76 @@
+{
+  "node": {
+    "00462205a0c4f47c3411531d6b96e6d6d299cfbd9c": {
+      "workers": {
+        "app/_not-found/page": {
+          "moduleId": 9101,
+          "async": false
+        },
+        "app/audit/[id]/page": {
+          "moduleId": 23637,
+          "async": false
+        },
+        "app/dashboard/page": {
+          "moduleId": 40520,
+          "async": false
+        },
+        "app/dashboard/pixel/page": {
+          "moduleId": 36420,
+          "async": false
+        },
+        "app/dev/citation-probe/page": {
+          "moduleId": 5576,
+          "async": false
+        },
+        "app/page": {
+          "moduleId": 63731,
+          "async": false
+        }
+      },
+      "filename": "node_modules/@clerk/nextjs/dist/esm/app-router/server-actions.js",
+      "exportedName": "invalidateCacheAction"
+    },
+    "0049548ba9a3fd9346d7758dbdd908cf85aa44ba7b": {
+      "workers": {
+        "app/_not-found/page": {
+          "moduleId": 9101,
+          "async": false
+        },
+        "app/audit/[id]/page": {
+          "moduleId": 23637,
+          "async": false
+        },
+        "app/dashboard/page": {
+          "moduleId": 40520,
+          "async": false
+        },
+        "app/dashboard/pixel/page": {
+          "moduleId": 36420,
+          "async": false
+        },
+        "app/dev/citation-probe/page": {
+          "moduleId": 5576,
+          "async": false
+        },
+        "app/page": {
+          "moduleId": 63731,
+          "async": false
+        }
+      },
+      "filename": "node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js",
+      "exportedName": "deleteKeylessAction"
+    },
+    "60d717141f9826e1930c13843f325fe9b46d19121d": {
+      "workers": {
+        "app/dev/citation-probe/page": {
+          "moduleId": 5576,
+          "async": false
+        }
+      },
+      "filename": "app/dev/citation-probe/actions.ts",
+      "exportedName": "probeCitationAction"
+    }
+  },
+  "edge": {},
+  "encryptionKey": "PiH4XZY/ZafEynZSPQ8NTlOgw5eUGCKxiczr7YoeRs8="
+}

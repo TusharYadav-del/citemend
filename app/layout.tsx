@@ -1,7 +1,6 @@
 ﻿import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/ui/sonner";
-import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
@@ -23,3 +22,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     </html>
   );
 }
+const Inter = (_config: Record<string, unknown>) => ({ variable: "font-inter-local" });
+const JetBrains_Mono = (_config: Record<string, unknown>) => ({ variable: "font-mono-local" });
+

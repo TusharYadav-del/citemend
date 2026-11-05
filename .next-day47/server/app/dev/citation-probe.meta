@@ -1,0 +1,40 @@
+{
+  "status": 404,
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/dev/layout,_N_T_/dev/citation-probe/layout,_N_T_/dev/citation-probe/page,_N_T_/dev/citation-probe"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/dev/citation-probe/__PAGE__"
+  ],
+  "prefetchHints": {
+    "hints": 49216,
+    "slots": {
+      "children": {
+        "hints": 49248,
+        "slots": {
+          "children": {
+            "hints": 49248,
+            "slots": {
+              "children": {
+                "hints": 49312,
+                "slots": null
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/50fea3e1af348ba871ad7834b7217b54d99ad5929d8af12b4c3429a6f75e2084/$/dev/citation-probe",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/dev/citation-probe/page"
+    },
+    "isFallback": false
+  }
+}
