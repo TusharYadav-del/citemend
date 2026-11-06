@@ -169,6 +169,7 @@
       claim_pixel_intercept_quota: { Args: { target_domain: string }; Returns: boolean };
       reserve_workspace_agent_scan: { Args: { p_user_id: string; p_workspace_domain: string }; Returns: boolean };
       consume_workspace_api_rate_limit: { Args: { p_key_id: string; p_limit: number }; Returns: boolean };
+      citemend_readiness_schema_status: { Args: Record<PropertyKey, never>; Returns: { table_name: string; table_exists: boolean; rls_enabled: boolean; policy_count: number }[] };
       match_sitemap_url: {
         Args: { query_embedding: string; target_domain: string; match_threshold: number; match_count: number; query_model?: string };
         Returns: { url: string; similarity: number }[];

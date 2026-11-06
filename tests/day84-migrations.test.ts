@@ -18,13 +18,14 @@ test("retention and scheduled-report cron configuration uses the protected daily
   ]);
 });
 
-test("migrations 001 through 028 apply in order and expose the columns used by the application", async () => {
+test("migrations 001 through 029 apply in order and expose the columns used by the application", async () => {
   const db = new PGlite({ extensions: { vector } });
   try {
     await db.exec("create role anon; create role authenticated; create role service_role bypassrls;");
+    await db.exec("create schema auth; create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$; grant usage on schema auth to authenticated, service_role; grant execute on function auth.jwt() to authenticated, service_role;");
     const directory = new URL("../supabase/migrations/", import.meta.url);
     const files = (await readdir(directory)).filter(name => /^\d{3}_.+\.sql$/.test(name)).sort();
-    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 28 }, (_, index) => String(index + 1).padStart(3, "0")));
+    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 29 }, (_, index) => String(index + 1).padStart(3, "0")));
     for (const file of files) await db.exec(await readFile(new URL(file, directory), "utf8"));
     const expected: Record<string, string[]> = {
       audits: ["id", "user_id", "domain", "buyer_prompt", "status", "created_at", "completed_at", "competitor_domains", "ground_truth_pricing", "indexnow_key", "share_of_model_score", "engine_matrix_json", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text", "llms_txt_content", "webhook_url", "sitemap_url_count"],
@@ -54,12 +55,15 @@ test("migrations 001 through 028 apply in order and expose the columns used by t
       scheduled_reports: ["id", "user_id", "workspace_domain", "report_type", "schedule_at", "recurrence_interval", "status", "payload_json", "created_at", "updated_at"],
       citation_change_events: ["id", "user_id", "workspace_domain", "audit_id", "previous_observation_id", "current_observation_id", "prompt_query", "event_type", "source_url", "replacement_url", "new_replacement_url", "replaced_by_competitor", "evidence_json", "detected_at"],
       workspace_operating_metrics: ["user_id", "workspace_domain", "workspace_created_at", "baseline_method", "created_at"],
+      workspace_api_rate_windows: ["key_id", "window_started_at", "request_count"],
     };
     const result = await db.query<{ table_name: string; column_name: string; is_nullable: string }>("select table_name, column_name, is_nullable from information_schema.columns where table_schema = 'public'");
     for (const [table, columns] of Object.entries(expected)) {
       const actual = new Set(result.rows.filter(row => row.table_name === table).map(row => row.column_name));
       for (const column of columns) assert.ok(actual.has(column), `${table}.${column} is missing`);
     }
+    const rlsTables = await db.query<{ table_name: string; rls_enabled: boolean }>("select c.relname as table_name,c.relrowsecurity as rls_enabled from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p')");
+    for (const table of Object.keys(expected)) assert.equal(rlsTables.rows.find((row) => row.table_name === table)?.rls_enabled, true, `${table} must have RLS enabled`);
     const source = ts.createSourceFile("database.types.ts", await readFile(new URL("../lib/database.types.ts", import.meta.url), "utf8"), ts.ScriptTarget.Latest, true);
     const alias = source.statements.find((item): item is ts.TypeAliasDeclaration => ts.isTypeAliasDeclaration(item) && item.name.text === "Database");
     assert.ok(alias && ts.isTypeLiteralNode(alias.type));
@@ -118,5 +122,26 @@ test("migrations 001 through 028 apply in order and expose the columns used by t
     await assert.rejects(db.query("select public.claim_pixel_intercept_quota('example.com')"), /permission denied/);
     for (const table of ["ai_observation_evidence", "recovery_outcomes", "webhook_events_log", "workspace_api_keys", "autonomous_agent_runs", "ecommerce_catalog_items", "organization_members", "workspace_governance_policies", "scheduled_reports", "citation_change_events"]) await assert.rejects(db.query(`select * from ${table}`), /permission denied/);
     await assert.rejects(db.query("select public.reserve_workspace_agent_scan('user_test','example.com')"), /permission denied/);
+    assert.equal((await db.query<{ relrowsecurity: boolean }>("select relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname='audits'")).rows[0].relrowsecurity, true);
+
+    // Personal owners see only their own workspace, while a verified organization
+    // member receives the stored role's scoped access for the claimed organization.
+    await db.exec("reset role; insert into public.audits (domain,user_id,status) values ('other.example','other_owner','completed'),('org.example','org_owner','completed'); insert into public.organization_members(organization_id,owner_user_id,member_user_id,role) values ('org_acme','org_owner','org_viewer','viewer'),('org_acme','org_owner','org_editor','editor');");
+    await db.exec("set role authenticated; select set_config('request.jwt.claims','{\"sub\":\"user_test\"}',false);");
+    assert.deepEqual((await db.query<{ domain: string }>("select distinct domain from public.audits order by domain")).rows, [{ domain: "example.com" }]);
+    await assert.rejects(db.query("select key_hash from public.workspace_api_keys"), /permission denied/);
+    await assert.rejects(db.exec("insert into public.audits(domain,user_id,status) values ('spoofed.example','other_owner','completed')"), /row-level security|policy/);
+    await db.exec("reset role; set role authenticated; select set_config('request.jwt.claims','{\"sub\":\"org_viewer\",\"org_id\":\"org_acme\"}',false);");
+    assert.deepEqual((await db.query<{ domain: string }>("select domain from public.audits where user_id='org_owner'")).rows, [{ domain: "org.example" }]);
+    assert.equal((await db.query<{ id: string }>("delete from public.audits where domain='org.example' returning id")).rows.length, 0, "verified viewers cannot delete tenant data");
+    await assert.rejects(db.exec("insert into public.audits(domain,user_id,status) values ('org-spoof.example','org_owner','completed')"), /row-level security|policy/);
+    await db.exec("reset role; set role authenticated; select set_config('request.jwt.claims','{\"sub\":\"org_editor\",\"org_id\":\"org_acme\"}',false);");
+    await db.exec("insert into public.audits(domain,user_id,status) values ('org-editor-workspace.example','org_owner','completed')");
+    assert.equal((await db.query<{ count: number }>("select count(*)::integer as count from public.audits where domain='org-editor-workspace.example'")).rows[0].count, 1);
+    await db.exec("reset role; set role authenticated; select set_config('request.jwt.claims','{\"sub\":\"org_editor\"}',false);");
+    assert.equal((await db.query<{ count: number }>("select count(*)::integer as count from public.audits where user_id='org_owner'")).rows[0].count, 0);
+    await db.exec("reset role; set role service_role;");
+    assert.equal((await db.query<{ count: number }>("select count(*)::integer as count from public.audits")).rows[0].count >= 4, true, "service role retains cross-tenant server access");
+    await db.query("select * from public.workspace_integrations");
   } finally { await db.close(); }
 });

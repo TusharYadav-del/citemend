@@ -857,3 +857,14 @@ Migration 027 passed ordered local PGlite schema checks, and the user confirmed 
 - [x] Verify TypeScript, lint, full tests, production dependency audit, and production build; record the twelve-month repository scorecard in `AUDIT_INVENTORY.md`.
 
 Operating metrics use the first valid audit submission as a workspace-creation proxy because the product has no separate workspace-created event. Gross-margin estimates are enabled with conservative per-call model/search budgets, can be overridden through environment variables, and exclude infrastructure, payment fees, and actual provider usage. Migration 028 passed local ordered schema tests and the user confirmed it was applied to hosted Supabase. The twelve-month scorecard measures repository implementation and automated QA. Historical live-service setup and production checks explicitly recorded as pending elsewhere in this plan remain external verification items.
+
+## Days 181–195 — Production Cloud Cutover, Supabase RLS & Readiness (COMPLETED IN CODE)
+
+- [x] Preserve the already-occupied migration 016 and add forward-only migration 029 with idempotent RLS, tenant policies, least-privilege grants, and service-role access across the application tables.
+- [x] Keep anonymous redirect lookup restricted to approved active redirects; keep credentials, queues, telemetry, and append-only logs server-only.
+- [x] Add an admin/owner-authenticated `/api/health/readiness` diagnostic for live Supabase schema/RLS state, Clerk, AI/search, email/cron, and supported billing configuration without returning secret values.
+- [x] Add a shared-design-system Production Readiness panel in workspace Settings and an authenticated one-click migration SQL download when database setup is pending.
+- [x] Add readiness tests and ordered PGlite RLS tests for table coverage, personal tenant isolation, verified organization membership, viewer/editor permissions, restricted API-key hashes, and service-role access.
+- [x] Verify `npx tsc --noEmit`, `npm run lint`, all 240 `npm test` cases, and an optimized production build.
+
+Migration 029 passed the local ordered PGlite migration and tenant-isolation checks, and the user confirmed it was applied to hosted Supabase. The production build succeeded in an isolated output directory. The live readiness panel still needs to be checked in the deployment, so this records code completion and user-reported migration application without claiming a complete live cloud cutover. Lint passed with zero errors and two pre-existing unused-parameter warnings in `app/layout.tsx`.
