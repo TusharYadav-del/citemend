@@ -93,9 +93,22 @@ Migration files are numbered 001-028 and the local schema test applies them in o
 
 | Feature | Evidence | Status |
 | --- | --- | --- |
-| Workspace operating metrics and founder aggregates | `lib/operating-metrics.ts`, `app/api/metrics/operating/route.ts`, workspace metrics dashboard components, migration 028 | Shipped in code; telemetry is workspace owner-scoped; hosted migration 028 is not confirmed |
+| Workspace operating metrics and founder aggregates | `lib/operating-metrics.ts`, `app/api/metrics/operating/route.ts`, workspace metrics dashboard components, migration 028 | Shipped; telemetry is workspace owner-scoped; user confirmed hosted migration 028 |
 | Dynamic model profiles | `lib/model-registry.ts`, `lib/citation-probe.ts`, `lib/engine-synthesis.ts`, `lib/engine-matrix.ts` | Shipped; profile simulation/native-provider limitations are explicitly exposed |
-| Gross margin estimator | `lib/model-registry.ts`, `lib/operating-metrics.ts` | Shipped as a configurable estimate; stays unavailable until model-call cost assumptions are configured |
+| Gross margin estimator | `lib/model-registry.ts`, `lib/operating-metrics.ts` | Enabled with conservative default assumptions and per-profile environment overrides; estimate excludes infrastructure, payment fees, and unmetered usage |
+
+### Configured model-call cost assumptions
+
+These are upper-budget planning estimates per buyer-prompt profile call, not measured provider bills. Current displayed profiles use shared search plus Groq simulations for Perplexity Sonar and Claude. ChatGPT Search's estimate includes one basic Tavily search; Gemini uses the native Gemini paid rate effective January 2027 even when its Groq fallback is active. Operators can override each number using the four `CITEMEND_MODEL_COST_*_USD_PER_CALL` variables in `.env.example`.
+
+| Profile | Default USD/call | Basis |
+| --- | ---: | --- |
+| ChatGPT Search | $0.012 | Groq GPT-OSS 120B bounded-token budget plus one Tavily basic-search credit |
+| Perplexity Sonar (simulated) | $0.001 | Rounded-up Groq GPT-OSS 20B bounded-token budget |
+| Google Gemini | $0.014 | Rounded-up 4,000 input / 1,000 output token budget at announced Jan 2027 Gemini 3.8 Flash standard rates |
+| Claude (simulated) | $0.001 | Rounded-up Groq GPT-OSS 20B bounded-token budget |
+
+Pricing references: [Groq GPT-OSS 120B](https://console.groq.com/docs/model/openai/gpt-oss-120b), [Groq GPT-OSS 20B](https://console.groq.com/docs/model/openai/gpt-oss-20b), [Tavily pricing](https://www.tavily.com/pricing), and [Gemini API pricing](https://ai.google.dev/gemini-api/docs/pricing). The gross-margin percentage subtracts estimated model/search spend from the current plan's monthly price; it is not accounting gross margin or recognized revenue.
 
 ## Final 12-Month Roadmap Completion Scorecard
 
@@ -116,12 +129,12 @@ The score is for repository implementation and automated QA, not customer produc
 | 11 | Days 161-170: citation change and predictive intelligence | 100% shipped | Final suite passed |
 | 12 | Days 171-180: operating metrics, model registry and master QA | 100% shipped | Final suite passed |
 
-**Repository score: 12/12 months shipped and automated checks passing.** Remaining live checks are operational prerequisites, not silently included in this score: earlier plan entries identify pending billing/webhook activation, signed-in or provider checks, live Shopify/Cloudflare behavior, and hosted migration state. Apply migration 028 before deploying this metrics feature. Set `CITEMEND_MODEL_COST_*_USD_PER_CALL` before using the gross-margin estimate; the default is intentionally unavailable rather than invented.
+**Repository score: 12/12 months shipped and automated checks passing.** Remaining live checks are operational prerequisites, not silently included in this score: earlier plan entries identify pending billing/webhook activation, signed-in or provider checks, and live Shopify/Cloudflare behavior. The user confirmed migration 028 was applied to hosted Supabase. Cost defaults are enabled; set `CITEMEND_MODEL_COST_*_USD_PER_CALL` to match measured usage or provider invoices.
 
 ### Final master QA run (2026-11-06)
 
 - `npx tsc --noEmit`: pass.
 - `npm run lint`: pass with zero errors; two existing unused-parameter warnings remain in `app/layout.tsx`.
-- `npm test`: pass (234 tests).
+- `npm test`: pass (236 tests).
 - `npm audit --omit=dev`: pass, zero production dependency vulnerabilities.
-- `npm run build`: pass (`.next-month12-check`, isolated output directory).
+- `npm run build`: pass (`.next-gm-final-check`, isolated output directory).

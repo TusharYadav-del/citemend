@@ -1,7 +1,7 @@
-import test from "node:test";
+﻿import test from "node:test";
 import assert from "node:assert/strict";
 import { calculateWorkspaceOperatingMetrics, validFounderMetricsAuthorization } from "../lib/operating-metrics";
-import { estimateAuditModelCostUsd, getModelRegistry } from "../lib/model-registry";
+import { DEFAULT_MODEL_COST_USD_PER_CALL, estimateAuditModelCostUsd, getModelRegistry } from "../lib/model-registry";
 
 test("operating metrics measure first completed audit, first recovery, verified deploys, and complete evidence", () => {
   const evidence = new Map([[
@@ -69,6 +69,31 @@ test("model registry supports per-profile version, timeout, and estimated invoca
   assert.equal(registry.chatgpt_search.timeoutMs, 30000);
   assert.equal(registry.claude.profileKind, "synthesis_simulation");
   assert.deepEqual(estimateAuditModelCostUsd(2), { estimatedCostUsd: 0.02, promptCount: 2, assumedModelCallsPerPrompt: 4, missingCostModels: [], estimateOnly: true });
+});
+
+test("model registry enables gross-margin estimates with conservative defaults when no overrides exist", (context) => {
+  const names = ["CITEMEND_MODEL_COST_CHATGPT_SEARCH_USD_PER_CALL", "CITEMEND_MODEL_COST_PERPLEXITY_SONAR_USD_PER_CALL", "CITEMEND_MODEL_COST_GOOGLE_GEMINI_USD_PER_CALL", "CITEMEND_MODEL_COST_CLAUDE_USD_PER_CALL"];
+  const old = new Map(names.map((name) => [name, process.env[name]]));
+  for (const name of names) delete process.env[name];
+  context.after(() => { for (const [name, value] of old) { if (value === undefined) delete process.env[name]; else process.env[name] = value; } });
+  const registry = getModelRegistry();
+  assert.equal(registry.chatgpt_search.estimatedCostUsdPerCall, DEFAULT_MODEL_COST_USD_PER_CALL.chatgpt_search);
+  assert.equal(registry.perplexity_sonar.estimatedCostUsdPerCall, DEFAULT_MODEL_COST_USD_PER_CALL.perplexity_sonar);
+  assert.equal(registry.google_gemini.estimatedCostUsdPerCall, DEFAULT_MODEL_COST_USD_PER_CALL.google_gemini);
+  assert.equal(registry.claude.estimatedCostUsdPerCall, DEFAULT_MODEL_COST_USD_PER_CALL.claude);
+  assert.deepEqual(estimateAuditModelCostUsd(1), { estimatedCostUsd: 0.028, promptCount: 1, assumedModelCallsPerPrompt: 4, missingCostModels: [], estimateOnly: true });
+});
+
+test("default per-prompt cost enables the Pro gross-margin estimate", (context) => {
+  const names = ["CITEMEND_MODEL_COST_CHATGPT_SEARCH_USD_PER_CALL", "CITEMEND_MODEL_COST_PERPLEXITY_SONAR_USD_PER_CALL", "CITEMEND_MODEL_COST_GOOGLE_GEMINI_USD_PER_CALL", "CITEMEND_MODEL_COST_CLAUDE_USD_PER_CALL"];
+  const old = new Map(names.map((name) => [name, process.env[name]]));
+  for (const name of names) delete process.env[name];
+  context.after(() => { for (const [name, value] of old) { if (value === undefined) delete process.env[name]; else process.env[name] = value; } });
+  const metrics = calculateWorkspaceOperatingMetrics({ workspaceCreatedAt: null, audits: [], recoveryActions: [], deploymentActions: [], outcomes: [], evidenceById: new Map(), tier: "pro", monthlyPriceUsd: 39, monthlyAuditCount: 1, averagePromptCount: 1 });
+  assert.equal(metrics.gross_margin_estimate.estimated_cost_per_audit_usd, 0.028);
+  assert.equal(metrics.gross_margin_estimate.estimated_monthly_scan_api_cost_usd, 0.028);
+  assert.equal(Math.round((metrics.gross_margin_estimate.estimated_gross_margin_percent ?? 0) * 100) / 100, 99.93);
+  assert.equal(metrics.gross_margin_estimate.target_met, true);
 });
 
 test("founder aggregate endpoint requires timing-safe bearer authorization", () => {

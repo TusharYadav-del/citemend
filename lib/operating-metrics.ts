@@ -83,7 +83,7 @@ export function calculateWorkspaceOperatingMetrics(input: {
       target_met: estimatedGrossMarginPercent !== null && estimatedGrossMarginPercent >= 75,
       cost_estimate_only: true,
       unconfigured_model_costs: cost.missingCostModels,
-      note: "Model-call cost assumptions are operator-configured estimates; provider token usage, infrastructure, payment fees, and actual recognized revenue are not included.",
+      note: "Conservative per-call model and search budgets are estimates, not provider-metered usage. They exclude infrastructure, payment fees, and actual recognized revenue; environment variables can override each profile assumption.",
     },
   };
 }
