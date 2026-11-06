@@ -45,8 +45,13 @@ export async function GET(request: Request) {
 
   if (new URL(request.url).searchParams.get("format") === "sql") {
     try {
-      const migration = await readFile(join(process.cwd(), "supabase", "migrations", "029_strict_rls_and_tenant_isolation.sql"), "utf8");
-      return new Response(migration, { headers: { ...privateHeaders, "Content-Type": "application/sql; charset=utf-8", "Content-Disposition": "attachment; filename=029_strict_rls_and_tenant_isolation.sql" } });
+      const migrationDirectory = join(process.cwd(), "supabase", "migrations");
+      const [tenantIsolation, acquisitionTools] = await Promise.all([
+        readFile(join(migrationDirectory, "029_strict_rls_and_tenant_isolation.sql"), "utf8"),
+        readFile(join(migrationDirectory, "030_gtm_case_studies_referrals.sql"), "utf8"),
+      ]);
+      const migrationBundle = `-- Apply in order. Reapplying migration 029 is safe before migration 030.\n${tenantIsolation}\n\n${acquisitionTools}`;
+      return new Response(migrationBundle, { headers: { ...privateHeaders, "Content-Type": "application/sql; charset=utf-8", "Content-Disposition": "attachment; filename=029-030-citemend-database-setup.sql" } });
     } catch { return json({ error: "The consolidated database setup script is unavailable." }, 503); }
   }
 

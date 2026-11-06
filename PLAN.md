@@ -868,3 +868,16 @@ Operating metrics use the first valid audit submission as a workspace-creation p
 - [x] Verify `npx tsc --noEmit`, `npm run lint`, all 240 `npm test` cases, and an optimized production build.
 
 Migration 029 passed the local ordered PGlite migration and tenant-isolation checks, and the user confirmed it was applied to hosted Supabase. The production build succeeded in an isolated output directory. The live readiness panel still needs to be checked in the deployment, so this records code completion and user-reported migration application without claiming a complete live cloud cutover. Lint passed with zero errors and two pre-existing unused-parameter warnings in `app/layout.tsx`.
+
+## Sprint 8 — Days 196–220: Commercial Acquisition & Proof Tools (COMPLETED IN CODE)
+
+- [x] Add a public buyer-prompt forensic scan with observable evidence separated from hypotheses, DNS-pinned SSRF-safe checks, bounded provider work, HMAC-derived caller keys, and an atomic five-per-minute database limiter.
+- [x] Add the conversion gate and homepage entry points for the Free AI Citation Forensic Scan and Design Partner Program.
+- [x] Add verified, anonymizable or workspace-branded recovery case studies with separate deployment, later citation, measured rescued visits, and optional explicitly configured pipeline estimates.
+- [x] Add migration 030 for case studies, design partner applications, agency referrals, public scan/application rate windows, and readiness inventory. Migration 017 was already occupied, so this change follows migration 029.
+- [x] Scope newly measured pixel visits to the audit owner and exclude legacy domain-only visits from case studies to preserve tenant attribution.
+- [x] Add agency and B2B SaaS onboarding tracks, application validation/persistence, and an automatic teaser scan that still saves the application if external providers are unavailable.
+- [x] Add tests for forensic scan rate limiting, application validation and persistence, case-study qualification/anonymization, and ordered migration/RLS coverage.
+- [x] Verify `npx tsc --noEmit`, `npm run lint`, `npm test` (251 passed), and `npm run build` in an isolated output directory.
+
+Migration 030 passed the local ordered PGlite migration and schema/type checks; hosted application remains a deployment step. The optional `CASE_STUDY_PIPELINE_VALUE_PER_VISIT_USD` assumption is blank by default, so reports show measured traffic without inventing pipeline value until an approved estimate is configured. Build generated `tsconfig.json` include changes, which were removed after verification. Lint had zero errors and the same two pre-existing unused-parameter warnings in `app/layout.tsx`.

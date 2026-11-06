@@ -18,14 +18,14 @@ test("retention and scheduled-report cron configuration uses the protected daily
   ]);
 });
 
-test("migrations 001 through 029 apply in order and expose the columns used by the application", async () => {
+test("migrations 001 through 030 apply in order and expose the columns used by the application", async () => {
   const db = new PGlite({ extensions: { vector } });
   try {
     await db.exec("create role anon; create role authenticated; create role service_role bypassrls;");
     await db.exec("create schema auth; create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$; grant usage on schema auth to authenticated, service_role; grant execute on function auth.jwt() to authenticated, service_role;");
     const directory = new URL("../supabase/migrations/", import.meta.url);
     const files = (await readdir(directory)).filter(name => /^\d{3}_.+\.sql$/.test(name)).sort();
-    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 29 }, (_, index) => String(index + 1).padStart(3, "0")));
+    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 30 }, (_, index) => String(index + 1).padStart(3, "0")));
     for (const file of files) await db.exec(await readFile(new URL(file, directory), "utf8"));
     const expected: Record<string, string[]> = {
       audits: ["id", "user_id", "domain", "buyer_prompt", "status", "created_at", "completed_at", "competitor_domains", "ground_truth_pricing", "indexnow_key", "share_of_model_score", "engine_matrix_json", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text", "llms_txt_content", "webhook_url", "sitemap_url_count"],
@@ -41,7 +41,7 @@ test("migrations 001 through 029 apply in order and expose the columns used by t
       citation_hijack_opportunities: ["id", "audit_id", "domain", "opportunity_type", "target_url", "dead_competitor_url", "matched_user_live_url", "verification_status", "lifecycle_stage", "relevance_score", "buyer_intent_score", "citation_evidence_score", "replacement_quality_score", "composite_priority_score", "stage_history_json"],
       action_audit_logs: ["id", "workspace_domain", "actor_user_id", "action_type", "target_url", "previous_state_json", "new_state_json", "safety_check_passed", "created_at"],
       cms_connections: ["id", "user_id", "domain", "platform", "shop_subdomain", "access_token"],
-      rescued_ai_visits: ["id", "domain", "broken_path", "rescued_target_url", "ai_referrer", "similarity_score", "latency_ms", "created_at"],
+      rescued_ai_visits: ["id", "user_id", "domain", "broken_path", "rescued_target_url", "ai_referrer", "similarity_score", "latency_ms", "created_at"],
       workspace_integrations: ["id", "user_id", "domain", "slack_webhook_url", "discord_webhook_url", "shopify_store_domain", "shopify_admin_token", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text"],
       pixel_intercept_quotas: ["domain", "window_started_at", "request_count"],
       ai_observation_evidence: ["id", "audit_id", "domain", "prompt_query", "prompt_version", "provider", "model_name", "search_method", "locale", "raw_answer", "extracted_urls_json", "url_status_json", "sample_size", "observation_confidence", "job_status", "retry_count", "error_message", "observed_at"],
@@ -56,6 +56,10 @@ test("migrations 001 through 029 apply in order and expose the columns used by t
       citation_change_events: ["id", "user_id", "workspace_domain", "audit_id", "previous_observation_id", "current_observation_id", "prompt_query", "event_type", "source_url", "replacement_url", "new_replacement_url", "replaced_by_competitor", "evidence_json", "detected_at"],
       workspace_operating_metrics: ["user_id", "workspace_domain", "workspace_created_at", "baseline_method", "created_at"],
       workspace_api_rate_windows: ["key_id", "window_started_at", "request_count"],
+      case_studies: ["id", "slug", "user_id", "workspace_domain", "audit_id", "anonymized", "is_public", "study_json", "created_at"],
+      design_partner_applications: ["id", "contact_name", "contact_email", "company_name", "domain", "segment", "client_or_catalog_size", "buyer_prompt", "primary_pain_point", "teaser_status", "teaser_json", "status", "created_at"],
+      agency_referrals: ["id", "partner_application_id", "referrer_user_id", "referral_code", "referred_email", "status", "created_at"],
+      forensic_teaser_rate_windows: ["key_id", "window_started_at", "request_count"],
     };
     const result = await db.query<{ table_name: string; column_name: string; is_nullable: string }>("select table_name, column_name, is_nullable from information_schema.columns where table_schema = 'public'");
     for (const [table, columns] of Object.entries(expected)) {
@@ -64,6 +68,10 @@ test("migrations 001 through 029 apply in order and expose the columns used by t
     }
     const rlsTables = await db.query<{ table_name: string; rls_enabled: boolean }>("select c.relname as table_name,c.relrowsecurity as rls_enabled from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p')");
     for (const table of Object.keys(expected)) assert.equal(rlsTables.rows.find((row) => row.table_name === table)?.rls_enabled, true, `${table} must have RLS enabled`);
+    assert.deepEqual((await db.query<{ table_name: string }>("select table_name from public.citemend_readiness_schema_status() order by table_name")).rows.length, 32);
+    assert.equal((await db.query<{ allowed: boolean }>(`select public.consume_forensic_teaser_rate_limit('${"a".repeat(64)}',2) as allowed`)).rows[0].allowed, true);
+    assert.equal((await db.query<{ allowed: boolean }>(`select public.consume_forensic_teaser_rate_limit('${"a".repeat(64)}',2) as allowed`)).rows[0].allowed, true);
+    assert.equal((await db.query<{ allowed: boolean }>(`select public.consume_forensic_teaser_rate_limit('${"a".repeat(64)}',2) as allowed`)).rows[0].allowed, false);
     const source = ts.createSourceFile("database.types.ts", await readFile(new URL("../lib/database.types.ts", import.meta.url), "utf8"), ts.ScriptTarget.Latest, true);
     const alias = source.statements.find((item): item is ts.TypeAliasDeclaration => ts.isTypeAliasDeclaration(item) && item.name.text === "Database");
     assert.ok(alias && ts.isTypeLiteralNode(alias.type));

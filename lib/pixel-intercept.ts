@@ -9,7 +9,7 @@ const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: cors });
 export const interceptOptions = () => new Response(null, { status: 204, headers: cors });
 type Input = { domain: string; brokenPath: string; referrer: string; userAgent: string; utmSource: string; force: boolean; simulation: boolean };
-type Candidate = { url: string; score: number };
+type Candidate = { url: string; score: number; userId?: string | null };
 type Deps = {
   quota: (domain: string) => Promise<boolean>;
   cached: (domain: string, path: string) => Promise<Candidate | null>;
@@ -50,18 +50,21 @@ const defaults: Deps = {
   },
   cached: async (domain, path) => {
     const db = createServerDatabase();
-    const { data: audits, error } = await db.from("audits").select("id").eq("domain", domain).not("user_id", "is", null).order("created_at", { ascending: false }).limit(100);
+    const { data: audits, error } = await db.from("audits").select("id,user_id").eq("domain", domain).not("user_id", "is", null).order("created_at", { ascending: false }).limit(100);
     if (error) throw error;
     if (!audits?.length) return null;
     // Match the entire URL after restricting to this domain's audits.
-    const { data: links, error: linkError } = await db.from("broken_links").select("cited_url,suggested_redirect,approval_status,match_confidence,url_state").in("audit_id", audits.map(a => a.id)).eq("http_status", 404).eq("url_state", "404").in("approval_status", ["approved", "deployed"]).gte("match_confidence", 70).not("suggested_redirect", "is", null).limit(500);
+    const { data: links, error: linkError } = await db.from("broken_links").select("audit_id,cited_url,suggested_redirect,approval_status,match_confidence,url_state").in("audit_id", audits.map(a => a.id)).eq("http_status", 404).eq("url_state", "404").in("approval_status", ["approved", "deployed"]).gte("match_confidence", 70).not("suggested_redirect", "is", null).limit(500);
     if (linkError) throw linkError;
-    const link = links?.find(item => canAutoRedirect({ urlState: item.url_state, httpStatus: 404, approvalStatus: item.approval_status, similarityPercent: item.match_confidence }) && (() => { try { const url = new URL(item.cited_url); return url.hostname === domain && url.pathname === path; } catch { return false; } })());
-    return link?.suggested_redirect ? { url: link.suggested_redirect, score: 1 } : null;
+    for (const audit of audits) {
+      const link = links?.find(item => item.audit_id === audit.id && canAutoRedirect({ urlState: item.url_state, httpStatus: 404, approvalStatus: item.approval_status, similarityPercent: item.match_confidence }) && (() => { try { const url = new URL(item.cited_url); return url.hostname === domain && url.pathname === path; } catch { return false; } })());
+      if (link?.suggested_redirect) return { url: link.suggested_redirect, score: 1, userId: audit.user_id };
+    }
+    return null;
   },
   check: checkUrlStatus,
   log: async (input, target, latency) => {
-    const { error } = await createServerDatabase().from("rescued_ai_visits").insert({ domain: input.domain, broken_path: input.brokenPath, rescued_target_url: target.url, ai_referrer: aiSource(input.referrer) || aiSource(input.utmSource) || "forced", similarity_score: target.score, latency_ms: latency, user_agent: input.userAgent });
+    const { error } = await createServerDatabase().from("rescued_ai_visits").insert({ user_id: target.userId ?? null, domain: input.domain, broken_path: input.brokenPath, rescued_target_url: target.url, ai_referrer: aiSource(input.referrer) || aiSource(input.utmSource) || "forced", similarity_score: target.score, latency_ms: latency, user_agent: input.userAgent });
     if (error) throw error;
   },
   authorizeSimulation: async domain => {

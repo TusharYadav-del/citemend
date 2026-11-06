@@ -1,6 +1,30 @@
 ﻿export type Database = {
   public: {
     Tables: {
+      case_studies: {
+        Row: { id: string; slug: string; user_id: string; workspace_domain: string; audit_id: string; anonymized: boolean; is_public: boolean; study_json: Record<string, unknown>; created_at: string };
+        Insert: { id?: string; slug: string; user_id: string; workspace_domain: string; audit_id: string; anonymized?: boolean; is_public?: boolean; study_json: Record<string, unknown>; created_at?: string };
+        Update: { id?: string; slug?: string; user_id?: string; workspace_domain?: string; audit_id?: string; anonymized?: boolean; is_public?: boolean; study_json?: Record<string, unknown>; created_at?: string };
+        Relationships: [];
+      };
+      design_partner_applications: {
+        Row: { id: string; contact_name: string; contact_email: string; company_name: string; domain: string; segment: string; client_or_catalog_size: number; buyer_prompt: string; primary_pain_point: string; teaser_status: string; teaser_json: Record<string, unknown> | null; status: string; created_at: string; updated_at: string };
+        Insert: { id?: string; contact_name: string; contact_email: string; company_name: string; domain: string; segment: string; client_or_catalog_size: number; buyer_prompt: string; primary_pain_point: string; teaser_status?: string; teaser_json?: Record<string, unknown> | null; status?: string; created_at?: string; updated_at?: string };
+        Update: { id?: string; contact_name?: string; contact_email?: string; company_name?: string; domain?: string; segment?: string; client_or_catalog_size?: number; buyer_prompt?: string; primary_pain_point?: string; teaser_status?: string; teaser_json?: Record<string, unknown> | null; status?: string; updated_at?: string };
+        Relationships: [];
+      };
+      agency_referrals: {
+        Row: { id: string; partner_application_id: string | null; referrer_user_id: string | null; referral_code: string; referred_email: string | null; status: string; created_at: string; updated_at: string };
+        Insert: { id?: string; partner_application_id?: string | null; referrer_user_id?: string | null; referral_code: string; referred_email?: string | null; status?: string; created_at?: string; updated_at?: string };
+        Update: { id?: string; partner_application_id?: string | null; referrer_user_id?: string | null; referral_code?: string; referred_email?: string | null; status?: string; updated_at?: string };
+        Relationships: [];
+      };
+      forensic_teaser_rate_windows: {
+        Row: { key_id: string; window_started_at: string; request_count: number };
+        Insert: { key_id: string; window_started_at?: string; request_count?: number };
+        Update: { key_id?: string; window_started_at?: string; request_count?: number };
+        Relationships: [];
+      };
       ai_observation_evidence: {
         Row: { id: string; audit_id: string; domain: string; prompt_query: string; prompt_version: string; provider: string; model_name: string; search_method: string; locale: string; raw_answer: string; extracted_urls_json: string[]; url_status_json: Record<string, number | string>; sample_size: number; observation_confidence: number | null; job_status: string; retry_count: number; error_message: string | null; observed_at: string };
         Insert: { id?: string; audit_id: string; domain: string; prompt_query: string; prompt_version?: string; provider: string; model_name: string; search_method: string; locale?: string; raw_answer: string; extracted_urls_json?: string[]; url_status_json?: Record<string, number | string>; sample_size?: number; observation_confidence?: number | null; job_status?: string; retry_count?: number; error_message?: string | null; observed_at?: string };
@@ -80,9 +104,9 @@
         Relationships: [];
       };
       rescued_ai_visits: {
-        Row: { id: string; domain: string; broken_path: string; rescued_target_url: string; ai_referrer: string; similarity_score: number | null; latency_ms: number | null; user_agent: string | null; created_at: string | null };
-        Insert: { id?: string; domain: string; broken_path: string; rescued_target_url: string; ai_referrer: string; similarity_score?: number | null; latency_ms?: number | null; user_agent?: string | null; created_at?: string | null };
-        Update: { id?: string; domain?: string; broken_path?: string; rescued_target_url?: string; ai_referrer?: string; similarity_score?: number | null; latency_ms?: number | null; user_agent?: string | null; created_at?: string | null };
+        Row: { id: string; user_id: string | null; domain: string; broken_path: string; rescued_target_url: string; ai_referrer: string; similarity_score: number | null; latency_ms: number | null; user_agent: string | null; created_at: string | null };
+        Insert: { id?: string; user_id?: string | null; domain: string; broken_path: string; rescued_target_url: string; ai_referrer: string; similarity_score?: number | null; latency_ms?: number | null; user_agent?: string | null; created_at?: string | null };
+        Update: { id?: string; user_id?: string | null; domain?: string; broken_path?: string; rescued_target_url?: string; ai_referrer?: string; similarity_score?: number | null; latency_ms?: number | null; user_agent?: string | null; created_at?: string | null };
         Relationships: [];
       };
       audit_citation_gaps: {
@@ -169,6 +193,7 @@
       claim_pixel_intercept_quota: { Args: { target_domain: string }; Returns: boolean };
       reserve_workspace_agent_scan: { Args: { p_user_id: string; p_workspace_domain: string }; Returns: boolean };
       consume_workspace_api_rate_limit: { Args: { p_key_id: string; p_limit: number }; Returns: boolean };
+      consume_forensic_teaser_rate_limit: { Args: { p_key_id: string; p_limit: number }; Returns: boolean };
       citemend_readiness_schema_status: { Args: Record<PropertyKey, never>; Returns: { table_name: string; table_exists: boolean; rls_enabled: boolean; policy_count: number }[] };
       match_sitemap_url: {
         Args: { query_embedding: string; target_domain: string; match_threshold: number; match_count: number; query_model?: string };
