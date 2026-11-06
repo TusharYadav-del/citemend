@@ -5,7 +5,7 @@ import type { ForensicTeaserReport } from "@/lib/forensic-teaser";
 
 type Result = { received: true; message: string; teaserStatus: string; teaser: ForensicTeaserReport | null; disclosure: string };
 
-export function DesignPartnerApplicationForm() {
+export function DesignPartnerApplicationForm({ referralCode }: { referralCode?: string }) {
   const [form, setForm] = useState({ contactName: "", contactEmail: "", companyName: "", domain: "", segment: "agency", clientOrCatalogSize: "5", buyerPrompt: "", primaryPainPoint: "" });
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -15,7 +15,7 @@ export function DesignPartnerApplicationForm() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setLoading(true); setError(null); setResult(null);
     try {
-      const response = await fetch("/api/design-partners/apply", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, clientOrCatalogSize: Number(form.clientOrCatalogSize) }) });
+      const response = await fetch("/api/design-partners/apply", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, clientOrCatalogSize: Number(form.clientOrCatalogSize), ...(referralCode ? { referralCode } : {}) }) });
       const body = await response.json() as Result | { error?: string };
       if (!response.ok) throw new Error("error" in body ? body.error : "Your application could not be submitted.");
       setResult(body as Result);

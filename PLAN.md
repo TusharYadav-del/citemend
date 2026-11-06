@@ -881,3 +881,14 @@ Migration 029 passed the local ordered PGlite migration and tenant-isolation che
 - [x] Verify `npx tsc --noEmit`, `npm run lint`, `npm test` (251 passed), and `npm run build` in an isolated output directory.
 
 Migration 030 passed the local ordered PGlite migration and schema/type checks, and the user confirmed it was applied to hosted Supabase. The optional `CASE_STUDY_PIPELINE_VALUE_PER_VISIT_USD` assumption is blank by default, so reports show measured traffic without inventing pipeline value until an approved estimate is configured. Build generated `tsconfig.json` include changes, which were removed after verification. Lint had zero errors and the same two pre-existing unused-parameter warnings in `app/layout.tsx`.
+
+## Sprint 9 — Days 221–250: Distribution & Co-Marketing Assets (COMPLETED IN CODE)
+
+- [x] Add conversion-focused, statically generated solution pages for SEO/GEO agencies, B2B SaaS, ecommerce, and enterprise, with evidence-first copy and routes into relevant product workflows.
+- [x] Add a searchable, category-filtered public integration directory with setup steps and workspace/developer deep links for Shopify, Cloudflare, Vercel, Next.js, GitHub PR Bot, Slack, Discord, Resend, IndexNow, Clerk SSO, and MCP agents.
+- [x] Add workspace-scoped agency partner links, co-branded forensic scan URLs, privacy-preserving visit counting, design-partner application attribution, and authenticated referred-workspace conversion tracking in the Workspaces / Partner tab.
+- [x] Add a public benchmark hub backed by a service-role-only database function. It includes only completed observations from explicitly opted-in workspaces, suppresses each model/cause segment below five distinct contributors, exposes Wilson intervals and observation counts, and omits workspace IDs, domains, prompts, and raw URLs.
+- [x] Add Sprint 9 tests for vertical solution route models, referral link/tracking behavior, anonymized benchmark aggregation and opt-in/sample-floor isolation; extend ordered migration tests through migration 031.
+- [x] Verify `npx tsc --noEmit`, `npm run lint`, all 254 `npm test` cases, and optimized `npm run build` in an isolated output directory.
+
+Migration 031 passed ordered local PGlite migration tests. It extends the already deployed referral table and adds a server-only opt-in benchmark query; apply `supabase/migrations/031_sprint9_distribution_benchmarks.sql` to hosted Supabase before enabling referral counters and live benchmark publication. Lint completed with zero errors and two existing unused-parameter warnings in `app/layout.tsx`.

@@ -18,14 +18,14 @@ test("retention and scheduled-report cron configuration uses the protected daily
   ]);
 });
 
-test("migrations 001 through 030 apply in order and expose the columns used by the application", async () => {
+test("migrations 001 through 031 apply in order and expose the columns used by the application", async () => {
   const db = new PGlite({ extensions: { vector } });
   try {
     await db.exec("create role anon; create role authenticated; create role service_role bypassrls;");
     await db.exec("create schema auth; create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$; grant usage on schema auth to authenticated, service_role; grant execute on function auth.jwt() to authenticated, service_role;");
     const directory = new URL("../supabase/migrations/", import.meta.url);
     const files = (await readdir(directory)).filter(name => /^\d{3}_.+\.sql$/.test(name)).sort();
-    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 30 }, (_, index) => String(index + 1).padStart(3, "0")));
+    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 31 }, (_, index) => String(index + 1).padStart(3, "0")));
     for (const file of files) await db.exec(await readFile(new URL(file, directory), "utf8"));
     const expected: Record<string, string[]> = {
       audits: ["id", "user_id", "domain", "buyer_prompt", "status", "created_at", "completed_at", "competitor_domains", "ground_truth_pricing", "indexnow_key", "share_of_model_score", "engine_matrix_json", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text", "llms_txt_content", "webhook_url", "sitemap_url_count"],
@@ -58,7 +58,7 @@ test("migrations 001 through 030 apply in order and expose the columns used by t
       workspace_api_rate_windows: ["key_id", "window_started_at", "request_count"],
       case_studies: ["id", "slug", "user_id", "workspace_domain", "audit_id", "anonymized", "is_public", "study_json", "created_at"],
       design_partner_applications: ["id", "contact_name", "contact_email", "company_name", "domain", "segment", "client_or_catalog_size", "buyer_prompt", "primary_pain_point", "teaser_status", "teaser_json", "status", "created_at"],
-      agency_referrals: ["id", "partner_application_id", "referrer_user_id", "referral_code", "referred_email", "status", "created_at"],
+      agency_referrals: ["id", "partner_application_id", "referrer_user_id", "referrer_workspace_domain", "referral_code", "referred_email", "status", "visit_count", "last_visited_at", "referred_workspace_domain", "referred_workspace_user_id", "converted_at", "created_at"],
       forensic_teaser_rate_windows: ["key_id", "window_started_at", "request_count"],
     };
     const result = await db.query<{ table_name: string; column_name: string; is_nullable: string }>("select table_name, column_name, is_nullable from information_schema.columns where table_schema = 'public'");

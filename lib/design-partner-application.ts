@@ -11,6 +11,7 @@ export type DesignPartnerApplication = {
   clientOrCatalogSize: number;
   buyerPrompt: string;
   primaryPainPoint: string;
+  referralCode?: string;
 };
 export type DesignPartnerApplicationRow = DesignPartnerApplication & {
   teaserStatus: "complete" | "partial" | "unavailable";
@@ -25,6 +26,7 @@ function parseApplication(value: unknown): DesignPartnerApplication {
   const companyName = typeof row.companyName === "string" ? row.companyName.trim() : "";
   const buyerPrompt = typeof row.buyerPrompt === "string" ? row.buyerPrompt.trim() : "";
   const primaryPainPoint = typeof row.primaryPainPoint === "string" ? row.primaryPainPoint.trim() : "";
+  const referralCode = typeof row.referralCode === "string" ? row.referralCode.trim().toLowerCase() : undefined;
   const segment = row.segment;
   const clientOrCatalogSize = row.clientOrCatalogSize;
   if (!contactName || contactName.length > 120 || !companyName || companyName.length > 160) throw new TypeError("Enter your name and company name.");
@@ -33,7 +35,8 @@ function parseApplication(value: unknown): DesignPartnerApplication {
   if (typeof clientOrCatalogSize !== "number" || !Number.isInteger(clientOrCatalogSize) || clientOrCatalogSize < (segment === "agency" ? 5 : 1) || clientOrCatalogSize > (segment === "agency" ? 50 : 1_000_000)) throw new TypeError(segment === "agency" ? "Agency applicants should manage 5 to 50 clients." : "Enter a positive content library or catalog size.");
   if (buyerPrompt.length < 8 || buyerPrompt.length > 4000) throw new TypeError("Enter one buyer prompt between 8 and 4000 characters.");
   if (primaryPainPoint.length < 12 || primaryPainPoint.length > 1200) throw new TypeError("Describe your primary AI search pain point in 12 to 1200 characters.");
-  return { contactName, contactEmail, companyName, domain: normalizeTeaserDomain(row.domain), segment, clientOrCatalogSize, buyerPrompt, primaryPainPoint };
+  if (referralCode !== undefined && !/^agency_[a-f0-9]{24}$/.test(referralCode)) throw new TypeError("The referral code is invalid.");
+  return { contactName, contactEmail, companyName, domain: normalizeTeaserDomain(row.domain), segment, clientOrCatalogSize, buyerPrompt, primaryPainPoint, ...(referralCode ? { referralCode } : {}) };
 }
 
 export type DesignPartnerApplicationDependencies = {

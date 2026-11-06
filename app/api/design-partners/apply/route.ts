@@ -13,7 +13,8 @@ export const POST = createDesignPartnerApplicationHandler({
   },
   runTeaser: runPublicForensicTeaser,
   saveApplication: async (row) => {
-    const { error } = await createServerDatabase().from("design_partner_applications").insert({
+    const db = createServerDatabase();
+    const { data, error } = await db.from("design_partner_applications").insert({
       contact_name: row.contactName,
       contact_email: row.contactEmail,
       company_name: row.companyName,
@@ -24,7 +25,12 @@ export const POST = createDesignPartnerApplicationHandler({
       primary_pain_point: row.primaryPainPoint,
       teaser_status: row.teaserStatus,
       teaser_json: row.teaser as unknown as Record<string, unknown> | null,
-    });
+    }).select("id").single();
     if (error) throw error;
+    if (row.referralCode) {
+      // Referral attribution is best effort; it must not prevent application intake.
+      await db.from("agency_referrals").update({ partner_application_id: data.id, referred_email: row.contactEmail, status: "applied", updated_at: new Date().toISOString() })
+        .eq("referral_code", row.referralCode).in("status", ["issued", "visited"]).is("partner_application_id", null);
+    }
   },
 });

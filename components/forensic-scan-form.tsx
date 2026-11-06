@@ -4,8 +4,8 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import type { ForensicTeaserReport } from "@/lib/forensic-teaser";
 
-export function ForensicScanForm() {
-  const [domain, setDomain] = useState("");
+export function ForensicScanForm({ initialDomain = "", agencyName }: { initialDomain?: string; agencyName?: string }) {
+  const [domain, setDomain] = useState(initialDomain);
   const [buyerPrompt, setBuyerPrompt] = useState("");
   const [report, setReport] = useState<ForensicTeaserReport | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -24,6 +24,7 @@ export function ForensicScanForm() {
 
   return <div className="grid gap-6 lg:grid-cols-[.85fr_1.15fr]">
     <form onSubmit={submit} className="rounded-2xl border border-white/10 bg-[#0D1119] p-5 sm:p-6">
+      {agencyName && <p className="mb-4 rounded-lg border border-emerald-300/15 bg-emerald-300/[.04] px-3 py-2 text-xs text-emerald-100">Partner scan prepared with {agencyName.slice(0, 100)}</p>}
       <label htmlFor="forensic-domain" className="block text-xs font-semibold text-slate-200">Your public domain</label>
       <input id="forensic-domain" required type="text" autoComplete="url" value={domain} onChange={(event) => setDomain(event.target.value)} placeholder="example.com" className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-white placeholder:text-slate-600 focus:border-emerald-300/50 focus:outline-none focus:ring-2 focus:ring-emerald-300/20" />
       <label htmlFor="forensic-prompt" className="mt-5 block text-xs font-semibold text-slate-200">One buyer-intent prompt</label>

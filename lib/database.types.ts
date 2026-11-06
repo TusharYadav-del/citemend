@@ -14,9 +14,9 @@
         Relationships: [];
       };
       agency_referrals: {
-        Row: { id: string; partner_application_id: string | null; referrer_user_id: string | null; referral_code: string; referred_email: string | null; status: string; created_at: string; updated_at: string };
-        Insert: { id?: string; partner_application_id?: string | null; referrer_user_id?: string | null; referral_code: string; referred_email?: string | null; status?: string; created_at?: string; updated_at?: string };
-        Update: { id?: string; partner_application_id?: string | null; referrer_user_id?: string | null; referral_code?: string; referred_email?: string | null; status?: string; updated_at?: string };
+        Row: { id: string; partner_application_id: string | null; referrer_user_id: string | null; referrer_workspace_domain: string | null; referral_code: string; referred_email: string | null; status: string; visit_count: number; last_visited_at: string | null; referred_workspace_domain: string | null; referred_workspace_user_id: string | null; converted_at: string | null; created_at: string; updated_at: string };
+        Insert: { id?: string; partner_application_id?: string | null; referrer_user_id?: string | null; referrer_workspace_domain?: string | null; referral_code: string; referred_email?: string | null; status?: string; visit_count?: number; last_visited_at?: string | null; referred_workspace_domain?: string | null; referred_workspace_user_id?: string | null; converted_at?: string | null; created_at?: string; updated_at?: string };
+        Update: { id?: string; partner_application_id?: string | null; referrer_user_id?: string | null; referrer_workspace_domain?: string | null; referral_code?: string; referred_email?: string | null; status?: string; visit_count?: number; last_visited_at?: string | null; referred_workspace_domain?: string | null; referred_workspace_user_id?: string | null; converted_at?: string | null; updated_at?: string };
         Relationships: [];
       };
       forensic_teaser_rate_windows: {
@@ -194,6 +194,8 @@
       reserve_workspace_agent_scan: { Args: { p_user_id: string; p_workspace_domain: string }; Returns: boolean };
       consume_workspace_api_rate_limit: { Args: { p_key_id: string; p_limit: number }; Returns: boolean };
       consume_forensic_teaser_rate_limit: { Args: { p_key_id: string; p_limit: number }; Returns: boolean };
+      record_agency_referral_visit: { Args: { p_referral_code: string }; Returns: boolean };
+      citemend_opt_in_benchmark_observations: { Args: Record<PropertyKey, never>; Returns: { workspace_key: string; workspace_domain: string; model_name: string; job_status: string; extracted_urls_json: string[] | null; url_status_json: Record<string, number | string> | null }[] };
       citemend_readiness_schema_status: { Args: Record<PropertyKey, never>; Returns: { table_name: string; table_exists: boolean; rls_enabled: boolean; policy_count: number }[] };
       match_sitemap_url: {
         Args: { query_embedding: string; target_domain: string; match_threshold: number; match_count: number; query_model?: string };
