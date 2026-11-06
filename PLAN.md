@@ -846,3 +846,14 @@ Dashboard follow-up: `AuditAnalysisTools` is now connected to the latest complet
 - [x] Verify `npx tsc --noEmit`, `npm run lint`, `npm test` (229 passed), ordered migration tests, and `npm run build` (alternate output directory).
 
 Migration 027 passed ordered local PGlite schema checks, and the user confirmed successful application to hosted Supabase. Benchmark aggregation is disabled by default and only returns category aggregates when at least five opted-in workspaces contribute; source URL status changes are reported only when both observations contain saved status evidence.
+
+## Days 171–180 — Month 12 Operating Metrics, Model Registry & Master QA (COMPLETED IN CODE)
+
+- [x] Add workspace operating telemetry for first completed audit and recovery action timing, redirect verification, reproducible evidence completeness, customer activation, and explicitly estimated scan API gross margin.
+- [x] Add migration 028 for completed audit timestamps and privacy-scoped workspace measurement baselines; keep historical timestamps unmeasured where no baseline exists.
+- [x] Centralize the four displayed AI profiles in `lib/model-registry.ts` with model-version, timeout, and configurable per-call cost estimates; disclose that several profiles are simulations rather than native engine observations.
+- [x] Add an authenticated, owner/workspace-scoped metrics API and dashboard panel, founder-only aggregate endpoint, and dashboard Suspense/loading skeleton.
+- [x] Add tests for metric targets, recovery chronology, verification/evidence rates, model overrides/costs, migration order, and founder authorization.
+- [x] Verify TypeScript, lint, full tests, production dependency audit, and production build; record the twelve-month repository scorecard in `AUDIT_INVENTORY.md`.
+
+Operating metrics use the first valid audit submission as a workspace-creation proxy because the product has no separate workspace-created event. Gross-margin estimates remain unavailable until operators configure model-call cost assumptions; they exclude infrastructure, payment fees, and actual provider usage. Migration 028 passed local ordered schema tests; hosted application is not confirmed. The twelve-month scorecard measures repository implementation and automated QA. Historical live-service setup and production checks explicitly recorded as pending elsewhere in this plan remain external verification items.

@@ -50,7 +50,7 @@ export async function GET(request: Request) {
     // These schemas share select builders but different tenant key columns.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const scopedDb = context.db as any;
-    for (const [table, domainField] of [["redirect_rules", "source_host"], ["ecommerce_catalog_items", "workspace_domain"], ["scheduled_reports", "workspace_domain"], ["workspace_governance_policies", "workspace_domain"]] as const) {
+    for (const [table, domainField] of [["redirect_rules", "source_host"], ["ecommerce_catalog_items", "workspace_domain"], ["scheduled_reports", "workspace_domain"], ["workspace_governance_policies", "workspace_domain"], ["workspace_operating_metrics", "workspace_domain"]] as const) {
       const result = await scopedDb.from(table).select("*").eq("user_id", context.ownerId).eq(domainField, context.domain).limit(10000);
       if (result.error) return json({ error: `Export failed while reading ${table}.` }, 503);
       exported[table] = result.data;
@@ -83,7 +83,7 @@ export async function DELETE(request: Request) {
   // Delete only scoped records; audit children cascade from the owned audit rows.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const scopedDb = context.db as any;
-  for (const [table, domainField] of [["workspace_api_keys", "workspace_domain"], ["ecommerce_catalog_items", "workspace_domain"], ["scheduled_reports", "workspace_domain"], ["workspace_governance_policies", "workspace_domain"], ["citation_change_events", "workspace_domain"], ["autonomous_agent_runs", "workspace_domain"], ["cms_connections", "domain"], ["redirect_rules", "source_host"]] as const) {
+  for (const [table, domainField] of [["workspace_api_keys", "workspace_domain"], ["ecommerce_catalog_items", "workspace_domain"], ["scheduled_reports", "workspace_domain"], ["workspace_governance_policies", "workspace_domain"], ["workspace_operating_metrics", "workspace_domain"], ["citation_change_events", "workspace_domain"], ["autonomous_agent_runs", "workspace_domain"], ["cms_connections", "domain"], ["redirect_rules", "source_host"]] as const) {
     const result = await scopedDb.from(table).delete().eq("user_id", context.ownerId).eq(domainField, context.domain);
     if (result.error) return json({ error: `Deletion paused at ${table}; retry to continue.` }, 503);
   }

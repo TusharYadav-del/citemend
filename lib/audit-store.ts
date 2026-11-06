@@ -5,7 +5,7 @@ import { detectCitationChanges } from "./citation-change-detector";
 
 export class AuditStorageError extends Error {}
 
-export async function persistAudit(report: AuditReport, userId?: string, reservation?: { id: string; createdAt: string }, scheduledId?: string): Promise<{ id: string; createdAt: string }> {
+export async function persistAudit(report: AuditReport, userId?: string, reservation?: { id: string; createdAt: string }, scheduledId?: string, auditStartedAt?: string): Promise<{ id: string; createdAt: string }> {
   if (!userId?.trim()) throw new AuditStorageError("An authenticated Clerk user ID is required to save an audit.");
   let db: ReturnType<typeof createServerDatabase>;
   try { db = createServerDatabase(); } catch { throw new AuditStorageError("Configure the server-only Supabase key and project URL."); }
@@ -47,27 +47,36 @@ export async function persistAudit(report: AuditReport, userId?: string, reserva
         }
       } catch { /* Keep optional analytics independent from core audit persistence. */ }
     }
-    const updateStatus = (includePrompt: boolean, includeCompetitors: boolean, includeCrawl = true) => {
-      let query = db.from("audits").update({ status: report.status, ...(includeCrawl ? { sitemap_url_count: report.sitemapUrlCount } : {}), ...(includePrompt ? { buyer_prompt: report.buyerPrompt } : {}), ...(includeCompetitors && report.competitorDomains?.length ? { competitor_domains: report.competitorDomains } : {}), ...(report.groundTruthPricing ? { ground_truth_pricing: report.groundTruthPricing } : {}), ...(report.shareOfModelScore !== undefined ? { share_of_model_score: report.shareOfModelScore } : {}), ...(report.engineMatrixJson ? { engine_matrix_json: report.engineMatrixJson } : {}) }).eq("id", audit.id).eq("user_id", userId);
+    const updateStatus = (includePrompt: boolean, includeCompetitors: boolean, includeCrawl = true, includeCompletedAt = true) => {
+      let query = db.from("audits").update({ status: report.status, ...(includeCompletedAt ? { completed_at: report.status === "completed" ? new Date().toISOString() : null } : {}), ...(includeCrawl ? { sitemap_url_count: report.sitemapUrlCount } : {}), ...(includePrompt ? { buyer_prompt: report.buyerPrompt } : {}), ...(includeCompetitors && report.competitorDomains?.length ? { competitor_domains: report.competitorDomains } : {}), ...(report.groundTruthPricing ? { ground_truth_pricing: report.groundTruthPricing } : {}), ...(report.shareOfModelScore !== undefined ? { share_of_model_score: report.shareOfModelScore } : {}), ...(report.engineMatrixJson ? { engine_matrix_json: report.engineMatrixJson } : {}) }).eq("id", audit.id).eq("user_id", userId);
       if (reservation) query = query.eq("status", "free_saving").eq("created_at", reservation.createdAt);
       return query;
     };
-    let { error: statusError } = await updateStatus(true, true);
+    let includeCompletedAt = true;
+    let { error: statusError } = await updateStatus(true, true, true, includeCompletedAt);
+    if (statusError && ["PGRST204", "42703"].includes(statusError.code) && statusError.message.includes("completed_at")) {
+      includeCompletedAt = false;
+      ({ error: statusError } = await updateStatus(true, true, true, includeCompletedAt));
+    }
     // Existing deployments keep saving audits while migration 005 is pending.
     if (statusError && ["PGRST204", "42703"].includes(statusError.code) && statusError.message.includes("buyer_prompt")) {
-      ({ error: statusError } = await updateStatus(false, true));
+      ({ error: statusError } = await updateStatus(false, true, true, includeCompletedAt));
     }
     if (statusError && ["PGRST204", "42703"].includes(statusError.code) && statusError.message.includes("competitor_domains")) {
-      ({ error: statusError } = await updateStatus(false, false));
+      ({ error: statusError } = await updateStatus(false, false, true, includeCompletedAt));
     }
     if (statusError && ["PGRST204", "42703"].includes(statusError.code) && statusError.message.includes("sitemap_url_count")) {
-      ({ error: statusError } = await updateStatus(false, false, false));
+      ({ error: statusError } = await updateStatus(false, false, false, includeCompletedAt));
     }
     if (statusError && ["PGRST204", "42703"].includes(statusError.code) && /share_of_model_score|engine_matrix_json/.test(statusError.message)) {
       const fallback = await db.from("audits").update({ status: report.status, ...(report.groundTruthPricing ? { ground_truth_pricing: report.groundTruthPricing } : {}) }).eq("id", audit.id).eq("user_id", userId);
       statusError = fallback.error;
     }
     if (statusError) throw new Error("Status update failed.");
+    if (auditStartedAt) {
+      try { await db.from("workspace_operating_metrics").upsert({ user_id: userId, workspace_domain: report.domain, workspace_created_at: auditStartedAt, baseline_method: "first_valid_audit_submission" }, { onConflict: "user_id,workspace_domain", ignoreDuplicates: true }); }
+      catch { /* Optional metrics storage never invalidates a successfully persisted audit. */ }
+    }
     const { data: verified, error: readError } = await db.from("audits").select("id,user_id,status,broken_links(id)").eq("id", audit.id).eq("user_id", userId).single();
     if (readError || !verified || verified.user_id !== userId || verified.status !== report.status || verified.broken_links.length !== broken.length) throw new Error("Read-back failed.");
     return { id: audit.id, createdAt: audit.created_at };

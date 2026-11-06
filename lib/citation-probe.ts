@@ -1,6 +1,7 @@
 ﻿import "server-only";
 import Groq from "groq-sdk";
 import { extractTextUrls } from "./citation-urls";
+import { getModelDefinition } from "./model-registry";
 
 export interface CitationProbeResult {
   text: string;
@@ -69,8 +70,9 @@ export async function runCitationProbe(domain: string, buyerPrompt: string): Pro
     } catch { warnings.push("Tavily search was unavailable; the answer may include model-known URLs without live search evidence."); }
   } else warnings.push("TAVILY_API_KEY is missing; the answer has no live web-search grounding.");
 
-  const model = process.env.GROQ_MODEL?.trim() || "openai/gpt-oss-120b";
-  const groq = new Groq({ apiKey, timeout: 45_000, maxRetries: 0 });
+  const modelConfig = getModelDefinition("chatgpt_search");
+  const model = modelConfig.model;
+  const groq = new Groq({ apiKey, timeout: modelConfig.timeoutMs, maxRetries: 0 });
   let text: string;
   try {
     const completion = await groq.chat.completions.create({

@@ -18,16 +18,16 @@ test("retention and scheduled-report cron configuration uses the protected daily
   ]);
 });
 
-test("migrations 001 through 027 apply in order and expose the columns used by the application", async () => {
+test("migrations 001 through 028 apply in order and expose the columns used by the application", async () => {
   const db = new PGlite({ extensions: { vector } });
   try {
     await db.exec("create role anon; create role authenticated; create role service_role bypassrls;");
     const directory = new URL("../supabase/migrations/", import.meta.url);
     const files = (await readdir(directory)).filter(name => /^\d{3}_.+\.sql$/.test(name)).sort();
-    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 27 }, (_, index) => String(index + 1).padStart(3, "0")));
+    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 28 }, (_, index) => String(index + 1).padStart(3, "0")));
     for (const file of files) await db.exec(await readFile(new URL(file, directory), "utf8"));
     const expected: Record<string, string[]> = {
-      audits: ["id", "user_id", "domain", "buyer_prompt", "status", "created_at", "competitor_domains", "ground_truth_pricing", "indexnow_key", "share_of_model_score", "engine_matrix_json", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text", "llms_txt_content", "webhook_url", "sitemap_url_count"],
+      audits: ["id", "user_id", "domain", "buyer_prompt", "status", "created_at", "completed_at", "competitor_domains", "ground_truth_pricing", "indexnow_key", "share_of_model_score", "engine_matrix_json", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text", "llms_txt_content", "webhook_url", "sitemap_url_count"],
       broken_links: ["id", "audit_id", "cited_url", "http_status", "suggested_redirect", "url_state", "approval_status", "approved_by", "approved_at", "previous_destination_url", "deployed_at", "rolled_back_at", "match_evidence_reason", "match_confidence", "created_at"],
       subscriptions: ["id", "user_id", "store_id", "product_id", "variant_id", "status", "plan", "current_period_end", "ends_at", "cancelled", "provider_updated_at"],
       weekly_scan_runs: ["id", "week_start", "status", "lease_token", "digests_prepared_at"],
@@ -53,6 +53,7 @@ test("migrations 001 through 027 apply in order and expose the columns used by t
       workspace_governance_policies: ["id", "user_id", "workspace_domain", "monthly_scan_quota", "scans_used_this_month", "usage_month", "entity_truth_baseline_json", "allow_benchmark_aggregation", "benchmark_category", "created_at", "updated_at"],
       scheduled_reports: ["id", "user_id", "workspace_domain", "report_type", "schedule_at", "recurrence_interval", "status", "payload_json", "created_at", "updated_at"],
       citation_change_events: ["id", "user_id", "workspace_domain", "audit_id", "previous_observation_id", "current_observation_id", "prompt_query", "event_type", "source_url", "replacement_url", "new_replacement_url", "replaced_by_competitor", "evidence_json", "detected_at"],
+      workspace_operating_metrics: ["user_id", "workspace_domain", "workspace_created_at", "baseline_method", "created_at"],
     };
     const result = await db.query<{ table_name: string; column_name: string; is_nullable: string }>("select table_name, column_name, is_nullable from information_schema.columns where table_schema = 'public'");
     for (const [table, columns] of Object.entries(expected)) {

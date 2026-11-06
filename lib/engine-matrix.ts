@@ -1,9 +1,6 @@
-export const ENGINE_PROFILES = [
-  "ChatGPT Search",
-  "Perplexity Sonar",
-  "Google Gemini",
-  "Claude",
-] as const;
+import { MODEL_PROFILE_NAMES } from "./model-registry";
+
+export const ENGINE_PROFILES = MODEL_PROFILE_NAMES;
 
 export type EngineName = typeof ENGINE_PROFILES[number];
 export type EngineStatus = "cited_rank_1" | "cited_rank_2_plus" | "cited_dead_404_slug" | "cited_reddit_thread" | "omitted_competitor_won" | "cited_unverified" | "omitted_no_competitor" | "not_evaluated";

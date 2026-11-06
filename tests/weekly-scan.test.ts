@@ -337,7 +337,8 @@ test("existing audit saving remains compatible until the prompt column migration
   };
   const report: Parameters<typeof persistAudit>[0] = { domain: "example.com", buyerPrompt: "Custom prompt", generatedText: "", groundingMetadata: null, extractedUrls: [], sitemapUrlCount: 0, warnings: [], status: "completed", findings: [] };
   assert.equal((await persistAudit(report, "pro-user")).id, "audit-1");
-  assert.deepEqual(updates, [{ status: "completed", sitemap_url_count: 0, buyer_prompt: "Custom prompt" }, { status: "completed", sitemap_url_count: 0 }]);
+  assert.deepEqual(updates.map(update => Object.fromEntries(Object.entries(update).filter(([key]) => key !== "completed_at"))), [{ status: "completed", sitemap_url_count: 0, buyer_prompt: "Custom prompt" }, { status: "completed", sitemap_url_count: 0 }]);
+  assert.ok(updates.every(update => typeof update.completed_at === "string"));
 });
 test("free audit reservations also survive a missing buyer_prompt column", async () => {
   const { persistAudit } = await import("../lib/audit-store");
@@ -361,7 +362,8 @@ test("free audit reservations also survive a missing buyer_prompt column", async
   };
   const report: Parameters<typeof persistAudit>[0] = { domain: "example.com", buyerPrompt: "Custom prompt", generatedText: "", groundingMetadata: null, extractedUrls: [], sitemapUrlCount: 0, warnings: [], status: "completed", findings: [] };
   await persistAudit(report, "free-user", { id: "reserved-id", createdAt });
-  assert.deepEqual(updates, [{ status: "free_saving" }, { status: "completed", sitemap_url_count: 0, buyer_prompt: "Custom prompt" }, { status: "completed", sitemap_url_count: 0 }]);
+  assert.deepEqual(updates.map(update => Object.fromEntries(Object.entries(update).filter(([key]) => key !== "completed_at"))), [{ status: "free_saving" }, { status: "completed", sitemap_url_count: 0, buyer_prompt: "Custom prompt" }, { status: "completed", sitemap_url_count: 0 }]);
+  assert.ok(updates.slice(1).every(update => typeof update.completed_at === "string"));
 });
 test("a completed weekly run is not started again", async () => {
   const store = fakeStore([makeJob("never-run", "pro")]);

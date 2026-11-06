@@ -9,6 +9,8 @@ import { inspectThirdPartyCitations } from "./listicle-crawler";
 import { detectEntityPricingTruth } from "./entity-truth";
 import { stampAgencyProfile } from "./agency-store";
 import { getAuditQuota } from "./audit-quota";
+import { createServerDatabase } from "./supabase-server";
+import { ensureWorkspaceOperatingBaseline } from "./operating-metrics";
 
 type AuditPostDependencies = {
   isConfigured?: () => boolean;
@@ -108,8 +110,12 @@ export function createAuditPostHandler(dependencies: AuditPostDependencies = {})
       reservation = { id: result.id, createdAt: result.createdAt };
     }
 
+    const auditStartedAt = new Date().toISOString();
+    try { await ensureWorkspaceOperatingBaseline(createServerDatabase(), userId, domain, auditStartedAt); }
+    catch { /* Metrics telemetry must never block a valid audit. */ }
+
     try {
-      const report = await execute(input, { ...(quota ? { sitemapPageLimit: quota.maxSitemapPages } : {}), ...(reservation ? { save: (value, owner) => persistAudit(value, owner, reservation) } : {}) }, userId);
+      const report = await execute(input, { ...(quota ? { sitemapPageLimit: quota.maxSitemapPages } : {}), save: (value, owner) => persistAudit(value, owner, reservation, undefined, auditStartedAt) }, userId);
       let hijackResult: Awaited<ReturnType<typeof findCompetitor404Opportunities>> | null = null;
       let listicleResult: Awaited<ReturnType<typeof inspectThirdPartyCitations>> | null = null;
       let entityTruthResult: Awaited<ReturnType<typeof detectEntityPricingTruth>> | null = null;

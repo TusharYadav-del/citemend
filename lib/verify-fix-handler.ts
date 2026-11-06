@@ -140,8 +140,8 @@ export function createVerifyFixHandler(dependencies: Dependencies = {}) {
         const evidence = await record({ audit_id: input.auditId, domain, prompt_query: audit.buyer_prompt, provider: result.providerUsed, model_name: "configured-citation-probe", search_method: "verify-fix-follow-up", locale: "en-US", raw_answer: result.text, extracted_urls: cited, job_status: "completed" });
         const observationAt = new Date().toISOString();
         probeCitedLiveUrl = technicalDeploymentVerified && observationCitesCanonical({ technicalVerified: true, observationAt, technicalVerifiedAt: technicalVerifiedAt!, extractedUrls: cited, canonicalUrl: target.href });
-        if (probeCitedLiveUrl) {
-          const updateOutcome = await db.from("recovery_outcomes").update({ ai_citation_observed_at: observationAt, evidence_id: evidence.id }).eq("audit_id", input.auditId).eq("broken_link_id", link.id).eq("canonical_destination_url", target.href);
+        if (technicalDeploymentVerified) {
+          const updateOutcome = await db.from("recovery_outcomes").update({ evidence_id: evidence.id, ...(probeCitedLiveUrl ? { ai_citation_observed_at: observationAt } : {}) }).eq("audit_id", input.auditId).eq("broken_link_id", link.id).eq("canonical_destination_url", target.href);
           if (updateOutcome.error) throw updateOutcome.error;
         }
       } catch { probeWarning = "The AI citation re-check was unavailable; a successful HTTP check can still verify the redirect."; }

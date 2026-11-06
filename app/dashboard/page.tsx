@@ -40,6 +40,7 @@ import ScheduledReportSettings from "@/components/ScheduledReportSettings";
 import { canWorkspace } from "@/lib/rbac";
 import { resolveWorkspaceAccess } from "@/lib/workspace-access";
 import { AiVisibilityInsights } from "@/components/ai-visibility-insights";
+import { WorkspaceOperatingMetrics, OperatingMetricsSkeleton } from "@/components/workspace-operating-metrics";
 
 function HistoryLoading() {
   return <main className="min-h-screen bg-[#07090E] px-5 py-10 text-white sm:px-8 sm:py-14" role="status" aria-label="Loading your command center"><div className="h-8 w-52 animate-pulse rounded-lg bg-white/10" /><div className="mt-8 grid gap-4 sm:grid-cols-4">{[0, 1, 2, 3].map((item) => <div key={item} className="h-32 animate-pulse rounded-2xl bg-white/[0.04]" />)}</div><span className="sr-only">Loading your audit history...</span></main>;
@@ -199,7 +200,7 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
       <OnboardingChecklist progress={onboarding} />
       <AuditTemplates />
       <MetricCards audits={audits} rescued={access.organizationId?null:rescued} deployments={deploymentCount} citations={citationCount} activeWorkspaces={new Set(audits.map(audit => audit.domain)).size} />
-      <section aria-label="Citation intelligence overview" className="mb-5 rounded-xl border border-white/10 bg-white/[0.02] p-4"><h2 className="text-sm font-semibold">Citation intelligence overview</h2><AiVisibilityInsights domain={selectedDomain || allDomains[0] || ""} compact /></section>
+      <Suspense fallback={<OperatingMetricsSkeleton />}><WorkspaceOperatingMetrics domain={selectedDomain || allDomains[0] || ""} ownerUserIds={ownerIds} actorUserIds={[...new Set([...ownerIds, userId])]} organizationId={access.organizationId} /></Suspense>
       {latestReport && <section aria-label="Quick tools" className="mb-6 rounded-xl border border-white/10 bg-white/[0.03] p-4"><h2 className="text-sm font-semibold text-white">Quick Tools</h2><a href={`/audit/${latestReport.id}?print=1`} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg border border-emerald-400/30 px-3 py-2 text-xs font-semibold text-emerald-300">Export Report / Save as PDF</a><p className="mt-2 text-xs text-slate-500">Opens the latest report for {latestReport.domain}.</p></section>}
       {access.organizationId===null&&<AuditAnalysisTools auditId={latestReport?.id} />}
       <div id="ai-scanner" className="mb-3 scroll-mt-8 rounded-xl border border-white/10 bg-white/[0.02] p-4"><h2 className="text-sm font-semibold">AI Scanner</h2><p className="mt-1 text-xs text-slate-400">Run a saved, search-grounded buyer prompt audit and review its recorded sources.</p>{canWorkspace(access.role,"scan")&&<Link href="/#audit" className="mt-2 inline-block text-xs text-emerald-300">Start an audit →</Link>}</div>

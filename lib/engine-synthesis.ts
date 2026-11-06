@@ -3,12 +3,14 @@ import Groq from "groq-sdk";
 import { GoogleGenAI } from "@google/genai";
 import { normalizeCitationUrl } from "./citation-urls";
 import type { EngineName } from "./engine-matrix";
+import { getModelDefinition, type ModelId } from "./model-registry";
 
 export type GroundedSource = { url: string; title: string; content?: string; publishedAt?: string | null };
 export type SynthesizedProfile = { engine: EngineName; urls: string[]; provider: string; available: boolean };
 type Job = { prompt: string; sources: GroundedSource[] };
 type Work = { index: number; engine: Exclude<EngineName, "ChatGPT Search"> };
 const engines: Work["engine"][] = ["Perplexity Sonar", "Google Gemini", "Claude"];
+const profileId: Record<Work["engine"], ModelId> = { "Perplexity Sonar": "perplexity_sonar", "Google Gemini": "google_gemini", Claude: "claude" };
 
 export function parseProfileCitations(text: string, sources: GroundedSource[]): string[] {
   if (text.length > 12_000) throw new Error("Profile response too large.");
@@ -32,11 +34,11 @@ export async function synthesizeEngineProfiles(jobs: Job[]): Promise<Synthesized
   const queue: Work[] = jobs.flatMap((_, index) => engines.map(engine => ({ index, engine })));
   const apiKey = process.env.GROQ_API_KEY;
   const deadline = Date.now() + 15_000;
-  const groq = apiKey ? new Groq({ apiKey, timeout: 6_000, maxRetries: 0 }) : null;
   let cursor = 0;
   await Promise.all(Array.from({ length: Math.min(4, queue.length) }, async () => {
     while (cursor < queue.length) {
       const job = queue[cursor++];
+      const config = getModelDefinition(profileId[job.engine]);
       const sources = newestFirst(jobs[job.index].sources);
       const unavailable: SynthesizedProfile = { engine: job.engine, urls: [], provider: "unavailable", available: false };
       if (!sources.length || Date.now() >= deadline) { results[job.index].push(unavailable); continue; }
@@ -47,17 +49,19 @@ export async function synthesizeEngineProfiles(jobs: Job[]): Promise<Synthesized
       try {
         if (job.engine === "Google Gemini" && process.env.GEMINI_API_KEY) {
           try {
-            const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY, httpOptions: { timeout: 5_000, retryOptions: { attempts: 1 } } });
-            const answer = await ai.models.generateContent({ model: "gemini-3.8-flash", contents: `${instruction}\n${context}`, config: { responseMimeType: "application/json", maxOutputTokens: 1024, abortSignal: AbortSignal.timeout(Math.max(1, Math.min(5000, deadline - Date.now()))) } });
+            const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY, httpOptions: { timeout: config.timeoutMs, retryOptions: { attempts: 1 } } });
+            const answer = await ai.models.generateContent({ model: config.model, contents: `${instruction}\n${context}`, config: { responseMimeType: "application/json", maxOutputTokens: 1024, abortSignal: AbortSignal.timeout(Math.max(1, Math.min(config.timeoutMs, deadline - Date.now()))) } });
             text = answer.text ?? "";
             parseProfileCitations(text, sources);
-            provider = "gemini-3.8-flash";
+            provider = config.model;
           } catch { text = ""; }
         }
-        if (!text && groq && Date.now() < deadline) {
-          const response = await groq.chat.completions.create({ model: "openai/gpt-oss-20b", messages: [{ role: "system", content: instruction }, { role: "user", content: context }], response_format: { type: "json_object" }, temperature: 0.1, max_completion_tokens: 1024 }, { signal: AbortSignal.timeout(Math.max(1, Math.min(6000, deadline - Date.now()))) });
+        if (!text && apiKey && Date.now() < deadline) {
+          const groqModel = job.engine === "Google Gemini" ? config.fallbackModel ?? config.model : config.model;
+          const groq = new Groq({ apiKey, timeout: config.timeoutMs, maxRetries: 0 });
+          const response = await groq.chat.completions.create({ model: groqModel, messages: [{ role: "system", content: instruction }, { role: "user", content: context }], response_format: { type: "json_object" }, temperature: 0.1, max_completion_tokens: 1024 }, { signal: AbortSignal.timeout(Math.max(1, Math.min(config.timeoutMs, deadline - Date.now()))) });
           text = response.choices[0]?.message?.content ?? "";
-          provider = "groq-openai/gpt-oss-20b";
+          provider = `groq-${groqModel}`;
         }
         if (!text) throw new Error("Profile unavailable.");
         results[job.index].push({ engine: job.engine, urls: parseProfileCitations(text, sources), provider, available: true });

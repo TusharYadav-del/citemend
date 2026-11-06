@@ -23,7 +23,7 @@ export function AiVisibilityInsights({ domain, compact = false }: { domain: stri
 
   if (!domain) return <p className="mt-1 text-xs text-slate-400">Run an audit to build citation history for this panel.</p>;
   if (unavailable) return <p className="mt-1 text-xs text-slate-400">Citation predictions are currently unavailable.</p>;
-  if (!data) return <p className="mt-1 text-xs text-slate-400">Loading historical citation signals…</p>;
+  if (!data) return <div aria-label="Loading citation intelligence" aria-busy="true" className="mt-4 space-y-3"><div className="h-4 w-48 animate-pulse rounded bg-white/10" /><div className="h-20 animate-pulse rounded-lg bg-white/[.04]" /><div className="h-28 animate-pulse rounded-lg bg-white/[.04]" /></div>;
   if (compact) {
     const highRisk = data.predictions.filter((prediction) => prediction.decay_risk_score >= 60).length;
     return <div className="mt-3 flex flex-wrap gap-2 text-xs"><span className="rounded-full border border-amber-300/20 px-3 py-1 text-amber-200">{data.sourceReplacementAlerts.length} source-change alerts</span><span className="rounded-full border border-rose-300/20 px-3 py-1 text-rose-200">{highRisk} high decay risks</span><span className="rounded-full border border-white/10 px-3 py-1 text-slate-300">{data.predictions.length} cited URL estimates with 95% intervals</span></div>;

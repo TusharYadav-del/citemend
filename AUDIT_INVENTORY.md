@@ -1,6 +1,6 @@
-# CiteMend Repository Truth Audit
+﻿# CiteMend Repository Truth Audit
 
-**Scope:** repository inspection for Days 85–88 (Phase 0 and Phase 1). Status reflects code present in this checkout and checked behavior; it does not claim external provider, hosted Supabase, Vercel, or Shopify production state unless explicitly stated.
+**Scope:** repository inspection for Days 85â€“88 (Phase 0 and Phase 1). Status reflects code present in this checkout and checked behavior; it does not claim external provider, hosted Supabase, Vercel, or Shopify production state unless explicitly stated.
 
 ## Feature inventory
 
@@ -74,7 +74,7 @@
 | `workspace_integrations` | Shopify, Slack/Discord, and agency settings | Shipped |
 | `pixel_intercept_quotas` | Atomic per-domain interceptor quota | Shipped |
 
-Migration files are numbered 001-021 and the local schema test applies them in order, then compares TypeScript row fields and SQL nullability. The user confirmed migration 020 was applied. Migration 021 is new in this task and the user confirmed it was applied to hosted Supabase before deployment.
+Migration files are numbered 001-028 and the local schema test applies them in order, then compares TypeScript row fields and SQL nullability. The user confirmed hosted application of migrations 020, 021, and 027. Migration 028 passed locally; hosted application is not confirmed.
 
 ## Security and operational checks
 
@@ -88,3 +88,40 @@ Migration files are numbered 001-021 and the local schema test applies them in o
 | Recovery safety and action history | Migrations 020/021 are additive; approval checks enforce canonical-host URLs, a non-looping same-host redirect chain, no live HTTP 200 source overwrite, no conflicting active source rule, and a final HTTP 200 destination. Action rows are append-only and service-role-only. | Shipped in code; user confirmed hosted migration 021 was applied |
 | Opportunity lifecycle guardrails | API stages advance one step at a time and keep actor/time/note events; scores use equal 25% weights for relevance, buyer intent, citation evidence, and replacement quality. Outreach and Reddit content remain human-reviewed drafts. | Shipped in code; user confirmed hosted migration 021 was applied |
 | External production state | This inspection did not make live provider calls or inspect Vercel, Shopify, Clerk, Lemon Squeezy, or hosted Supabase dashboards. Day 84 records the Agency variant as pending/test-mode. | Needs Verification |
+
+## Month 12 additions
+
+| Feature | Evidence | Status |
+| --- | --- | --- |
+| Workspace operating metrics and founder aggregates | `lib/operating-metrics.ts`, `app/api/metrics/operating/route.ts`, workspace metrics dashboard components, migration 028 | Shipped in code; telemetry is workspace owner-scoped; hosted migration 028 is not confirmed |
+| Dynamic model profiles | `lib/model-registry.ts`, `lib/citation-probe.ts`, `lib/engine-synthesis.ts`, `lib/engine-matrix.ts` | Shipped; profile simulation/native-provider limitations are explicitly exposed |
+| Gross margin estimator | `lib/model-registry.ts`, `lib/operating-metrics.ts` | Shipped as a configurable estimate; stays unavailable until model-call cost assumptions are configured |
+
+## Final 12-Month Roadmap Completion Scorecard
+
+The score is for repository implementation and automated QA, not customer production rollout. A 100% shipped/tested mark means the scoped code is present and the final repository-wide checks below pass. It does not override historical live provider, hosted migration, billing, account, or deployment checks marked pending in this file or `PLAN.md`.
+
+| Month | Roadmap scope recorded in `PLAN.md` | Repository status | Automated QA |
+| --- | --- | --- | --- |
+| 1 | Days 1-20: setup, audit foundation, authentication, billing and first retrospectives | 100% shipped | Final suite passed |
+| 2 | Days 21-40: edge recovery, telemetry, alerts and weekly scans | 100% shipped | Final suite passed |
+| 3 | Days 41-60: launch experience, integrations, onboarding and batch QA | 100% shipped | Final suite passed |
+| 4 | Days 61-80: engine matrix, visibility and workspace dashboard capabilities | 100% shipped | Final suite passed |
+| 5 | Days 81-100: recovery safety, redirect approval and opportunity workflows | 100% shipped | Final suite passed |
+| 6 | Days 101-120: evidence, integrations, forensics and intelligence graph | 100% shipped | Final suite passed |
+| 7 | Days 121-130: controlled autonomous recovery agents | 100% shipped | Final suite passed |
+| 8 | Days 131-140: ecommerce catalog and SKU recovery | 100% shipped | Final suite passed |
+| 9 | Days 141-150: enterprise workspaces and governance | 100% shipped | Final suite passed |
+| 10 | Days 151-160: Public API, MCP and evidence distribution | 100% shipped | Final suite passed |
+| 11 | Days 161-170: citation change and predictive intelligence | 100% shipped | Final suite passed |
+| 12 | Days 171-180: operating metrics, model registry and master QA | 100% shipped | Final suite passed |
+
+**Repository score: 12/12 months shipped and automated checks passing.** Remaining live checks are operational prerequisites, not silently included in this score: earlier plan entries identify pending billing/webhook activation, signed-in or provider checks, live Shopify/Cloudflare behavior, and hosted migration state. Apply migration 028 before deploying this metrics feature. Set `CITEMEND_MODEL_COST_*_USD_PER_CALL` before using the gross-margin estimate; the default is intentionally unavailable rather than invented.
+
+### Final master QA run (2026-11-06)
+
+- `npx tsc --noEmit`: pass.
+- `npm run lint`: pass with zero errors; two existing unused-parameter warnings remain in `app/layout.tsx`.
+- `npm test`: pass (234 tests).
+- `npm audit --omit=dev`: pass, zero production dependency vulnerabilities.
+- `npm run build`: pass (`.next-month12-check`, isolated output directory).
