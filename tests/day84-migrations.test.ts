@@ -18,13 +18,13 @@ test("retention and scheduled-report cron configuration uses the protected daily
   ]);
 });
 
-test("migrations 001 through 026 apply in order and expose the columns used by the application", async () => {
+test("migrations 001 through 027 apply in order and expose the columns used by the application", async () => {
   const db = new PGlite({ extensions: { vector } });
   try {
     await db.exec("create role anon; create role authenticated; create role service_role bypassrls;");
     const directory = new URL("../supabase/migrations/", import.meta.url);
     const files = (await readdir(directory)).filter(name => /^\d{3}_.+\.sql$/.test(name)).sort();
-    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 26 }, (_, index) => String(index + 1).padStart(3, "0")));
+    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 27 }, (_, index) => String(index + 1).padStart(3, "0")));
     for (const file of files) await db.exec(await readFile(new URL(file, directory), "utf8"));
     const expected: Record<string, string[]> = {
       audits: ["id", "user_id", "domain", "buyer_prompt", "status", "created_at", "competitor_domains", "ground_truth_pricing", "indexnow_key", "share_of_model_score", "engine_matrix_json", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text", "llms_txt_content", "webhook_url", "sitemap_url_count"],
@@ -43,16 +43,16 @@ test("migrations 001 through 026 apply in order and expose the columns used by t
       rescued_ai_visits: ["id", "domain", "broken_path", "rescued_target_url", "ai_referrer", "similarity_score", "latency_ms", "created_at"],
       workspace_integrations: ["id", "user_id", "domain", "slack_webhook_url", "discord_webhook_url", "shopify_store_domain", "shopify_admin_token", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text"],
       pixel_intercept_quotas: ["domain", "window_started_at", "request_count"],
-      ai_observation_evidence: ["id", "audit_id", "domain", "prompt_query", "prompt_version", "provider", "model_name", "search_method", "locale", "raw_answer", "extracted_urls_json", "sample_size", "observation_confidence", "job_status", "retry_count", "error_message", "observed_at"],
+      ai_observation_evidence: ["id", "audit_id", "domain", "prompt_query", "prompt_version", "provider", "model_name", "search_method", "locale", "raw_answer", "extracted_urls_json", "url_status_json", "sample_size", "observation_confidence", "job_status", "retry_count", "error_message", "observed_at"],
       recovery_outcomes: ["id", "audit_id", "domain", "broken_link_id", "canonical_destination_url", "technical_deployment_verified_at", "ai_citation_observed_at", "evidence_id", "created_at"],
       webhook_events_log: ["id", "event_id", "provider", "event_type", "delivery_status", "retry_count", "last_error", "received_at", "completed_at"],
       workspace_api_keys: ["id", "user_id", "workspace_domain", "key_hash", "key_prefix", "permissions_json", "rate_limit_per_minute", "last_used_at", "created_at", "revoked_at"],
       autonomous_agent_runs: ["id", "user_id", "workspace_domain", "audit_id", "opportunity_id", "broken_link_id", "action_type", "risk_level", "current_step", "run_status", "human_approved_by", "human_approved_at", "evidence_json", "recommendation_json", "result_json", "stage_history_json", "rollback_snapshot_json", "rollback_completed_at", "error_message", "created_at", "updated_at"],
       ecommerce_catalog_items: ["id", "user_id", "workspace_domain", "platform", "external_item_id", "canonical_url", "product_json", "synced_at"],
       organization_members: ["id", "organization_id", "owner_user_id", "member_user_id", "role", "created_at"],
-      workspace_governance_policies: ["id", "user_id", "workspace_domain", "monthly_scan_quota", "scans_used_this_month", "usage_month", "entity_truth_baseline_json", "created_at", "updated_at"],
+      workspace_governance_policies: ["id", "user_id", "workspace_domain", "monthly_scan_quota", "scans_used_this_month", "usage_month", "entity_truth_baseline_json", "allow_benchmark_aggregation", "benchmark_category", "created_at", "updated_at"],
       scheduled_reports: ["id", "user_id", "workspace_domain", "report_type", "schedule_at", "recurrence_interval", "status", "payload_json", "created_at", "updated_at"],
-      citation_change_events: ["id", "user_id", "workspace_domain", "audit_id", "previous_observation_id", "current_observation_id", "prompt_query", "event_type", "source_url", "replacement_url", "evidence_json", "detected_at"],
+      citation_change_events: ["id", "user_id", "workspace_domain", "audit_id", "previous_observation_id", "current_observation_id", "prompt_query", "event_type", "source_url", "replacement_url", "new_replacement_url", "replaced_by_competitor", "evidence_json", "detected_at"],
     };
     const result = await db.query<{ table_name: string; column_name: string; is_nullable: string }>("select table_name, column_name, is_nullable from information_schema.columns where table_schema = 'public'");
     for (const [table, columns] of Object.entries(expected)) {

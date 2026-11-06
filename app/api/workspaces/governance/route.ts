@@ -60,8 +60,8 @@ export async function GET(request: Request) {
     return new Response(JSON.stringify({ exportedAt: new Date().toISOString(), workspace: context.domain, data: exported }, null, 2), { headers: { "Content-Type": "application/json", "Content-Disposition": `attachment; filename="citemend-${context.domain}-export.json"`, "Cache-Control": "private, no-store" } });
   }
   const context = await workspaceContext(request, "read"); if (isResponse(context)) return context;
-  const result = await context.db.from("workspace_governance_policies").select("observation_retention_days,require_two_person_redirect_approval,api_rate_limit_per_minute,monthly_scan_quota").eq("user_id", context.ownerId).eq("workspace_domain", context.domain).maybeSingle();
-  return result.error ? json({ error: "Policy unavailable." }, 503) : json({ policy: result.data ?? { observation_retention_days: 365, require_two_person_redirect_approval: false, api_rate_limit_per_minute: 60, monthly_scan_quota: 20 } });
+  const result = await context.db.from("workspace_governance_policies").select("observation_retention_days,require_two_person_redirect_approval,api_rate_limit_per_minute,monthly_scan_quota,allow_benchmark_aggregation,benchmark_category").eq("user_id", context.ownerId).eq("workspace_domain", context.domain).maybeSingle();
+  return result.error ? json({ error: "Policy unavailable." }, 503) : json({ policy: result.data ?? { observation_retention_days: 365, require_two_person_redirect_approval: false, api_rate_limit_per_minute: 60, monthly_scan_quota: 20, allow_benchmark_aggregation: false, benchmark_category: "other" } });
 }
 
 export async function PATCH(request: Request) {
@@ -70,7 +70,9 @@ export async function PATCH(request: Request) {
   if (parsed.kind !== "ok" || !parsed.value || typeof parsed.value !== "object") return json({ error: "Provide policy values." }, 400);
   const policy = parsed.value as Record<string, unknown>;
   if (![90, 180, 365].includes(policy.observation_retention_days as number) || typeof policy.require_two_person_redirect_approval !== "boolean" || !Number.isInteger(policy.api_rate_limit_per_minute) || (policy.api_rate_limit_per_minute as number) < 1 || (policy.api_rate_limit_per_minute as number) > 600) return json({ error: "Retention must be 90, 180, or 365 days; rate limit must be 1–600." }, 400);
-  const saved = await context.db.from("workspace_governance_policies").upsert({ user_id: context.ownerId, workspace_domain: context.domain, observation_retention_days: policy.observation_retention_days as number, require_two_person_redirect_approval: policy.require_two_person_redirect_approval, api_rate_limit_per_minute: policy.api_rate_limit_per_minute as number }, { onConflict: "user_id,workspace_domain" }).select("observation_retention_days,require_two_person_redirect_approval,api_rate_limit_per_minute").single();
+  if (typeof policy.allow_benchmark_aggregation !== "boolean") return json({ error: "Set benchmark aggregation opt-in explicitly." }, 400);
+  if (!['b2b_saas', 'ecommerce', 'agency', 'other'].includes(policy.benchmark_category as string)) return json({ error: "Choose a supported benchmark category." }, 400);
+  const saved = await context.db.from("workspace_governance_policies").upsert({ user_id: context.ownerId, workspace_domain: context.domain, observation_retention_days: policy.observation_retention_days as number, require_two_person_redirect_approval: policy.require_two_person_redirect_approval, api_rate_limit_per_minute: policy.api_rate_limit_per_minute as number, allow_benchmark_aggregation: policy.allow_benchmark_aggregation, benchmark_category: policy.benchmark_category as string }, { onConflict: "user_id,workspace_domain" }).select("observation_retention_days,require_two_person_redirect_approval,api_rate_limit_per_minute,allow_benchmark_aggregation,benchmark_category").single();
   return saved.error ? json({ error: "Policy could not be saved." }, 503) : json({ policy: saved.data });
 }
 

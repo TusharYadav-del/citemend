@@ -2,9 +2,9 @@
   public: {
     Tables: {
       ai_observation_evidence: {
-        Row: { id: string; audit_id: string; domain: string; prompt_query: string; prompt_version: string; provider: string; model_name: string; search_method: string; locale: string; raw_answer: string; extracted_urls_json: string[]; sample_size: number; observation_confidence: number | null; job_status: string; retry_count: number; error_message: string | null; observed_at: string };
-        Insert: { id?: string; audit_id: string; domain: string; prompt_query: string; prompt_version?: string; provider: string; model_name: string; search_method: string; locale?: string; raw_answer: string; extracted_urls_json?: string[]; sample_size?: number; observation_confidence?: number | null; job_status?: string; retry_count?: number; error_message?: string | null; observed_at?: string };
-        Update: { id?: string; audit_id?: string; domain?: string; prompt_query?: string; prompt_version?: string; provider?: string; model_name?: string; search_method?: string; locale?: string; raw_answer?: string; extracted_urls_json?: string[]; sample_size?: number; observation_confidence?: number | null; job_status?: string; retry_count?: number; error_message?: string | null; observed_at?: string };
+        Row: { id: string; audit_id: string; domain: string; prompt_query: string; prompt_version: string; provider: string; model_name: string; search_method: string; locale: string; raw_answer: string; extracted_urls_json: string[]; url_status_json: Record<string, number | string>; sample_size: number; observation_confidence: number | null; job_status: string; retry_count: number; error_message: string | null; observed_at: string };
+        Insert: { id?: string; audit_id: string; domain: string; prompt_query: string; prompt_version?: string; provider: string; model_name: string; search_method: string; locale?: string; raw_answer: string; extracted_urls_json?: string[]; url_status_json?: Record<string, number | string>; sample_size?: number; observation_confidence?: number | null; job_status?: string; retry_count?: number; error_message?: string | null; observed_at?: string };
+        Update: { id?: string; audit_id?: string; domain?: string; prompt_query?: string; prompt_version?: string; provider?: string; model_name?: string; search_method?: string; locale?: string; raw_answer?: string; extracted_urls_json?: string[]; url_status_json?: Record<string, number | string>; sample_size?: number; observation_confidence?: number | null; job_status?: string; retry_count?: number; error_message?: string | null; observed_at?: string };
         Relationships: [];
       };
       recovery_outcomes: {
@@ -44,9 +44,9 @@
         Relationships: [];
       };
       workspace_governance_policies: {
-        Row: { id: string; user_id: string; workspace_domain: string; monthly_scan_quota: number; scans_used_this_month: number; usage_month: string; entity_truth_baseline_json: Record<string, unknown>; observation_retention_days: number; require_two_person_redirect_approval: boolean; api_rate_limit_per_minute: number; created_at: string; updated_at: string };
-        Insert: { id?: string; user_id: string; workspace_domain: string; monthly_scan_quota?: number; scans_used_this_month?: number; usage_month?: string; entity_truth_baseline_json?: Record<string, unknown>; observation_retention_days?: number; require_two_person_redirect_approval?: boolean; api_rate_limit_per_minute?: number; created_at?: string; updated_at?: string };
-        Update: { id?: string; user_id?: string; workspace_domain?: string; monthly_scan_quota?: number; scans_used_this_month?: number; usage_month?: string; entity_truth_baseline_json?: Record<string, unknown>; observation_retention_days?: number; require_two_person_redirect_approval?: boolean; api_rate_limit_per_minute?: number; updated_at?: string };
+        Row: { id: string; user_id: string; workspace_domain: string; monthly_scan_quota: number; scans_used_this_month: number; usage_month: string; entity_truth_baseline_json: Record<string, unknown>; observation_retention_days: number; require_two_person_redirect_approval: boolean; api_rate_limit_per_minute: number; allow_benchmark_aggregation: boolean; benchmark_category: string; created_at: string; updated_at: string };
+        Insert: { id?: string; user_id: string; workspace_domain: string; monthly_scan_quota?: number; scans_used_this_month?: number; usage_month?: string; entity_truth_baseline_json?: Record<string, unknown>; observation_retention_days?: number; require_two_person_redirect_approval?: boolean; api_rate_limit_per_minute?: number; allow_benchmark_aggregation?: boolean; benchmark_category?: string; created_at?: string; updated_at?: string };
+        Update: { id?: string; user_id?: string; workspace_domain?: string; monthly_scan_quota?: number; scans_used_this_month?: number; usage_month?: string; entity_truth_baseline_json?: Record<string, unknown>; observation_retention_days?: number; require_two_person_redirect_approval?: boolean; api_rate_limit_per_minute?: number; allow_benchmark_aggregation?: boolean; benchmark_category?: string; updated_at?: string };
         Relationships: [];
       };
       scheduled_reports: {
@@ -56,9 +56,9 @@
         Relationships: [];
       };
       citation_change_events: {
-        Row: { id: string; user_id: string; workspace_domain: string; audit_id: string | null; previous_observation_id: string | null; current_observation_id: string | null; prompt_query: string; event_type: string; source_url: string; replacement_url: string | null; evidence_json: Record<string, unknown>; detected_at: string };
-        Insert: { id?: string; user_id: string; workspace_domain: string; audit_id?: string | null; previous_observation_id?: string | null; current_observation_id?: string | null; prompt_query: string; event_type: string; source_url: string; replacement_url?: string | null; evidence_json?: Record<string, unknown>; detected_at?: string };
-        Update: { id?: string; user_id?: string; workspace_domain?: string; audit_id?: string | null; previous_observation_id?: string | null; current_observation_id?: string | null; prompt_query?: string; event_type?: string; source_url?: string; replacement_url?: string | null; evidence_json?: Record<string, unknown>; detected_at?: string };
+        Row: { id: string; user_id: string; workspace_domain: string; audit_id: string | null; previous_observation_id: string | null; current_observation_id: string | null; prompt_query: string; event_type: string; source_url: string; replacement_url: string | null; new_replacement_url: string | null; replaced_by_competitor: boolean; evidence_json: Record<string, unknown>; detected_at: string };
+        Insert: { id?: string; user_id: string; workspace_domain: string; audit_id?: string | null; previous_observation_id?: string | null; current_observation_id?: string | null; prompt_query: string; event_type: string; source_url: string; replacement_url?: string | null; new_replacement_url?: string | null; replaced_by_competitor?: boolean; evidence_json?: Record<string, unknown>; detected_at?: string };
+        Update: { id?: string; user_id?: string; workspace_domain?: string; audit_id?: string | null; previous_observation_id?: string | null; current_observation_id?: string | null; prompt_query?: string; event_type?: string; source_url?: string; replacement_url?: string | null; new_replacement_url?: string | null; replaced_by_competitor?: boolean; evidence_json?: Record<string, unknown>; detected_at?: string };
         Relationships: [];
       };
       action_audit_logs: {

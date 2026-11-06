@@ -1,6 +1,7 @@
 import "server-only";
 import { createServerDatabase } from "./supabase-server";
 import type { AuditReport } from "./audit-pipeline";
+import { detectCitationChanges } from "./citation-change-detector";
 
 export class AuditStorageError extends Error {}
 
@@ -28,9 +29,23 @@ export async function persistAudit(report: AuditReport, userId?: string, reserva
       if (linkError) throw new Error("Link insert failed.");
     }
     if (report.observationEvidence?.length) {
-      const observations = report.observationEvidence.map(item => ({ audit_id: audit.id, domain: report.domain, prompt_query: item.prompt, prompt_version: "v1", provider: item.provider, model_name: item.model, search_method: "live-citation-probe", locale: "en-US", raw_answer: item.answer, extracted_urls_json: item.urls, sample_size: 1, observation_confidence: null, job_status: "completed", retry_count: 0 }));
-      const { error: evidenceError } = await db.from("ai_observation_evidence").insert(observations);
+      const observedStatus = Object.fromEntries(report.findings.filter(item => item.httpStatus !== null).map(item => [item.url, item.httpStatus! as number]));
+      const observations = report.observationEvidence.map(item => ({ audit_id: audit.id, domain: report.domain, prompt_query: item.prompt, prompt_version: "v1", provider: item.provider, model_name: item.model, search_method: "live-citation-probe", locale: "en-US", raw_answer: item.answer, extracted_urls_json: item.urls, url_status_json: observedStatus, sample_size: 1, observation_confidence: null, job_status: "completed", retry_count: 0 }));
+      const { data: savedObservations, error: evidenceError } = await db.from("ai_observation_evidence").insert(observations).select("id,audit_id,domain,prompt_query,model_name,extracted_urls_json,url_status_json,observed_at");
       if (evidenceError) throw new Error("Observation evidence insert failed.");
+      // Event logging is best-effort: analytics must not invalidate a saved audit.
+      try {
+        const ownedAudits = await db.from("audits").select("id").eq("user_id", userId).eq("domain", report.domain).limit(1000);
+        const ownedAuditIds = (ownedAudits.data ?? []).map(row => row.id);
+        if (ownedAuditIds.length && savedObservations?.length) {
+          const history = await db.from("ai_observation_evidence").select("id,audit_id,domain,prompt_query,model_name,extracted_urls_json,url_status_json,observed_at").in("audit_id", ownedAuditIds).eq("domain", report.domain).order("observed_at", { ascending: true }).limit(1000);
+          if (!history.error) {
+            const currentIds = new Set(savedObservations.map(row => row.id));
+            const changes = detectCitationChanges(history.data ?? []).filter(change => currentIds.has(change.current_observation_id));
+            if (changes.length) await db.from("citation_change_events").upsert(changes.map(change => ({ user_id: userId, workspace_domain: report.domain, audit_id: audit.id, ...change })), { onConflict: "user_id,current_observation_id,event_type,source_url", ignoreDuplicates: true });
+          }
+        }
+      } catch { /* Keep optional analytics independent from core audit persistence. */ }
     }
     const updateStatus = (includePrompt: boolean, includeCompetitors: boolean, includeCrawl = true) => {
       let query = db.from("audits").update({ status: report.status, ...(includeCrawl ? { sitemap_url_count: report.sitemapUrlCount } : {}), ...(includePrompt ? { buyer_prompt: report.buyerPrompt } : {}), ...(includeCompetitors && report.competitorDomains?.length ? { competitor_domains: report.competitorDomains } : {}), ...(report.groundTruthPricing ? { ground_truth_pricing: report.groundTruthPricing } : {}), ...(report.shareOfModelScore !== undefined ? { share_of_model_score: report.shareOfModelScore } : {}), ...(report.engineMatrixJson ? { engine_matrix_json: report.engineMatrixJson } : {}) }).eq("id", audit.id).eq("user_id", userId);

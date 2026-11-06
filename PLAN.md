@@ -834,3 +834,15 @@ Dashboard follow-up: `AuditAnalysisTools` is now connected to the latest complet
 ## Days 121–130 — Month 7 Controlled Autonomous Recovery Agents
 
 **Status: Complete.** The additive scale migration was applied successfully, autonomous agent runs now enforce action risk and human approval gates, rollback snapshots are supported, and the dashboard queue exposes run evidence and controls. The implementation and focused/full test suites were completed. Offline font configuration was updated to remove `next/font/google` network fetching; production build verification remains unconfirmed in this environment.
+
+## Days 161–170 — Month 11 Citation Change & Predictive Intelligence (COMPLETED)
+
+- [x] Add sequential `(workspace domain, prompt, model)` citation event detection for gained/lost citations and source replacements, with competitor/publisher replacement details.
+- [x] Record URL break events only when saved SSRF-safe status evidence shows a prior HTTP 200 becoming 404, 410, or timeout; do not infer status for older evidence without a saved snapshot.
+- [x] Add predictive citation decay signals for falling citation frequency, observed stale publication dates, fresher competitor dates, and increasing competitor-source velocity.
+- [x] Calculate Wilson 95% confidence intervals using observation `sample_size`, show explicit low-sample warnings for n < 5, and add category benchmarks gated by workspace opt-in and a five-workspace minimum.
+- [x] Add AI Visibility and Overview panels with source-change alerts, decay warnings, intervals, sample-size badges, and an opt-in benchmark setting in workspace governance.
+- [x] Add migration 027, TypeScript schema updates, and focused tests for event detection, break evidence, confidence math, sample warnings, and category/tenant opt-in isolation.
+- [x] Verify `npx tsc --noEmit`, `npm run lint`, `npm test` (229 passed), ordered migration tests, and `npm run build` (alternate output directory).
+
+Migration 027 passed ordered local PGlite schema checks, and the user confirmed successful application to hosted Supabase. Benchmark aggregation is disabled by default and only returns category aggregates when at least five opted-in workspaces contribute; source URL status changes are reported only when both observations contain saved status evidence.
