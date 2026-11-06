@@ -299,7 +299,7 @@ test("audit history query is scoped to the authenticated Clerk user", async () =
   });
   assert.deepEqual(await getUserAuditHistory("user_test_123"), []);
   const query = new URL(requestedUrl).searchParams;
-  assert.equal(query.get("user_id"), "eq.user_test_123");
+  assert.equal(query.get("user_id"), "in.(user_test_123)");
   assert.equal(query.get("order"), "created_at.desc");
 });
 // Provider regression checks: Tavily evidence and generated URLs remain distinct.

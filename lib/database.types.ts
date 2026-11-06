@@ -44,15 +44,15 @@
         Relationships: [];
       };
       workspace_governance_policies: {
-        Row: { id: string; user_id: string; workspace_domain: string; monthly_scan_quota: number; scans_used_this_month: number; usage_month: string; entity_truth_baseline_json: Record<string, unknown>; created_at: string; updated_at: string };
-        Insert: { id?: string; user_id: string; workspace_domain: string; monthly_scan_quota?: number; scans_used_this_month?: number; usage_month?: string; entity_truth_baseline_json?: Record<string, unknown>; created_at?: string; updated_at?: string };
-        Update: { id?: string; user_id?: string; workspace_domain?: string; monthly_scan_quota?: number; scans_used_this_month?: number; usage_month?: string; entity_truth_baseline_json?: Record<string, unknown>; updated_at?: string };
+        Row: { id: string; user_id: string; workspace_domain: string; monthly_scan_quota: number; scans_used_this_month: number; usage_month: string; entity_truth_baseline_json: Record<string, unknown>; observation_retention_days: number; require_two_person_redirect_approval: boolean; api_rate_limit_per_minute: number; created_at: string; updated_at: string };
+        Insert: { id?: string; user_id: string; workspace_domain: string; monthly_scan_quota?: number; scans_used_this_month?: number; usage_month?: string; entity_truth_baseline_json?: Record<string, unknown>; observation_retention_days?: number; require_two_person_redirect_approval?: boolean; api_rate_limit_per_minute?: number; created_at?: string; updated_at?: string };
+        Update: { id?: string; user_id?: string; workspace_domain?: string; monthly_scan_quota?: number; scans_used_this_month?: number; usage_month?: string; entity_truth_baseline_json?: Record<string, unknown>; observation_retention_days?: number; require_two_person_redirect_approval?: boolean; api_rate_limit_per_minute?: number; updated_at?: string };
         Relationships: [];
       };
       scheduled_reports: {
-        Row: { id: string; user_id: string; workspace_domain: string; report_type: string; schedule_at: string; status: string; payload_json: Record<string, unknown>; created_at: string; updated_at: string };
-        Insert: { id?: string; user_id: string; workspace_domain: string; report_type?: string; schedule_at: string; status?: string; payload_json?: Record<string, unknown>; created_at?: string; updated_at?: string };
-        Update: { id?: string; user_id?: string; workspace_domain?: string; report_type?: string; schedule_at?: string; status?: string; payload_json?: Record<string, unknown>; updated_at?: string };
+        Row: { id: string; user_id: string; workspace_domain: string; report_type: string; schedule_at: string; recurrence_interval: string; status: string; payload_json: Record<string, unknown>; created_at: string; updated_at: string };
+        Insert: { id?: string; user_id: string; workspace_domain: string; report_type?: string; schedule_at: string; recurrence_interval?: string; status?: string; payload_json?: Record<string, unknown>; created_at?: string; updated_at?: string };
+        Update: { id?: string; user_id?: string; workspace_domain?: string; report_type?: string; schedule_at?: string; recurrence_interval?: string; status?: string; payload_json?: Record<string, unknown>; updated_at?: string };
         Relationships: [];
       };
       citation_change_events: {
@@ -162,6 +162,7 @@
     Functions: {
       claim_pixel_intercept_quota: { Args: { target_domain: string }; Returns: boolean };
       reserve_workspace_agent_scan: { Args: { p_user_id: string; p_workspace_domain: string }; Returns: boolean };
+      consume_workspace_api_rate_limit: { Args: { p_key_id: string; p_limit: number }; Returns: boolean };
       match_sitemap_url: {
         Args: { query_embedding: string; target_domain: string; match_threshold: number; match_count: number; query_model?: string };
         Returns: { url: string; similarity: number }[];

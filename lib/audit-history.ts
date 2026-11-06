@@ -15,19 +15,22 @@ export type UserAuditHistoryItem = {
     suggested_redirect: string | null;
     url_state: string;
     approval_status: string;
+    approved_by?: string | null;
     match_confidence: number | null;
     match_evidence_reason: string | null;
   }[];
 };
 
-export async function getUserAuditHistory(userId: string): Promise<UserAuditHistoryItem[]> {
+export async function getUserAuditHistory(userId: string, ownerUserIds: string[] = [userId]): Promise<UserAuditHistoryItem[]> {
   if (!userId.trim()) throw new Error("A Clerk user ID is required to read audit history.");
+  const owners=[...new Set(ownerUserIds.filter(id=>typeof id==="string"&&id.trim()))];
+  if(!owners.length) return [];
 
   const db = createServerDatabase();
   const { data, error } = await db
     .from("audits")
-    .select("id,domain,status,created_at,share_of_model_score,engine_matrix_json,broken_links(id,cited_url,http_status,suggested_redirect,url_state,approval_status,match_confidence,match_evidence_reason)")
-    .eq("user_id", userId)
+    .select("id,domain,status,created_at,share_of_model_score,engine_matrix_json,broken_links(id,cited_url,http_status,suggested_redirect,url_state,approval_status,approved_by,match_confidence,match_evidence_reason)")
+    .in("user_id", owners)
     .not("status", "in", "(free_pending,free_saving)")
     .order("created_at", { ascending: false });
 

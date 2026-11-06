@@ -17,6 +17,7 @@
     "dev:verify-checkout": "node --env-file=.env.local --conditions=react-server --import tsx scripts/verify-test-checkout.ts",
     "dev:verify-email": "node --env-file=.env.local --conditions=react-server --import tsx scripts/verify-test-email.ts",
     "dev:verify-cron": "node --env-file=.env.local --conditions=react-server --import tsx scripts/verify-local-cron.ts",
+    "dev:verify-scheduled-report": "node --env-file=.env.local --require ./scripts/test-userinfo-fallback.cjs --conditions=react-server --import tsx scripts/verify-scheduled-report.ts",
     "dev:index-sitemap": "node --env-file=.env.local --conditions=react-server --import tsx scripts/index-domain-sitemap.ts"
   },
   "dependencies": {

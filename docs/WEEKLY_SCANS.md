@@ -1,5 +1,79 @@
 # Weekly Pro scans
 
+## Retention cleanup and scheduled-report dispatch
+
+The database cron setup also registers two production requests:
+
+| Job | UTC schedule | Endpoint |
+| --- | --- | --- |
+| `citemend-data-retention` | `0 2 * * *` | `/api/cron/data-retention` |
+| `citemend-scheduled-reports` | `0 4 * * *` | `/api/cron/scheduled-reports` |
+
+The additive migration is `supabase/migrations/026_cron_retention_and_reports.sql`.
+Migration `015` is already used by `015_audit_llms_txt_content.sql`, so the
+cron migration takes the next available sequence number. Enable `pg_cron` and
+`pg_net` and ensure Supabase Vault is available before applying it. The
+migration checks for these prerequisites and the secrets below; it skips local
+migration checks that do not have Supabase extensions installed.
+
+Create or update these Vault secrets before applying the migration:
+
+- `app_base_url`: the deployed app's HTTPS origin, such as
+  `https://your-production-domain.example` (no path is needed).
+- `cron_secret`: the exact value of the deployed app's `CRON_SECRET`.
+
+For example, run this in the Supabase SQL Editor after replacing the values
+locally. Check for existing names first and update existing secrets rather than
+creating duplicates. Never put real secrets in this file or source control.
+
+```sql
+select id, name
+from vault.decrypted_secrets
+where name in ('app_base_url', 'cron_secret');
+
+-- Run these only for names that are missing:
+select vault.create_secret('https://YOUR_PRODUCTION_DOMAIN', 'app_base_url');
+select vault.create_secret('YOUR_PRIVATE_CRON_SECRET', 'cron_secret');
+```
+
+For an existing entry, update it in the Supabase Vault UI, or call
+`vault.update_secret(existing_id, new_value, existing_name, description)` from
+the SQL Editor. The cron secret must exactly match Vercel's `CRON_SECRET`.
+
+The scheduled-report route dispatches report rows whose `status` is
+`scheduled` and `schedule_at` is due. `recurrence_interval` supports `one_time`,
+`weekly`, `biweekly`, and `monthly`; recurring rows advance to their next future
+occurrence after a successful send, while one-time rows become completed. The
+daily job will deliver due rows at the next 04:00 UTC run. The application also
+needs `RESEND_API_KEY` and a verified `RESEND_FROM_EMAIL` sender.
+
+After applying migration 026 to the Supabase database configured in `.env.local`,
+set `TEST_REPORT_EMAIL` locally to the intended test inbox and run
+`npm run dev:verify-scheduled-report`. The script inserts one due, uniquely
+identified report row, invokes the local POST handler with `CRON_SECRET`,
+checks the returned JSON and Resend message status, prints the result, then
+deletes only its own test row. The handler's `verificationId` query parameter
+restricts this invocation to that seeded row, so it does not dispatch other
+due reports. This is a real email send; use only an inbox you control.
+
+The optional `vercel.json` schedules mirror these daily invocations. Vercel
+only installs cron jobs from production deployments. Both schedulers may run
+at the same time; the report handler uses a stable Resend idempotency key per
+scheduled occurrence. Supabase's `pg_net` queues request headers until dispatch, so
+restrict direct database login roles that can inspect that queue.
+
+Verify the registrations after applying the migration:
+
+```sql
+select jobname, schedule, active
+from cron.job
+where jobname in ('citemend-data-retention', 'citemend-scheduled-reports');
+```
+
+The `pg_net` request is asynchronous. Inspect `net._http_response` after the
+request worker has processed it, then check the app response status and the
+scheduled report row/email status for the actual outcome.
+
 The scheduler starts a weekly run on Monday at 09:00 Asia/Kolkata (03:30 UTC).
 It queues each distinct domain from completed or partial audits owned by a
 currently eligible Pro account. The worker rechecks Pro access before each

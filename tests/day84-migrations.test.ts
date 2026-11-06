@@ -5,13 +5,26 @@ import { PGlite } from "@electric-sql/pglite";
 import { vector } from "@electric-sql/pglite-pgvector";
 import ts from "typescript";
 
-test("migrations 001 through 024 apply in order and expose the columns used by the application", async () => {
+test("retention and scheduled-report cron configuration uses the protected daily UTC endpoints", async () => {
+  const migration = await readFile(new URL("../supabase/migrations/026_cron_retention_and_reports.sql", import.meta.url), "utf8");
+  assert.match(migration, /name = 'app_base_url'/);
+  assert.match(migration, /name = 'cron_secret'/);
+  assert.match(migration, /'citemend-data-retention',[\s\S]*?'0 2 \* \* \*'[\s\S]*?\/api\/cron\/data-retention/);
+  assert.match(migration, /'citemend-scheduled-reports',[\s\S]*?'0 4 \* \* \*'[\s\S]*?\/api\/cron\/scheduled-reports/);
+  const vercel = JSON.parse(await readFile(new URL("../vercel.json", import.meta.url), "utf8")) as { crons: { path: string; schedule: string }[] };
+  assert.deepEqual(vercel.crons, [
+    { path: "/api/cron/data-retention", schedule: "0 2 * * *" },
+    { path: "/api/cron/scheduled-reports", schedule: "0 4 * * *" },
+  ]);
+});
+
+test("migrations 001 through 026 apply in order and expose the columns used by the application", async () => {
   const db = new PGlite({ extensions: { vector } });
   try {
     await db.exec("create role anon; create role authenticated; create role service_role bypassrls;");
     const directory = new URL("../supabase/migrations/", import.meta.url);
     const files = (await readdir(directory)).filter(name => /^\d{3}_.+\.sql$/.test(name)).sort();
-    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 24 }, (_, index) => String(index + 1).padStart(3, "0")));
+    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 26 }, (_, index) => String(index + 1).padStart(3, "0")));
     for (const file of files) await db.exec(await readFile(new URL(file, directory), "utf8"));
     const expected: Record<string, string[]> = {
       audits: ["id", "user_id", "domain", "buyer_prompt", "status", "created_at", "competitor_domains", "ground_truth_pricing", "indexnow_key", "share_of_model_score", "engine_matrix_json", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text", "llms_txt_content", "webhook_url", "sitemap_url_count"],
@@ -38,7 +51,7 @@ test("migrations 001 through 024 apply in order and expose the columns used by t
       ecommerce_catalog_items: ["id", "user_id", "workspace_domain", "platform", "external_item_id", "canonical_url", "product_json", "synced_at"],
       organization_members: ["id", "organization_id", "owner_user_id", "member_user_id", "role", "created_at"],
       workspace_governance_policies: ["id", "user_id", "workspace_domain", "monthly_scan_quota", "scans_used_this_month", "usage_month", "entity_truth_baseline_json", "created_at", "updated_at"],
-      scheduled_reports: ["id", "user_id", "workspace_domain", "report_type", "schedule_at", "status", "payload_json", "created_at", "updated_at"],
+      scheduled_reports: ["id", "user_id", "workspace_domain", "report_type", "schedule_at", "recurrence_interval", "status", "payload_json", "created_at", "updated_at"],
       citation_change_events: ["id", "user_id", "workspace_domain", "audit_id", "previous_observation_id", "current_observation_id", "prompt_query", "event_type", "source_url", "replacement_url", "evidence_json", "detected_at"],
     };
     const result = await db.query<{ table_name: string; column_name: string; is_nullable: string }>("select table_name, column_name, is_nullable from information_schema.columns where table_schema = 'public'");
@@ -81,6 +94,12 @@ test("migrations 001 through 024 apply in order and expose the columns used by t
     assert.equal((await db.query<{ allowed: boolean }>("select public.reserve_workspace_agent_scan('user_test','example.com') as allowed")).rows[0].allowed, false);
     await db.exec("update public.workspace_governance_policies set usage_month=(date_trunc('month',now()) - interval '1 month')::date where user_id='user_test' and workspace_domain='example.com'");
     assert.equal((await db.query<{ allowed: boolean }>("select public.reserve_workspace_agent_scan('user_test','example.com') as allowed")).rows[0].allowed, true);
+    await db.exec("update public.workspace_governance_policies set api_rate_limit_per_minute=2,observation_retention_days=180,require_two_person_redirect_approval=true where user_id='user_test' and workspace_domain='example.com'; insert into public.workspace_api_keys(user_id,workspace_domain,key_hash,key_prefix) values ('user_test','example.com',repeat('a',64),'cm_live_test')");
+    const rateKey=(await db.query<{id:string}>("select id from public.workspace_api_keys where user_id='user_test'")).rows[0].id;
+    assert.equal((await db.query<{allowed:boolean}>(`select public.consume_workspace_api_rate_limit('${rateKey}',2) as allowed`)).rows[0].allowed,true);
+    assert.equal((await db.query<{allowed:boolean}>(`select public.consume_workspace_api_rate_limit('${rateKey}',2) as allowed`)).rows[0].allowed,true);
+    assert.equal((await db.query<{allowed:boolean}>(`select public.consume_workspace_api_rate_limit('${rateKey}',2) as allowed`)).rows[0].allowed,false);
+    await assert.rejects(db.exec("update public.workspace_governance_policies set observation_retention_days=30"),/workspace_governance_policies_observation_retention_days_check/);
     await db.exec("insert into public.audits(id,domain,user_id,status) values ('10000000-0000-4000-8000-000000000001','example.com','user_test','completed')");
     await db.exec("insert into public.broken_links(id,audit_id,cited_url,http_status,suggested_redirect,url_state,approval_status,match_confidence) values ('20000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000001','https://example.com/pending',404,'https://example.com/new-pending','404','pending_review',94),('20000000-0000-4000-8000-000000000002','10000000-0000-4000-8000-000000000001','https://example.com/approved',404,'https://example.com/new-approved','404','approved',85)");
     await db.exec("insert into public.redirect_rules(user_id,source_link_id,source_host,source_path,destination,active) values ('user_test','20000000-0000-4000-8000-000000000001','example.com','/pending','https://example.com/new-pending',true),('user_test','20000000-0000-4000-8000-000000000002','example.com','/approved','https://example.com/new-approved',true)");

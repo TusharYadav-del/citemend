@@ -2,15 +2,16 @@ import { auth } from "@clerk/nextjs/server";
 import { createServerDatabase } from "@/lib/supabase-server";
 import { readRequestJson } from "@/lib/read-request-json";
 import { comparePageEntities, fetchCorePage } from "@/lib/entity-consistency";
+import { resolveWorkspaceAccess } from "@/lib/workspace-access";
 
 const UUID = /^[0-9a-f-]{36}$/i;
 export async function POST(request: Request) {
-  const { userId } = await auth(); if (!userId) return Response.json({ error: "Sign in to inspect an owned workspace." }, { status: 401 });
+  const { userId, orgId, orgRole } = await auth(); if (!userId) return Response.json({ error: "Sign in to inspect an owned workspace." }, { status: 401 });
   const parsed = await readRequestJson(request, 8192); if (parsed.kind !== "ok" || !parsed.value || typeof parsed.value !== "object") return Response.json({ error: "Provide a valid audit ID." }, { status: 400 });
   const input = parsed.value as Record<string, unknown>; if (typeof input.auditId !== "string" || !UUID.test(input.auditId)) return Response.json({ error: "Provide a valid audit ID." }, { status: 400 });
   const db = createServerDatabase();
   try {
-    const audit = await db.from("audits").select("id,domain,buyer_prompt").eq("id", input.auditId).eq("user_id", userId).maybeSingle();
+    const access=await resolveWorkspaceAccess(db,userId,orgId??null,orgRole); const audit = await db.from("audits").select("id,domain,buyer_prompt").eq("id", input.auditId).in("user_id", access.ownerUserIds).maybeSingle();
     if (audit.error) throw audit.error; if (!audit.data) return Response.json({ error: "Audit not found." }, { status: 404 });
     const [homepage, pricing, product, docs, observations] = await Promise.all([
       fetchCorePage(audit.data.domain, "homepage"), fetchCorePage(audit.data.domain, "pricing"), fetchCorePage(audit.data.domain, "product"), fetchCorePage(audit.data.domain, "docs"),

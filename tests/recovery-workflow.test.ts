@@ -7,12 +7,12 @@ const linkId = "d98a5c0a-01a9-4d17-a9b1-2df80515548c";
 const auditId = "6c4c2f50-56a9-4d66-a462-4dbfa68ee4b1";
 const baseLink = {
   id: linkId, audit_id: auditId, cited_url: "https://acme.com/old", http_status: 404, url_state: "404",
-  suggested_redirect: "https://acme.com/new", approval_status: "pending_review", match_confidence: 78,
+  suggested_redirect: "https://acme.com/new", approval_status: "pending_review", approved_by: null as string | null, match_confidence: 78,
   match_evidence_reason: "semantic candidate", previous_destination_url: null,
   audits: { user_id: "owner", domain: "acme.com" },
 };
 
-function setup(link = baseLink, rule: Record<string, unknown> | null = null, integration: Record<string, unknown> | null = null) {
+function setup(link = baseLink, rule: Record<string, unknown> | null = null, integration: Record<string, unknown> | null = null, policy: Record<string, unknown> | null = null, membership: Record<string, unknown> | null = null) {
   const updates: { table: string; value: Record<string, unknown> }[] = [];
   const logs: Record<string, unknown>[] = [];
   const db = { from(table: string) {
@@ -21,11 +21,13 @@ function setup(link = baseLink, rule: Record<string, unknown> | null = null, int
     const query = {
       select() { return query; },
       eq(column: string, value: unknown) { filters[column] = value; return query; },
+      is(column: string, value: unknown) { filters[column] = value; return query; },
+      in() { return query; },
       limit() { return query; },
       insert(value: Record<string, unknown>) { logs.push(value); return Promise.resolve({ error: null }); },
       update(value: Record<string, unknown>) { updateValue = value; updates.push({ table, value }); return query; },
-      maybeSingle: async () => ({ data: table === "broken_links" ? link : table === "redirect_rules" ? rule : table === "workspace_integrations" ? integration : null, error: null }),
-      then(resolve: (value: unknown) => unknown) { const data = table === "redirect_rules" && filters.source_host && rule ? [rule] : null; return Promise.resolve({ data, error: null, updateValue }).then(resolve); },
+      maybeSingle: async () => ({ data: table === "broken_links" ? link : table === "redirect_rules" ? rule : table === "workspace_integrations" ? integration : table === "workspace_governance_policies" ? policy : table === "organization_members" ? membership : null, error: null }),
+      then(resolve: (value: unknown) => unknown) { const data = table === "broken_links" && updateValue?.approval_status === "approved" ? [{ id: linkId }] : table === "redirect_rules" && filters.source_host && rule ? [rule] : null; return Promise.resolve({ data, error: null, updateValue }).then(resolve); },
     };
     return query;
   } };
@@ -42,6 +44,36 @@ test("low similarity blocks approval of the candidate until a manual mapping is 
   assert.equal(preview.status, 409);
   assert.equal((await preview.json()).code, "MANUAL_MAPPING_REQUIRED");
   assert.equal(updates.length, 0);
+});
+
+test("two-person policy records a first approval and leaves the redirect pending", async () => {
+  const { db, updates, logs } = setup({ ...baseLink, match_confidence: 90 }, null, null, { require_two_person_redirect_approval: true }, { owner_user_id: "owner", role: "admin" });
+  const handler = createRecoveryApproveHandler({ getUserId: async () => "reviewer-one", getOrganizationSession: async () => ({ organizationId: "org", role: "admin" }), database: () => db, verify: checkedUrl, trace: safeTrace });
+  const response = await handler(request({ linkId, action: "approve" }));
+  assert.equal(response.status, 202);
+  assert.equal((await response.json()).awaitingSecondApprover, true);
+  assert.equal(updates.at(-1)?.value.approved_by, "reviewer-one");
+  assert.equal(updates.at(-1)?.value.approval_status, undefined);
+  assert.equal(logs.at(-1)?.action_type, "redirect_first_approval");
+});
+
+test("two-person policy allows a distinct authorized administrator to finalize approval", async () => {
+  const { db, updates, logs } = setup({ ...baseLink, approved_by: "reviewer-one", match_confidence: 90 }, null, null, { require_two_person_redirect_approval: true }, { owner_user_id: "owner", role: "admin" });
+  const handler = createRecoveryApproveHandler({ getUserId: async () => "reviewer-two", getOrganizationSession: async () => ({ organizationId: "org", role: "admin" }), database: () => db, verify: checkedUrl, trace: safeTrace });
+  const response = await handler(request({ linkId, action: "approve" }));
+  assert.equal(response.status, 200);
+  assert.equal(updates.at(-1)?.value.approved_by, "reviewer-two");
+  assert.equal(updates.at(-1)?.value.approval_status, "approved");
+  assert.equal(logs.at(-1)?.action_type, "redirect_approval");
+});
+
+test("two-person policy rejects the first approver attempting to approve again", async () => {
+  const { db, updates } = setup({ ...baseLink, approved_by: "reviewer-one", match_confidence: 90 }, null, null, { require_two_person_redirect_approval: true }, { owner_user_id: "owner", role: "admin" });
+  const handler = createRecoveryApproveHandler({ getUserId: async () => "reviewer-one", getOrganizationSession: async () => ({ organizationId: "org", role: "admin" }), database: () => db, verify: checkedUrl, trace: safeTrace });
+  const response = await handler(request({ linkId, action: "approve" }));
+  assert.equal(response.status, 409);
+  assert.match((await response.json()).error, /different authorized administrator/);
+  assert.equal(updates.some(update => update.value.approval_status === "approved"), false);
 });
 
 test("an explicit manual mapping can be previewed and approved without reusing a low similarity score", async () => {

@@ -6,16 +6,20 @@ import { createServerDatabase } from "./supabase-server";
 import { readRequestJson } from "./read-request-json";
 import { decryptShopifyAccessToken } from "./shopify";
 import { deleteShopifyRedirect } from "./redirect-sync";
+import { canWorkspace } from "./rbac";
+import { resolveWorkspaceAccess } from "./workspace-access";
 
 const PRIVATE = { "Cache-Control": "private, no-store" };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 type Link = {
   id: string; audit_id: string; cited_url: string; http_status: number; url_state: string; suggested_redirect: string | null;
   approval_status: string; match_confidence: number | null; match_evidence_reason: string | null;
-  previous_destination_url: string | null; audits: { user_id: string; domain: string } | { user_id: string; domain: string }[] | null;
+  previous_destination_url: string | null; approved_by: string | null; audits: { user_id: string; domain: string } | { user_id: string; domain: string }[] | null;
 };
+type OrganizationSession = { organizationId: string | null; role: string | null };
 type Dependencies = {
   getUserId: () => Promise<string | null>;
+  getOrganizationSession: () => Promise<OrganizationSession>;
   database: typeof createServerDatabase;
   verify: typeof verifyUrl;
   trace: (url: string) => Promise<RedirectTrace>;
@@ -62,6 +66,7 @@ async function body(request: Request) {
 export function createRecoveryApproveHandler(overrides: Partial<Dependencies> = {}) {
   const deps: Dependencies = {
     getUserId: overrides.getUserId ?? (async () => (await (await import("@clerk/nextjs/server")).auth()).userId),
+    getOrganizationSession: overrides.getOrganizationSession ?? (overrides.getUserId ? async () => ({ organizationId: null, role: null }) : async () => { const session=await (await import("@clerk/nextjs/server")).auth(); return { organizationId: session.orgId ?? null, role: session.orgRole ?? null }; }),
     database: overrides.database ?? createServerDatabase,
     verify: overrides.verify ?? verifyUrl,
     trace: overrides.trace ?? (tracePublicRedirects as (url: string) => Promise<RedirectTrace>),
@@ -72,6 +77,7 @@ export function createRecoveryApproveHandler(overrides: Partial<Dependencies> = 
     let userId: string | null;
     try { userId = await deps.getUserId(); } catch { return json({ error: "Authentication is temporarily unavailable." }, 503); }
     if (!userId) return json({ error: "Sign in to review this redirect." }, 401);
+    let organization:OrganizationSession;try{organization=await deps.getOrganizationSession()}catch{return json({error:"Organization session is unavailable."},503)}
     if (crossOrigin(request)) return json({ error: "Cross-origin requests are not allowed." }, 403);
     const parsed = await body(request);
     if (parsed.error) return parsed.error;
@@ -79,13 +85,17 @@ export function createRecoveryApproveHandler(overrides: Partial<Dependencies> = 
     if (typeof linkId !== "string" || !UUID.test(linkId) || (action !== "preview" && action !== "approve") || (reviewConfirmed !== undefined && typeof reviewConfirmed !== "boolean") || (previewToken !== undefined && typeof previewToken !== "string") || (destinationUrl !== undefined && (typeof destinationUrl !== "string" || destinationUrl.length > 2048))) return json({ error: "Provide a linkId and preview or approve action." }, 400);
     try {
       const db = deps.database();
+      let access;try{access=await resolveWorkspaceAccess(db,userId,organization.organizationId,organization.role)}catch{return json({error:"Workspace membership is required."},403)}
+      if(action==="approve"&&!canWorkspace(access.role,"approve_redirect"))return json({error:"Admin permission is required to approve redirects."},403);
       const { data, error } = await db.from("broken_links")
-        .select("id,audit_id,cited_url,http_status,url_state,suggested_redirect,approval_status,match_confidence,match_evidence_reason,previous_destination_url,audits!inner(user_id,domain)")
-        .eq("id", linkId).eq("audits.user_id", userId).maybeSingle();
+        .select("id,audit_id,cited_url,http_status,url_state,suggested_redirect,approval_status,approved_by,match_confidence,match_evidence_reason,previous_destination_url,audits!inner(user_id,domain)")
+        .eq("id", linkId).eq("audits.user_id", access.ownerUserIds[0]).maybeSingle();
       if (error) throw error;
       const link = data as unknown as Link | null;
       const audit = link && relation(link.audits);
       if (!link || !audit) return json({ error: "Broken link not found." }, 404);
+      const policy=await db.from("workspace_governance_policies").select("require_two_person_redirect_approval").eq("user_id",access.ownerUserIds[0]).eq("workspace_domain",audit.domain).maybeSingle();
+      if(policy.error)throw policy.error;
       const recordRejection = (reason: string) => logAction(db, { workspace_domain: audit.domain, actor_user_id: userId, action_type: "redirect_conflict_rejection", target_url: link.suggested_redirect, previous_state_json: { url_state: link.url_state, approval_status: link.approval_status }, new_state_json: { reason, action }, safety_check_passed: false });
       if (link.http_status !== 404 || link.url_state !== "404") { await recordRejection("Only a currently verified 404 can be reviewed for recovery."); return json({ error: "Only a currently verified 404 can be reviewed for recovery." }, 409); }
       if (link.approval_status === "deployed" || link.approval_status === "rejected") { await recordRejection("This recovery is no longer awaiting approval."); return json({ error: "This recovery is no longer awaiting approval." }, 409); }
@@ -137,11 +147,28 @@ export function createRecoveryApproveHandler(overrides: Partial<Dependencies> = 
         }
       }
 
-      const prior = await db.from("redirect_rules").select("id,destination,target_url").eq("source_link_id", link.id).eq("user_id", userId).maybeSingle();
+      if(action==="approve"&&policy.data?.require_two_person_redirect_approval){
+        if(!link.approved_by){
+          const firstApproval=await db.from("broken_links").update({approved_by:userId,approved_at:new Date().toISOString()}).eq("id",link.id).eq("audit_id",link.audit_id).eq("approval_status","pending_review").is("approved_by",null).select("id").maybeSingle();
+          if(firstApproval.error)throw firstApproval.error;
+          if(!firstApproval.data)return json({error:"Another reviewer recorded the first approval. Refresh and request a second reviewer."},409);
+          await logAction(db,{workspace_domain:audit.domain,actor_user_id:userId,action_type:"redirect_first_approval",target_url:pair.destination,previous_state_json:{approval_status:"pending_review"},new_state_json:{approval_status:"pending_review",first_approver:userId,awaiting_distinct_second_approver:true},safety_check_passed:true});
+          return json({approved:false,awaitingSecondApprover:true,status:"pending_review",message:"First approval recorded. A different authorized administrator must approve this redirect."},202);
+        }
+        if(link.approved_by===userId){await recordRejection("Two-person approval requires a different second reviewer.");return json({error:"A different authorized administrator must provide the second approval."},409);}
+      }
+
+      const prior = await db.from("redirect_rules").select("id,destination,target_url").eq("source_link_id", link.id).eq("user_id", access.ownerUserIds[0]).maybeSingle();
       if (prior.error) throw prior.error;
       const oldDestination = prior.data?.target_url ?? prior.data?.destination ?? null;
-      const update = await db.from("broken_links").update({ approval_status: "approved", approved_by: userId, approved_at: new Date().toISOString(), deployed_at: null, rolled_back_at: null, suggested_redirect: pair.destination, match_confidence: approvalScore, previous_destination_url: oldDestination && oldDestination !== pair.destination ? oldDestination : null, match_evidence_reason: manualMapping ? "Owner-provided manual mapping; similarity score is not applicable. Destination returned HTTP 200 and was explicitly approved." : `${link.match_evidence_reason ?? "Verified destination candidate."} Human approved after HTTP 200 preview.` }).eq("id", link.id).eq("audit_id", link.audit_id);
-      if (update.error) throw update.error;
+      const approvedState={ approval_status: "approved", approved_by: userId, approved_at: new Date().toISOString(), deployed_at: null, rolled_back_at: null, suggested_redirect: pair.destination, match_confidence: approvalScore, previous_destination_url: oldDestination && oldDestination !== pair.destination ? oldDestination : null, match_evidence_reason: manualMapping ? "Owner-provided manual mapping; similarity score is not applicable. Destination returned HTTP 200 and was explicitly approved." : `${link.match_evidence_reason ?? "Verified destination candidate."} Human approved after HTTP 200 preview.` };
+      if(policy.data?.require_two_person_redirect_approval){
+        const update=await db.from("broken_links").update(approvedState).eq("id",link.id).eq("audit_id",link.audit_id).eq("approved_by",link.approved_by!).select("id");
+        if(update.error)throw update.error;if(!update.data?.length)return json({error:"Approval state changed while this request was being processed; refresh and try again."},409);
+      }else{
+        const update=await db.from("broken_links").update(approvedState).eq("id",link.id).eq("audit_id",link.audit_id);
+        if(update.error)throw update.error;
+      }
       await logAction(db, { workspace_domain: audit.domain, actor_user_id: userId, action_type: "redirect_approval", target_url: pair.destination, previous_state_json: { approval_status: link.approval_status, suggested_redirect: link.suggested_redirect }, new_state_json: { approval_status: "approved", similarity_score: approvalScore, safety_checks: ["canonical_domain", "redirect_loop", "active_conflict", "destination_http_200"] }, safety_check_passed: true });
       return json({ approved: true, destination: pair.destination, status: "approved" });
     } catch { return json({ error: "Recovery approval is temporarily unavailable." }, 503); }
@@ -151,6 +178,7 @@ export function createRecoveryApproveHandler(overrides: Partial<Dependencies> = 
 export function createRecoveryRollbackHandler(overrides: Partial<Dependencies> = {}) {
   const deps: Dependencies = {
     getUserId: overrides.getUserId ?? (async () => (await (await import("@clerk/nextjs/server")).auth()).userId),
+    getOrganizationSession: overrides.getOrganizationSession ?? (overrides.getUserId ? async () => ({ organizationId: null, role: null }) : async () => { const session=await (await import("@clerk/nextjs/server")).auth(); return { organizationId: session.orgId ?? null, role: session.orgRole ?? null }; }),
     database: overrides.database ?? createServerDatabase,
     verify: overrides.verify ?? verifyUrl,
     trace: overrides.trace ?? (tracePublicRedirects as (url: string) => Promise<RedirectTrace>),
@@ -161,6 +189,7 @@ export function createRecoveryRollbackHandler(overrides: Partial<Dependencies> =
     let userId: string | null;
     try { userId = await deps.getUserId(); } catch { return json({ error: "Authentication is temporarily unavailable." }, 503); }
     if (!userId) return json({ error: "Sign in to roll back this redirect." }, 401);
+    let organization:OrganizationSession;try{organization=await deps.getOrganizationSession()}catch{return json({error:"Organization session is unavailable."},503)}
     if (crossOrigin(request)) return json({ error: "Cross-origin requests are not allowed." }, 403);
     const parsed = await body(request);
     if (parsed.error) return parsed.error;
@@ -168,9 +197,11 @@ export function createRecoveryRollbackHandler(overrides: Partial<Dependencies> =
     if (typeof linkId !== "string" || !UUID.test(linkId)) return json({ error: "Provide a valid broken link ID." }, 400);
     try {
       const db = deps.database();
+      let access;try{access=await resolveWorkspaceAccess(db,userId,organization.organizationId,organization.role)}catch{return json({error:"Workspace membership is required."},403)}
+      if(!canWorkspace(access.role,"approve_redirect"))return json({error:"Admin permission is required to roll back redirects."},403);
       const { data, error } = await db.from("broken_links")
-        .select("id,audit_id,cited_url,http_status,url_state,suggested_redirect,approval_status,match_confidence,match_evidence_reason,previous_destination_url,audits!inner(user_id,domain)")
-        .eq("id", linkId).eq("audits.user_id", userId).maybeSingle();
+        .select("id,audit_id,cited_url,http_status,url_state,suggested_redirect,approval_status,approved_by,match_confidence,match_evidence_reason,previous_destination_url,audits!inner(user_id,domain)")
+        .eq("id", linkId).eq("audits.user_id", access.ownerUserIds[0]).maybeSingle();
       if (error) throw error;
       const link = data as unknown as Link | null;
       const audit = link && relation(link.audits);
@@ -187,11 +218,11 @@ export function createRecoveryRollbackHandler(overrides: Partial<Dependencies> =
         if (checked.state !== "200" || checked.httpStatus !== 200) { await recordRollbackRejection("The previous destination is not currently HTTP 200, so rollback was stopped."); return json({ error: "The previous destination is not currently HTTP 200, so rollback was stopped." }, 409); }
         previous = valid.destination;
       }
-      const { data: rule, error: ruleError } = await db.from("redirect_rules").select("id,user_id,target_url,destination,active,is_active,synced_to_cms,shopify_redirect_id").eq("source_link_id", link.id).eq("user_id", userId).maybeSingle();
+      const { data: rule, error: ruleError } = await db.from("redirect_rules").select("id,user_id,target_url,destination,active,is_active,synced_to_cms,shopify_redirect_id").eq("source_link_id", link.id).eq("user_id", access.ownerUserIds[0]).maybeSingle();
       if (ruleError) throw ruleError;
       if (rule?.synced_to_cms) {
         if (!rule.shopify_redirect_id) { await recordRollbackRejection("The Shopify redirect has no tracked remote ID."); return json({ error: "This Shopify redirect predates rollback tracking. Remove it in Shopify Admin before marking it rolled back." }, 409); }
-        const integration = await db.from("workspace_integrations").select("shopify_store_domain,shopify_admin_token").eq("user_id", userId).eq("domain", audit.domain).maybeSingle();
+        const integration = await db.from("workspace_integrations").select("shopify_store_domain,shopify_admin_token").eq("user_id", access.ownerUserIds[0]).eq("domain", audit.domain).maybeSingle();
         if (integration.error) throw integration.error;
         if (!integration.data?.shopify_store_domain || !integration.data.shopify_admin_token) { await recordRollbackRejection("Shopify credentials are unavailable; rollback was not applied."); return json({ error: "Shopify credentials are unavailable; rollback was not applied." }, 409); }
         const token = integration.data.shopify_admin_token.startsWith("v1.") ? decryptShopifyAccessToken(integration.data.shopify_admin_token) : integration.data.shopify_admin_token;
@@ -199,8 +230,8 @@ export function createRecoveryRollbackHandler(overrides: Partial<Dependencies> =
       }
       if (rule) {
         const changed = previous
-          ? await db.from("redirect_rules").update({ destination: previous, target_url: previous, active: true, is_active: true, synced_to_cms: false, shopify_redirect_id: null, updated_at: new Date().toISOString() }).eq("id", rule.id).eq("user_id", userId)
-          : await db.from("redirect_rules").update({ active: false, is_active: false, synced_to_cms: false, shopify_redirect_id: null, updated_at: new Date().toISOString() }).eq("id", rule.id).eq("user_id", userId);
+          ? await db.from("redirect_rules").update({ destination: previous, target_url: previous, active: true, is_active: true, synced_to_cms: false, shopify_redirect_id: null, updated_at: new Date().toISOString() }).eq("id", rule.id).eq("user_id", access.ownerUserIds[0])
+          : await db.from("redirect_rules").update({ active: false, is_active: false, synced_to_cms: false, shopify_redirect_id: null, updated_at: new Date().toISOString() }).eq("id", rule.id).eq("user_id", access.ownerUserIds[0]);
         if (changed.error) throw changed.error;
       }
       const updated = await db.from("broken_links").update({ approval_status: "rolled_back", rolled_back_at: new Date().toISOString(), ...(previous ? { suggested_redirect: previous } : {}) }).eq("id", link.id).eq("audit_id", link.audit_id);

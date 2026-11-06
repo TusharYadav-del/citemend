@@ -9,9 +9,9 @@ export async function saveAuditCitationGap(auditId: string, userId: string, doma
   const { error } = await db.from("audit_citation_gaps").upsert({ audit_id: auditId, user_id: userId, domain, buyer_prompt: gap.buyerPrompt, provider: gap.provider, competitor_urls: gap.competitorUrls }, { onConflict: "audit_id" });
   if (error) throw new Error("Citation evidence could not be saved.");
 }
-export async function getAuditCitationGaps(userId: string, auditId?: string): Promise<Map<string, CitationGap>> {
-  if (!userId.trim()) return new Map();
-  let query = createServerDatabase().from("audit_citation_gaps").select("audit_id,buyer_prompt,competitor_urls,provider").eq("user_id", userId);
+export async function getAuditCitationGaps(userId: string | string[], auditId?: string): Promise<Map<string, CitationGap>> {
+  const userIds=Array.isArray(userId)?userId:[userId];if (!userIds.some(id=>id.trim())) return new Map();
+  let query = createServerDatabase().from("audit_citation_gaps").select("audit_id,buyer_prompt,competitor_urls,provider").in("user_id", userIds);
   if (auditId) query = query.eq("audit_id", auditId);
   const { data, error } = await query;
   if (error) throw new Error("Citation evidence is temporarily unavailable.");

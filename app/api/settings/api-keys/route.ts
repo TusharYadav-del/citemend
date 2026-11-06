@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   const { userId } = await auth(); if (!userId) return json({ error: "Sign in to create an API key." }, 401);
   const parsed = await readRequestJson(request, 4096); if (parsed.kind !== "ok" || !parsed.value || typeof parsed.value !== "object") return json({ error: "Provide a domain and optional permissions." }, 400);
   const input = parsed.value as Record<string, unknown>; let domain: string; try { domain = normalizeDashboardDomain(typeof input.domain === "string" ? input.domain : ""); } catch { return json({ error: "Provide a valid domain." }, 400); }
-  const allowed = ["audit:read", "evidence:read", "recovery:read"];
+  const allowed = ["audit:read", "evidence:read", "recovery:read", "recovery:propose"];
   const permissions = input.permissions ?? ["audit:read"];
   if (!Array.isArray(permissions) || !permissions.length || permissions.some(permission => typeof permission !== "string" || !allowed.includes(permission))) return json({ error: "API permissions must be selected from the supported read scopes." }, 400);
   const db = createServerDatabase(); const owner = await db.from("audits").select("id").eq("user_id", userId).eq("domain", domain).limit(1);

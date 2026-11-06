@@ -757,6 +757,31 @@ Final local verification: `npx tsc --noEmit`, `npm run lint`, `npm test` (175 te
 
 The repository's checkout implementation supports Pro ($39/month) and Agency ($249/month). Starter is the existing free account with one saved audit; the separate free teaser is the no-account availability preview. No new billing product or subscription entitlement was introduced.
 
+### Days 131–140: Ecommerce Catalog Synchronization & SKU Recovery (COMPLETED IN CODE)
+
+- [x] Add Shopify Admin API, product sitemap, and CSV/JSON catalog synchronization with SSRF-safe product URL checks and Product/Offer JSON-LD parsing.
+- [x] Compare catalog price and availability with recorded AI buyer answers; report stale price, stock-claim, missing-offer, and broken-URL conflicts.
+- [x] Add SKU filtering, measured rescued AI visits, explicitly estimated (not realized) revenue, and verified same-store pgvector Shopify 301 CSV export in the Recovery Center.
+- [x] Add focused product schema, conflict, and safe bulk mapping tests.
+
+### Days 141–150: Enterprise Workspaces & Governance (IMPLEMENTED IN CODE)
+
+- [x] Add owner/admin/editor/viewer permission mapping, Clerk organization membership management, and role-guarded governance settings.
+- [x] Add retention policy and API rate limit fields, atomic per-key rate windows, workspace JSON export, and scoped deletion with append-only audit records.
+- [x] Add authenticated retention processing, downloadable security documentation, and workspace governance controls.
+- [x] Test role permissions, rate-window enforcement, migration order, and policy constraints.
+
+### Days 151–160: Public API, MCP & Evidence Distribution (COMPLETED IN CODE)
+
+- [x] Add scoped Bearer-key REST endpoints for audits, verified broken citations/opportunities, and before/after evidence.
+- [x] Add JSON-RPC MCP initialize/list/call handling for workspace health, broken citations, recorded forensic evidence, and approval-queued redirect proposals.
+- [x] Add public developer documentation and white-label evidence pages, plus scheduled email report configuration and delivery endpoints.
+- [x] Run `npx tsc --noEmit`, `npm run lint`, `npm test` (221 passed), and `npm run build` (alternate output directory).
+
+Migrations 025 and 026 passed the ordered local PGlite migration tests. The user confirmed both were successfully applied to hosted Supabase and confirmed that the Supabase `pg_cron` jobs were registered. `vercel.json` provides optional backup schedules for retention at 02:00 UTC and scheduled reports at 04:00 UTC. The isolated local scheduled-report verification seeded only its test row, returned `{ "sent": 1, "failed": 0, "processed": 1 }`, and Resend reported `delivered`; the script removed the test row afterward. Report recurrence supports one-time, weekly, biweekly, and monthly intervals. Clerk SSO/MFA availability depends on the customer's Clerk plan and identity-provider configuration. Shopify, Gemini embeddings, and Resend features require their corresponding production credentials.
+
+Enterprise enforcement: recovery approval now records the first administrator without activating the redirect, rejects the same administrator as the second approver, and activates only after a distinct authorized administrator approves. Organization membership is checked against the server-side membership record; dashboard audit history, citation forensics, entity analysis, intelligence graph, integrations, governance, scheduled reports, and redirect approval/rollback resolve to the organization's workspace owner. Viewer roles remain read-only. Other legacy mutation routes retain their existing owner-scoped checks, so organization administrators use the explicitly shared admin routes for these operations. The user confirmed migration 025 was applied to hosted Supabase; independently verifying its hosted schema remains a deployment check.
+
 ### Days 85–88: Repository Truth Audit & Human-Approved Recovery (COMPLETED IN CODE)
 
 - [x] Add `AUDIT_INVENTORY.md` inventorying application features, API routes, Supabase tables, Clerk ownership checks, RLS posture, SSRF controls, rate limits, webhook signatures, and external verification gaps.

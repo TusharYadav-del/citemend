@@ -5,13 +5,14 @@ import { classifyCitationForensics, compareCitationPageFacts, measureBuyerPrompt
 import { checkRobotsAllows, fetchCitedPage, fetchCorePage } from "@/lib/entity-consistency";
 import { tracePublicRedirects } from "@/lib/seo";
 import { fetchSitemapUrls } from "@/lib/seo";
+import { resolveWorkspaceAccess } from "@/lib/workspace-access";
 
 export async function POST(request: Request) {
-  const { userId } = await auth(); if (!userId) return Response.json({ error: "Sign in to inspect citation evidence." }, { status: 401 });
+  const { userId, orgId, orgRole } = await auth(); if (!userId) return Response.json({ error: "Sign in to inspect citation evidence." }, { status: 401 });
   const input = await readRequestJson(request, 4096); if (input.kind !== "ok" || !input.value || typeof input.value !== "object") return Response.json({ error: "Provide an audit ID." }, { status: 400 });
   const auditId = (input.value as Record<string, unknown>).auditId; if (typeof auditId !== "string") return Response.json({ error: "Provide an audit ID." }, { status: 400 });
   try {
-    const db = createServerDatabase(); const audit = await db.from("audits").select("id,domain,buyer_prompt").eq("id", auditId).eq("user_id", userId).maybeSingle();
+    const db = createServerDatabase(); const access=await resolveWorkspaceAccess(db,userId,orgId??null,orgRole); const audit = await db.from("audits").select("id,domain,buyer_prompt").eq("id", auditId).in("user_id", access.ownerUserIds).maybeSingle();
     if (audit.error) throw audit.error; if (!audit.data) return Response.json({ error: "Audit not found." }, { status: 404 });
     const [page, observations, sitemapResult] = await Promise.all([fetchCorePage(audit.data.domain, "homepage"), db.from("ai_observation_evidence").select("id,prompt_query,model_name,provider,raw_answer,extracted_urls_json,observed_at").eq("audit_id", auditId).eq("domain", audit.data.domain).order("observed_at", { ascending: false }).limit(100), fetchSitemapUrls(audit.data.domain).then(urls => ({ available: true, urls }), () => ({ available: false, urls: [] as string[] }))]);
     if (observations.error) throw observations.error;
