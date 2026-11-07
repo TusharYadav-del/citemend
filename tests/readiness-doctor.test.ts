@@ -57,11 +57,13 @@ test("readiness doctor differentiates missing required settings from optional fe
   assert.equal(result.checks.find((check) => check.id === "database")?.status, "MISSING");
 });
 
-test("readiness doctor checks all expected tables from migrations 001 through 030", () => {
-  assert.equal(REQUIRED_READINESS_TABLES.length, 32);
+test("readiness doctor checks all expected tables through migration 032", () => {
+  assert.equal(REQUIRED_READINESS_TABLES.length, 34);
   assert.ok(REQUIRED_READINESS_TABLES.includes("workspace_api_rate_windows"));
   assert.ok(REQUIRED_READINESS_TABLES.includes("workspace_operating_metrics"));
   assert.ok(REQUIRED_READINESS_TABLES.includes("case_studies"));
   assert.ok(REQUIRED_READINESS_TABLES.includes("design_partner_applications"));
   assert.ok(REQUIRED_READINESS_TABLES.includes("agency_referrals"));
+  assert.ok(REQUIRED_READINESS_TABLES.includes("background_jobs"));
+  assert.ok(REQUIRED_READINESS_TABLES.includes("founder_weekly_scorecards"));
 });

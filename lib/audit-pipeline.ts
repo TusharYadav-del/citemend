@@ -34,6 +34,7 @@ export type AuditDependencies = {
   resolve: (url: string) => Promise<string | null>;
   save: (report: AuditReport, userId?: string) => Promise<{ id: string; createdAt: string }>;
   sitemapPageLimit?: number;
+  onProgress?: (progress: number, label: string) => Promise<void> | void;
 };
 
 export function validateAuditInput(input: unknown): { domain: string; buyerPrompt: string; buyerPrompts?: string[]; competitorDomains?: string[]; groundTruthPricing?: string } {
@@ -147,6 +148,7 @@ function similarity(a: string, b: string): number {
 export async function runAudit(input: unknown, overrides: Partial<AuditDependencies> = {}, userId?: string) {
   const { domain, buyerPrompt, buyerPrompts = [buyerPrompt], competitorDomains: providedCompetitors, groundTruthPricing } = validateAuditInput(input);
   const deps: AuditDependencies = { probe: runCitationProbe, sitemap: fetchSitemapUrls, check: checkUrlStatus, resolve: resolveGroundingRedirect, save: persistAudit, saveGap: saveAuditCitationGap, semantic: process.env.GEMINI_API_KEY ? matchSitemapUrls : null, synthesize: overrides.probe && overrides.probe !== runCitationProbe ? null : synthesizeEngineProfiles, ...overrides };
+  await deps.onProgress?.(5, "Discovering sitemap and running buyer prompts");
   const [sitemapResults, probeResults] = await Promise.all([
     Promise.allSettled([deps.sitemap(domain).then(urls => urls.slice(0, Math.max(0, deps.sitemapPageLimit ?? 20_000)))]),
     Promise.allSettled(buyerPrompts.map((prompt) => deps.probe(domain, prompt))),
@@ -154,6 +156,7 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
   const sitemapResult = sitemapResults[0];
   const successfulProbes = probeResults.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
   const probeFailures = probeResults.flatMap((result, index) => result.status === "rejected" ? [`Buyer prompt ${index + 1} probe failed.`] : []);
+  await deps.onProgress?.(25, `Completed ${successfulProbes.length} of ${buyerPrompts.length} buyer prompt checks`);
   if (!successfulProbes.length) {
     const failure = probeResults.find((result): result is PromiseRejectedResult => result.status === "rejected");
     throw failure?.reason ?? new AuditInputError("All buyer prompt probes failed.");
@@ -188,6 +191,7 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
   const allUrls = [...new Set([...extracted, ...resolved.filter((url): url is string => !!url)])];
   const competitorDomains = providedCompetitors ?? (await import("./hijacker")).inferCompetitorDomains(domain, allUrls, probe.text);
   const targetUrls = allUrls.filter((url) => inDomain(url, domain));
+  await deps.onProgress?.(38, `Checking ${targetUrls.length} cited website destinations`);
   if (targetUrls.length > 50) throw new AuditInputError("More than 50 target-domain citations were found; narrow the buyer prompt.");
   const profilesPromise: Promise<SynthesizedProfile[][] | null> = deps.synthesize
     ? deps.synthesize(probeResults.map((result, index) => ({ prompt: buyerPrompts[index], sources: result.status === "fulfilled" && "searchGrounding" in result.value && result.value.searchGrounding.status === "available" ? result.value.searchGrounding.sources : [] }))).catch(() => null)
@@ -212,6 +216,7 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
     const result = await verification(url);
     return { url, httpStatus: result.httpStatus, urlState: result.state, error: result.error ?? (result.httpStatus === null ? "HTTP status check failed or timed out." : null), suggestedRedirect: null };
   });
+  await deps.onProgress?.(70, `Verified ${findings.length} cited destination URLs`);
   const broken = findings.filter(item => item.httpStatus === 404);
   let semanticMatches = new Map<string, { url: string; similarity: number }[]>();
   if (broken.length && sitemap.length && deps.semantic) {
@@ -260,6 +265,7 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
   const visibilityScore = verifiedFindings.length ? Math.round(100 * verifiedFindings.filter((finding) => finding.httpStatus! >= 200 && finding.httpStatus! < 300).length / verifiedFindings.length) : 0;
   const findingByUrl = new Map(findings.map((finding) => [finding.url, finding]));
   const synthesized = await profilesPromise;
+  await deps.onProgress?.(85, "Building evidence and engine comparison");
   if (deps.synthesize && (!synthesized || synthesized.some(group => group.length !== 3 || group.some(profile => !profile.available)))) warnings.push("Some engine synthesis profiles were unavailable; the Share of Model score is not calculated.");
   const engineMatrix = buildEngineMatrix({
     domain,
@@ -286,6 +292,7 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
     return { ...report, auditId: null, createdAt: new Date().toISOString(), persistence: { status: "disabled" as const }, suggestionCandidatesPer404: 5 };
   }
   try {
+    await deps.onProgress?.(94, "Saving reproducible audit evidence");
     const saved = await deps.save(report, userId);
     if (gap && userId) {
       try { await deps.saveGap(saved.id, userId, domain, gap); }

@@ -892,3 +892,28 @@ Migration 030 passed the local ordered PGlite migration and schema/type checks, 
 - [x] Verify `npx tsc --noEmit`, `npm run lint`, all 254 `npm test` cases, and optimized `npm run build` in an isolated output directory.
 
 Migration 031 passed ordered local PGlite migration tests. It extends the already deployed referral table and adds a server-only opt-in benchmark query; apply `supabase/migrations/031_sprint9_distribution_benchmarks.sql` to hosted Supabase before enabling referral counters and live benchmark publication. Lint completed with zero errors and two existing unused-parameter warnings in `app/layout.tsx`.
+
+## Sprint 10 — Days 251–285: Background Queue & First 30-Day Verification (COMPLETED IN CODE)
+
+- [x] Add a durable, idempotent background job queue with tenant/workspace rate and depth limits, leased single-step execution, monotonic progress, exponential retry backoff, and server-only job state. Migration 018 was already occupied, so the additive schema is migration 032.
+- [x] Move multi-prompt audits, competitor/listicle enrichment and outbound crawl, and chunked ecommerce catalog sync behind a cron worker; return job IDs promptly and add owner/workspace-scoped polling endpoints and dashboard progress.
+- [x] Keep retries idempotent across partial audit persistence, checkpoint each multi-prompt provider result, and avoid counting successful chunk continuation as a failed attempt.
+- [x] Add an end-to-end Definition of Done suite covering useful audit persistence, all eight URL states and DNS-pinned SSRF rejection, guarded redirect preview/approval/deployment/rollback with immutable action logs, separated technical/citation milestones, and reproducible partner/evidence provenance.
+- [x] Schedule the protected Vercel worker at one-minute intervals and verify migrations 001–032 in ordered PGlite coverage.
+- [x] Verify TypeScript, lint, the full 264-test suite, production dependency audit, and optimized production build.
+
+Migration 032 passed the ordered local migration and worker tests. The user has not yet confirmed that migration 032 was applied to hosted Supabase; apply `supabase/migrations/032_background_jobs_and_founder_os.sql` before deploying the new queue routes or cron worker. Multi-prompt scans now return job IDs; single-prompt audits preserve the existing synchronous flow while enrichment is queued.
+
+## Sprint 11 — Days 286–365: Annual Contract Planning, Margin Guardrails & Founder OS (COMPLETED IN CODE)
+
+- [x] Add USD/INR monthly and annual contract price ranges for the six roadmap tiers, two months free as the default annual term, and a modeled-cost floor that can reduce the discount to preserve the 75% estimated gross-margin target.
+- [x] Add workspace unit economics using configured model/search budgets and shared infrastructure assumptions, workspace margin warnings, and a quota check before additional audit usage.
+- [x] Add the owner-only Founder Operating System cockpit for weekly operating targets, Section 10 metrics, plan-priced subscription estimates, segment mix, and the Month 1/4/12 MRR trajectory.
+- [x] Keep estimated gross margin, MRR, ARR run rate, and quote-only tier assumptions explicitly labeled; unpriced subscription plans are excluded from revenue sums and counted separately.
+- [x] Verify TypeScript, lint, all 264 tests, `npm audit --omit=dev` (zero production vulnerabilities), and the optimized production build.
+
+Annual prices are fully modeled, but no new Lemon Squeezy annual variants or other tier/currency variants are created by repository code; configure provider variants and validate cost assumptions before selling them. INR floor calculations default to 94.4 INR/USD and can be overridden through `CITEMEND_ESTIMATED_INR_PER_USD`. The Founder OS route is limited to IDs configured in `CITEMEND_FOUNDER_USER_IDS`. The final QA scorecard records repository implementation, not external billing or hosted deployment state.
+
+### Final Sprint 1–11 repository scorecard
+
+**Days 1–365: implementation and automated QA complete in the repository.** The final checks on 2026-11-07 passed: TypeScript, lint (0 errors; two existing warnings in `app/layout.tsx`), 264 tests, the production dependency audit (0 vulnerabilities), and the optimized production build. Hosted migration 032, annual payment-provider variants, and production deployment/provider checks remain external setup items; see `AUDIT_INVENTORY.md`.

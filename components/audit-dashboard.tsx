@@ -38,6 +38,7 @@ export default function AuditDashboard({ liveEnabled, clerkConfigured, embedded 
   const [activePromptCount, setActivePromptCount] = useState(1);
   const [suggesting, setSuggesting] = useState(false);
   const [pending, setPending] = useState(false);
+  const [backgroundStep, setBackgroundStep] = useState<string | null>(null);
   const [report, setReport] = useState<DashboardReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
@@ -67,18 +68,37 @@ export default function AuditDashboard({ liveEnabled, clerkConfigured, embedded 
     if (!prompt.trim()) { setError("Add a sample buyer prompt to tell the AI what to research."); return; }
     setPending(true);
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 180_000);
+    const timeout = setTimeout(() => controller.abort(), 900_000);
     try {
       const prompts = selectedPrompts.length ? selectedPrompts : [prompt.trim()];
       setActivePromptCount(prompts.length);
-      const response = await fetch("/api/audit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ domain: cleanDomain, buyerPrompt: prompts[0], buyerPrompts: prompts }), signal: controller.signal });
+      const idempotencyKey = crypto.randomUUID();
+      const response = await fetch("/api/audit", { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey }, body: JSON.stringify({ domain: cleanDomain, buyerPrompt: prompts[0], buyerPrompts: prompts }), signal: controller.signal });
       const data = await response.json().catch(() => null);
       if (response.status === 403 && data?.code === "PRO_REQUIRED") { setUpgrade(true); toast.info("Upgrade to Pro to copy 301 redirects."); return; }
       if (!response.ok) throw new Error(response.status === 429 && data?.code !== "AUDIT_IN_PROGRESS" ? "The AI provider is rate limiting requests. Wait a moment before trying again." : typeof data?.error === "string" ? data.error : "The audit could not finish. Please try again.");
+      if (response.status === 202 && typeof data?.jobId === "string") {
+        setBackgroundStep(data.currentStepLabel ?? "Queued for background processing");
+        for (let attempt = 0; attempt < 450; attempt++) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          const poll = await fetch(`/api/jobs/${encodeURIComponent(data.jobId)}`, { cache: "no-store", signal: controller.signal });
+          const job = await poll.json().catch(() => null);
+          if (!poll.ok) throw new Error(typeof job?.error === "string" ? job.error : "Could not read background audit progress.");
+          setBackgroundStep(`${job.currentStepLabel ?? "Processing"} · ${job.progressPercent ?? 0}%`);
+          if (job.status === "completed") {
+            const savedReport = job.result?.report ?? job.result;
+            setReport(parseDashboardReport(savedReport));
+            setBackgroundStep(null);
+            return;
+          }
+          if (job.status === "failed") throw new Error(job.error ?? "The background audit failed after its retry limit.");
+        }
+        throw new Error("The audit is still running. Open Workspaces to monitor its background job status.");
+      }
       setReport(parseDashboardReport(data));
     } catch (cause) {
       setError(controller.signal.aborted ? "The request took too long. It may still be running; wait a moment before starting another audit." : cause instanceof TypeError ? "Connection lost. Please check your connection and try again." : cause instanceof Error ? cause.message : "Connection lost. Please check your connection and try again.");
-    } finally { clearTimeout(timeout); setPending(false); }
+    } finally { clearTimeout(timeout); setPending(false); setBackgroundStep(null); }
   }
   async function autoGeneratePrompts() {
     if (suggesting || pending || !hydrated) return;
@@ -161,7 +181,7 @@ export default function AuditDashboard({ liveEnabled, clerkConfigured, embedded 
         </aside>
       </section>
 
-      {pending && <AuditProgress promptCount={activePromptCount} />}
+      {pending && <><AuditProgress promptCount={activePromptCount} />{backgroundStep && <p role="status" className="mt-3 text-center text-xs text-[#53704e]">{backgroundStep}</p>}</>}
       {error && <div role="alert" className="mt-6 flex gap-3 rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-800"><TriangleAlert className="mt-0.5 size-4 shrink-0" /><div><p className="font-semibold">We couldn&apos;t finish this audit</p><p className="mt-1 leading-6">{error}</p></div></div>}
 
       <section id="results" aria-labelledby="results-heading" className="scroll-mt-8 pt-11" aria-live="polite">

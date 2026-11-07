@@ -5,10 +5,38 @@ import { detectCitationChanges } from "./citation-change-detector";
 
 export class AuditStorageError extends Error {}
 
-export async function persistAudit(report: AuditReport, userId?: string, reservation?: { id: string; createdAt: string }, scheduledId?: string, auditStartedAt?: string): Promise<{ id: string; createdAt: string }> {
+export async function persistAudit(report: AuditReport, userId?: string, reservation?: { id: string; createdAt: string }, scheduledId?: string, auditStartedAt?: string, allowIdempotentRetry = false): Promise<{ id: string; createdAt: string }> {
   if (!userId?.trim()) throw new AuditStorageError("An authenticated Clerk user ID is required to save an audit.");
   let db: ReturnType<typeof createServerDatabase>;
   try { db = createServerDatabase(); } catch { throw new AuditStorageError("Configure the server-only Supabase key and project URL."); }
+  if (allowIdempotentRetry && (scheduledId || reservation)) {
+    const stableId = scheduledId ?? reservation!.id;
+    const existing = await db.from("audits").select("id,created_at,status,domain").eq("id", stableId).eq("user_id", userId).maybeSingle();
+    if (existing.error) throw new AuditStorageError("Could not verify the prior background audit result.");
+    if (existing.data) {
+      if (existing.data.domain !== report.domain) throw new AuditStorageError("The saved background audit belongs to a different workspace.");
+      const [brokenRows, evidenceRows] = await Promise.all([
+        db.from("broken_links").select("id", { count: "exact", head: true }).eq("audit_id", stableId),
+        db.from("ai_observation_evidence").select("id", { count: "exact", head: true }).eq("audit_id", stableId),
+      ]);
+      if (brokenRows.error || evidenceRows.error) throw new AuditStorageError("Could not verify prior background evidence rows.");
+      const expectedBroken = report.findings.filter(item => item.httpStatus === 404).length;
+      const expectedEvidence = report.observationEvidence?.length ?? 0;
+      if (existing.data.status === report.status && (brokenRows.count ?? 0) === expectedBroken && (evidenceRows.count ?? 0) === expectedEvidence) {
+        return { id: stableId, createdAt: existing.data.created_at };
+      }
+      if (reservation && existing.data.status === "free_saving" && existing.data.created_at === reservation.createdAt) {
+        await db.from("recovery_outcomes").delete().eq("audit_id", stableId);
+        await db.from("broken_links").delete().eq("audit_id", stableId);
+        await db.from("ai_observation_evidence").delete().eq("audit_id", stableId);
+        const reset = await db.from("audits").update({ status: "free_pending" }).eq("id", stableId).eq("user_id", userId).eq("created_at", reservation.createdAt).eq("status", "free_saving");
+        if (reset.error) throw new AuditStorageError("The free audit reservation could not be reset for a safe retry.");
+      } else if (!reservation && scheduledId && existing.data.status === "pending") {
+        const reset = await db.from("audits").delete().eq("id", stableId).eq("user_id", userId).eq("domain", report.domain);
+        if (reset.error) throw new AuditStorageError("The incomplete scheduled audit could not be reset for a safe retry.");
+      } else throw new AuditStorageError("A prior background audit exists but its saved state does not match the current report.");
+    }
+  }
   let created = reservation
     ? await db.from("audits").update({ status: "free_saving" }).eq("id", reservation.id).eq("user_id", userId).eq("status", "free_pending").eq("created_at", reservation.createdAt).select("id,created_at").single()
     : await db.from("audits").insert({ ...(scheduledId ? { id: scheduledId } : {}), user_id: userId, domain: report.domain, status: "pending", sitemap_url_count: report.sitemapUrlCount, ...(report.competitorDomains?.length ? { competitor_domains: report.competitorDomains } : {}), ...(report.groundTruthPricing ? { ground_truth_pricing: report.groundTruthPricing } : {}) }).select("id,created_at").single();

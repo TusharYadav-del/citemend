@@ -1,8 +1,9 @@
 import "server-only";
 import { timingSafeEqual } from "node:crypto";
 import type { createServerDatabase } from "./supabase-server";
-import { estimateAuditModelCostUsd } from "./model-registry";
 import { grantsProAccess } from "./subscription";
+import { activePlanMonthlyPriceUsd } from "./billing";
+import { estimateWorkspaceUnitEconomics } from "./unit-economics";
 
 type Db = ReturnType<typeof createServerDatabase>;
 type Row = Record<string, unknown>;
@@ -52,10 +53,7 @@ export function calculateWorkspaceOperatingMetrics(input: {
   const completeEvidenceOutcomes = verifiedOutcomes.filter((outcome) => typeof outcome.evidence_id === "string" && evidenceIsComplete(input.evidenceById.get(outcome.evidence_id)));
   const verifiedDestinations = new Set(verifiedOutcomes.filter((outcome) => outcome.technical_deployment_verified_at).map((outcome) => String(outcome.canonical_destination_url)));
   const verifiedDeploymentActions = input.deploymentActions.filter((action) => typeof action.target_url === "string" && verifiedDestinations.has(action.target_url));
-  const cost = estimateAuditModelCostUsd(input.averagePromptCount);
-  const monthlyEstimatedScanCostUsd = cost.estimatedCostUsd === null ? null : cost.estimatedCostUsd * input.monthlyAuditCount;
-  const estimatedGrossMarginPercent = input.monthlyPriceUsd !== null && input.monthlyPriceUsd > 0 && monthlyEstimatedScanCostUsd !== null
-    ? (input.monthlyPriceUsd - monthlyEstimatedScanCostUsd) / input.monthlyPriceUsd * 100 : null;
+  const unitEconomics = estimateWorkspaceUnitEconomics({ workspaceMrrUsd: input.monthlyPriceUsd, monthlyAuditCount: input.monthlyAuditCount, averagePromptCount: input.averagePromptCount });
   return {
     workspace_created_at: input.workspaceCreatedAt,
     workspace_creation_measurement: "First valid audit submission (proxy; no separate workspace creation event exists in the current product).",
@@ -75,25 +73,25 @@ export function calculateWorkspaceOperatingMetrics(input: {
     gross_margin_estimate: {
       tier: input.tier,
       monthly_plan_price_usd: input.monthlyPriceUsd,
-      estimated_cost_per_audit_usd: cost.estimatedCostUsd,
+      estimated_cost_per_audit_usd: unitEconomics.estimated_total_monthly_cost_usd === null || !input.monthlyAuditCount ? null : unitEconomics.estimated_total_monthly_cost_usd / input.monthlyAuditCount,
       estimated_audits_this_month: input.monthlyAuditCount,
-      estimated_monthly_scan_api_cost_usd: monthlyEstimatedScanCostUsd,
-      estimated_gross_margin_percent: estimatedGrossMarginPercent,
+      estimated_monthly_scan_api_cost_usd: unitEconomics.estimated_total_monthly_cost_usd,
+      estimated_ai_search_cost_usd: unitEconomics.estimated_monthly_ai_search_cost_usd,
+      estimated_infrastructure_cost_usd: unitEconomics.estimated_monthly_infrastructure_cost_usd,
+      estimated_gross_margin_percent: unitEconomics.estimated_gross_margin_percent,
       target_percent: 75,
-      target_met: estimatedGrossMarginPercent !== null && estimatedGrossMarginPercent >= 75,
+      target_met: unitEconomics.estimated_gross_margin_percent !== null && unitEconomics.estimated_gross_margin_percent >= 75,
       cost_estimate_only: true,
-      unconfigured_model_costs: cost.missingCostModels,
-      note: "Conservative per-call model and search budgets are estimates, not provider-metered usage. They exclude infrastructure, payment fees, and actual recognized revenue; environment variables can override each profile assumption.",
+      unconfigured_model_costs: unitEconomics.missing_model_costs,
+      margin_warning: unitEconomics.gross_margin_warning,
+      note: unitEconomics.note,
     },
   };
 }
 
 function priceForPlan(plan: string | null, active: boolean) {
   if (!active) return { tier: "free", monthlyPriceUsd: 0 };
-  if (plan === "agency") return { tier: "agency", monthlyPriceUsd: 249 };
-  if (plan === "pro" || plan === "professional" || plan === "pro_beta") return { tier: plan, monthlyPriceUsd: plan === "pro_beta" ? 0 : 39 };
-  if (plan === "starter" || plan === "growth" || plan === "enterprise") return { tier: plan, monthlyPriceUsd: null };
-  return { tier: plan ?? "unknown", monthlyPriceUsd: null };
+  return { tier: plan ?? "unknown", monthlyPriceUsd: activePlanMonthlyPriceUsd(plan) };
 }
 
 export async function getWorkspaceOperatingMetrics(db: Db, ownerUserIds: string[], requestedDomain?: string | null, actorUserIds = ownerUserIds) {

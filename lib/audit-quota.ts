@@ -2,6 +2,8 @@ import "server-only";
 import { createServerDatabase } from "./supabase-server";
 import { PLAN_TIERS, type TierName } from "./integrations-workflow";
 import { grantsProAccess } from "./subscription";
+import { activePlanMonthlyPriceUsd } from "./billing";
+import { marginGuardrailAllows } from "./unit-economics";
 
 export function planTier(plan: string | null | undefined, active: boolean): TierName {
   if (!active) return "free_audit";
@@ -29,6 +31,13 @@ export async function getAuditQuota(userId: string, requestedPromptCount: number
   const auditIds = audits.map(item => item.id);
   const usedModelCalls = auditIds.length ? await db.from("ai_observation_evidence").select("id", { count: "exact", head: true }).in("audit_id", auditIds) : { count: 0, error: null };
   if (usedModelCalls.error) throw new Error("Tier model-call usage is temporarily unavailable.");
+  const margin = marginGuardrailAllows({
+    workspaceMrrUsd: activePlanMonthlyPriceUsd(selected?.plan),
+    completedAuditsThisMonth: auditResult.count ?? audits.length,
+    observedBuyerPromptCountThisMonth: usedModelCalls.count ?? 0,
+    nextAuditPromptCount: requestedPromptCount,
+  });
+  if (!margin.allowed) return { allowed: false as const, reason: "gross_margin_guardrail" as const, tier, maxSitemapPages: 0 };
   const usedPages = audits.reduce((sum, item) => sum + (item.sitemap_url_count ?? 0), 0);
   const remainingModels = limits.modelCalls - (usedModelCalls.count ?? 0);
   const expectedCalls = requestedPromptCount * 5;

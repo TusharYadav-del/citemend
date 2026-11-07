@@ -187,6 +187,18 @@
         Update: { id?: string; user_id?: string; store_id?: string; product_id?: string; variant_id?: string; customer_id?: string | null; order_id?: string | null; status?: string; plan?: string | null; current_period_end?: string | null; email?: string | null; domain?: string | null; renews_at?: string | null; ends_at?: string | null; cancelled?: boolean; provider_updated_at?: string | null; created_at?: string; updated_at?: string };
         Relationships: [];
       };
+      background_jobs: {
+        Row: { id: string; user_id: string; workspace_domain: string; job_type: string; job_key: string; status: string; progress_percent: number; current_step_label: string; payload_json: Record<string, unknown>; result_json: Record<string, unknown> | null; attempt_count: number; max_attempts: number; continuation_pending: boolean; next_retry_at: string; lease_token: string | null; lease_expires_at: string | null; error_message: string | null; created_at: string; updated_at: string; completed_at: string | null };
+        Insert: { id?: string; user_id: string; workspace_domain: string; job_type: string; job_key: string; status?: string; progress_percent?: number; current_step_label?: string; payload_json?: Record<string, unknown>; result_json?: Record<string, unknown> | null; attempt_count?: number; max_attempts?: number; continuation_pending?: boolean; next_retry_at?: string; lease_token?: string | null; lease_expires_at?: string | null; error_message?: string | null; created_at?: string; updated_at?: string; completed_at?: string | null };
+        Update: { id?: string; user_id?: string; workspace_domain?: string; job_type?: string; job_key?: string; status?: string; progress_percent?: number; current_step_label?: string; payload_json?: Record<string, unknown>; result_json?: Record<string, unknown> | null; attempt_count?: number; max_attempts?: number; continuation_pending?: boolean; next_retry_at?: string; lease_token?: string | null; lease_expires_at?: string | null; error_message?: string | null; created_at?: string; updated_at?: string; completed_at?: string | null };
+        Relationships: [];
+      };
+      founder_weekly_scorecards: {
+        Row: { founder_user_id: string; week_start: string; scorecard_json: Record<string, unknown>; updated_at: string };
+        Insert: { founder_user_id: string; week_start: string; scorecard_json?: Record<string, unknown>; updated_at?: string };
+        Update: { founder_user_id?: string; week_start?: string; scorecard_json?: Record<string, unknown>; updated_at?: string };
+        Relationships: [];
+      };
     };
     Views: { [key in never]: never };
     Functions: {
@@ -197,6 +209,12 @@
       record_agency_referral_visit: { Args: { p_referral_code: string }; Returns: boolean };
       citemend_opt_in_benchmark_observations: { Args: Record<PropertyKey, never>; Returns: { workspace_key: string; workspace_domain: string; model_name: string; job_status: string; extracted_urls_json: string[] | null; url_status_json: Record<string, number | string> | null }[] };
       citemend_readiness_schema_status: { Args: Record<PropertyKey, never>; Returns: { table_name: string; table_exists: boolean; rls_enabled: boolean; policy_count: number }[] };
+      enqueue_background_job: { Args: { p_user_id: string; p_workspace_domain: string; p_job_type: string; p_job_key: string; p_payload_json: Record<string, unknown> }; Returns: { id: string; user_id: string; workspace_domain: string; job_type: string; job_key: string; status: string; progress_percent: number; current_step_label: string; payload_json: Record<string, unknown>; result_json: Record<string, unknown> | null; attempt_count: number; max_attempts: number; continuation_pending: boolean; next_retry_at: string; lease_token: string | null; lease_expires_at: string | null; error_message: string | null; created_at: string; updated_at: string; completed_at: string | null }[] };
+      claim_background_job: { Args: { p_lease_seconds?: number }; Returns: { id: string; user_id: string; workspace_domain: string; job_type: string; job_key: string; status: string; progress_percent: number; current_step_label: string; payload_json: Record<string, unknown>; result_json: Record<string, unknown> | null; attempt_count: number; max_attempts: number; continuation_pending: boolean; next_retry_at: string; lease_token: string | null; lease_expires_at: string | null; error_message: string | null; created_at: string; updated_at: string; completed_at: string | null }[] };
+      advance_background_job: { Args: { p_job_id: string; p_lease_token: string; p_payload_json: Record<string, unknown>; p_progress_percent: number; p_step_label: string }; Returns: boolean };
+      report_background_job_progress: { Args: { p_job_id: string; p_lease_token: string; p_progress_percent: number; p_step_label: string; p_lease_seconds?: number }; Returns: boolean };
+      complete_background_job: { Args: { p_job_id: string; p_lease_token: string; p_result_json: Record<string, unknown> }; Returns: boolean };
+      retry_background_job: { Args: { p_job_id: string; p_lease_token: string; p_safe_error: string }; Returns: string };
       match_sitemap_url: {
         Args: { query_embedding: string; target_domain: string; match_threshold: number; match_count: number; query_model?: string };
         Returns: { url: string; similarity: number }[];

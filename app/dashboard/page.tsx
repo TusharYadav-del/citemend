@@ -46,6 +46,8 @@ import ProductionReadinessPanel from "@/components/production-readiness-panel";
 import { WorkspaceSettingsTabs } from "@/components/workspace-settings-tabs";
 import { AgencyPartnerPanel } from "@/components/agency-partner-panel";
 import { AgencyReferralConversionTracker } from "@/components/agency-referral-conversion-tracker";
+import { parseFounderAllowlist } from "@/lib/founder-os";
+import { BackgroundJobsPanel } from "@/components/background-jobs-panel";
 
 function HistoryLoading() {
   return <main className="min-h-screen bg-[#07090E] px-5 py-10 text-white sm:px-8 sm:py-14" role="status" aria-label="Loading your command center"><div className="h-8 w-52 animate-pulse rounded-lg bg-white/10" /><div className="mt-8 grid gap-4 sm:grid-cols-4">{[0, 1, 2, 3].map((item) => <div key={item} className="h-32 animate-pulse rounded-2xl bg-white/[0.04]" />)}</div><span className="sr-only">Loading your audit history...</span></main>;
@@ -115,7 +117,7 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
   const session = await auth(); const userId=session.userId;
   if (!userId) redirect("/");
   let access;try{access=await resolveWorkspaceAccess(createServerDatabase(),userId,session.orgId??null,session.orgRole??null)}catch{return <HistoryUnavailable/>}
-  const ownerIds=access.ownerUserIds;const canApprove=canWorkspace(access.role,"approve_redirect");const canManageSettings=canWorkspace(access.role,"manage_integrations");const canManageOwnerSettings=canWorkspace(access.role,"manage_api_keys");
+  const ownerIds=access.ownerUserIds;const canApprove=canWorkspace(access.role,"approve_redirect");const canManageSettings=canWorkspace(access.role,"manage_integrations");const canManageOwnerSettings=canWorkspace(access.role,"manage_api_keys");const isFounder=parseFounderAllowlist().includes(userId);
 
   let isPro: boolean | null = null;
   try { isPro = await hasProSubscription(ownerIds[0]); } catch {}
@@ -199,10 +201,11 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
   return (
     <main className="min-h-screen bg-[#07090E] text-slate-100">
       <div className="mx-auto flex min-h-screen max-w-[1600px]">
-      <Sidebar items={[{ label: "Overview", href: "/dashboard#overview", active: true }, { label: "AI Scanner", href: "/dashboard#ai-scanner" }, { label: "Recovery Center", href: "/dashboard#recovery-command" }, { label: "Traffic Interceptor", href: "/dashboard/pixel" }, { label: "Competitor Intelligence", href: "/dashboard#competitor-intelligence" }, { label: "Outreach", href: "/dashboard#outreach" }, { label: "GEO Optimizer", href: "/dashboard#geo-optimizer" }, { label: "AI Visibility", href: "/dashboard#ai-visibility" }, { label: "Reports", href: "/dashboard#audit-history" }, { label: "Automations", href: "/dashboard#automations" }, { label: "Workspaces", href: "/dashboard#workspaces" }, ...(access.role==="owner"?[{label:"Billing",href:"/dashboard#billing"}]:[])]} />
+      <Sidebar items={[{ label: "Overview", href: "/dashboard#overview", active: true }, { label: "AI Scanner", href: "/dashboard#ai-scanner" }, { label: "Recovery Center", href: "/dashboard#recovery-command" }, { label: "Traffic Interceptor", href: "/dashboard/pixel" }, { label: "Competitor Intelligence", href: "/dashboard#competitor-intelligence" }, { label: "Outreach", href: "/dashboard#outreach" }, { label: "GEO Optimizer", href: "/dashboard#geo-optimizer" }, { label: "AI Visibility", href: "/dashboard#ai-visibility" }, { label: "Reports", href: "/dashboard#audit-history" }, { label: "Automations", href: "/dashboard#automations" }, { label: "Workspaces", href: "/dashboard#workspaces" }, ...(access.role==="owner"?[{label:"Billing",href:"/dashboard#billing"}]:[]), ...(isFounder?[{label:"Founder OS",href:"/dashboard/founder-os"}]:[])]} />
       <div className="min-w-0 flex-1 px-5 py-8 sm:px-8 sm:py-10">
       <div id="overview"><PageHeader eyebrow={`${access.organizationId?`${access.role} organization member · `:""}Live telemetry · ${audits.length} saved scans`} title="Command Center" description="Monitor citations, recover links, and pursue hijack opportunities." actions={<><Link href="/" className="rounded-full px-3 py-2 text-xs font-medium text-slate-400 hover:text-white">Public site</Link><DomainSwitcher domains={allDomains} selected={selectedDomain} />{canApprove&&<RedirectSyncButton domains={[...new Set(audits.map(audit => audit.domain))]} />}<RedirectExportDrawer rules={exportRules} />{access.organizationId===null&&<Link href="/dashboard/pixel" className="rounded-lg border border-white/10 px-3 py-2 text-sm font-medium text-emerald-300 hover:bg-white/5">Pixel &amp; traffic</Link>}{canWorkspace(access.role,"scan")&&<Link href="/#audit" className="rounded-lg bg-emerald-300 px-3 py-2 text-sm font-semibold text-[#07110d]">Run live audit</Link>}{access.role==="owner"&&<CheckoutButton />}<UserButton /></>} /></div>
       <OnboardingChecklist progress={onboarding} />
+      <BackgroundJobsPanel domain={selectedDomain || undefined} />
       <AuditTemplates />
       <MetricCards audits={audits} rescued={access.organizationId?null:rescued} deployments={deploymentCount} citations={citationCount} activeWorkspaces={new Set(audits.map(audit => audit.domain)).size} />
       <Suspense fallback={<OperatingMetricsSkeleton />}><WorkspaceOperatingMetrics domain={selectedDomain || allDomains[0] || ""} ownerUserIds={ownerIds} actorUserIds={[...new Set([...ownerIds, userId])]} organizationId={access.organizationId} /></Suspense>

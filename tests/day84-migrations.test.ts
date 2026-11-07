@@ -15,17 +15,18 @@ test("retention and scheduled-report cron configuration uses the protected daily
   assert.deepEqual(vercel.crons, [
     { path: "/api/cron/data-retention", schedule: "0 2 * * *" },
     { path: "/api/cron/scheduled-reports", schedule: "0 4 * * *" },
+    { path: "/api/cron/background-jobs", schedule: "* * * * *" },
   ]);
 });
 
-test("migrations 001 through 031 apply in order and expose the columns used by the application", async () => {
+test("migrations 001 through 032 apply in order and expose the columns used by the application", async () => {
   const db = new PGlite({ extensions: { vector } });
   try {
     await db.exec("create role anon; create role authenticated; create role service_role bypassrls;");
     await db.exec("create schema auth; create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$; grant usage on schema auth to authenticated, service_role; grant execute on function auth.jwt() to authenticated, service_role;");
     const directory = new URL("../supabase/migrations/", import.meta.url);
     const files = (await readdir(directory)).filter(name => /^\d{3}_.+\.sql$/.test(name)).sort();
-    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 31 }, (_, index) => String(index + 1).padStart(3, "0")));
+    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 32 }, (_, index) => String(index + 1).padStart(3, "0")));
     for (const file of files) await db.exec(await readFile(new URL(file, directory), "utf8"));
     const expected: Record<string, string[]> = {
       audits: ["id", "user_id", "domain", "buyer_prompt", "status", "created_at", "completed_at", "competitor_domains", "ground_truth_pricing", "indexnow_key", "share_of_model_score", "engine_matrix_json", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text", "llms_txt_content", "webhook_url", "sitemap_url_count"],
@@ -60,6 +61,8 @@ test("migrations 001 through 031 apply in order and expose the columns used by t
       design_partner_applications: ["id", "contact_name", "contact_email", "company_name", "domain", "segment", "client_or_catalog_size", "buyer_prompt", "primary_pain_point", "teaser_status", "teaser_json", "status", "created_at"],
       agency_referrals: ["id", "partner_application_id", "referrer_user_id", "referrer_workspace_domain", "referral_code", "referred_email", "status", "visit_count", "last_visited_at", "referred_workspace_domain", "referred_workspace_user_id", "converted_at", "created_at"],
       forensic_teaser_rate_windows: ["key_id", "window_started_at", "request_count"],
+      background_jobs: ["id", "user_id", "workspace_domain", "job_type", "job_key", "status", "progress_percent", "current_step_label", "payload_json", "result_json", "attempt_count", "max_attempts", "continuation_pending", "next_retry_at", "lease_token", "lease_expires_at", "error_message", "created_at", "updated_at", "completed_at"],
+      founder_weekly_scorecards: ["founder_user_id", "week_start", "scorecard_json", "updated_at"],
     };
     const result = await db.query<{ table_name: string; column_name: string; is_nullable: string }>("select table_name, column_name, is_nullable from information_schema.columns where table_schema = 'public'");
     for (const [table, columns] of Object.entries(expected)) {
@@ -68,7 +71,43 @@ test("migrations 001 through 031 apply in order and expose the columns used by t
     }
     const rlsTables = await db.query<{ table_name: string; rls_enabled: boolean }>("select c.relname as table_name,c.relrowsecurity as rls_enabled from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p')");
     for (const table of Object.keys(expected)) assert.equal(rlsTables.rows.find((row) => row.table_name === table)?.rls_enabled, true, `${table} must have RLS enabled`);
-    assert.deepEqual((await db.query<{ table_name: string }>("select table_name from public.citemend_readiness_schema_status() order by table_name")).rows.length, 32);
+    assert.deepEqual((await db.query<{ table_name: string }>("select table_name from public.citemend_readiness_schema_status() order by table_name")).rows.length, 34);
+    const firstJob = (await db.query<{ id: string }>("select id from public.enqueue_background_job('queue_user','queue.example','ecommerce_sync','catalog-run-1','{\"source\":\"json\"}'::jsonb)")).rows[0].id;
+    const duplicateJob = (await db.query<{ id: string }>("select id from public.enqueue_background_job('queue_user','queue.example','ecommerce_sync','catalog-run-1','{\"source\":\"json\"}'::jsonb)")).rows[0].id;
+    assert.equal(duplicateJob, firstJob, "idempotent enqueue returns the same job row");
+    let claimed = (await db.query<{ id: string; attempt_count: number; lease_token: string }>("select id,attempt_count,lease_token from public.claim_background_job(60)")).rows[0];
+    assert.equal(claimed.id, firstJob);
+    assert.equal(claimed.attempt_count, 1);
+    const siblingJob = (await db.query<{ id: string }>("select id from public.enqueue_background_job('queue_user','queue.example','audit_enrichment','sibling-job','{}'::jsonb)")).rows[0].id;
+    assert.equal((await db.query<{ reported: boolean }>(`select public.report_background_job_progress('${firstJob}','${claimed.lease_token}',10,'Live worker heartbeat',300) as reported`)).rows[0].reported, true);
+    assert.equal((await db.query<{ lease_live: boolean }>(`select lease_expires_at>now() as lease_live from public.background_jobs where id='${firstJob}'`)).rows[0].lease_live, true);
+    assert.equal((await db.query("select * from public.claim_background_job(60)")).rows.length, 0, "the same workspace cannot run two jobs concurrently");
+    await db.exec(`delete from public.background_jobs where id='${siblingJob}'`);
+    assert.equal((await db.query<{ advanced: boolean }>(`select public.advance_background_job('${firstJob}','${claimed.lease_token}','{\"source\":\"json\",\"offset\":10}'::jsonb,20,'Batch 1 complete') as advanced`)).rows[0].advanced, true);
+    claimed = (await db.query<{ id: string; attempt_count: number; lease_token: string }>("select id,attempt_count,lease_token from public.claim_background_job(60)")).rows[0];
+    assert.equal(claimed.attempt_count, 1, "continuation chunks do not consume retry attempts");
+    assert.equal((await db.query<{ progress: number }>(`select progress_percent as progress from public.background_jobs where id='${firstJob}'`)).rows[0].progress, 20);
+    assert.equal((await db.query<{ status: string }>(`select public.retry_background_job('${firstJob}','${claimed.lease_token}','temporary test failure') as status`)).rows[0].status, "retrying");
+    await db.exec(`update public.background_jobs set next_retry_at=now()-interval '1 second' where id='${firstJob}'`);
+    claimed = (await db.query<{ id: string; attempt_count: number; lease_token: string }>("select id,attempt_count,lease_token from public.claim_background_job(60)")).rows[0];
+    assert.equal(claimed.attempt_count, 2, "retry attempts increment only after the backoff state");
+    assert.equal((await db.query<{ completed: boolean }>(`select public.complete_background_job('${firstJob}','${claimed.lease_token}','{\"synced\":10}'::jsonb) as completed`)).rows[0].completed, true);
+    assert.deepEqual((await db.query<{ status: string; progress: number }>(`select status,progress_percent as progress from public.background_jobs where id='${firstJob}'`)).rows[0], { status: "completed", progress: 100 });
+    const retryJob = (await db.query<{ id: string }>("select id from public.enqueue_background_job('retry_user','retry.example','audit_enrichment','retry-limit-test','{}'::jsonb)")).rows[0].id;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const lease = (await db.query<{ attempt_count: number; lease_token: string }>("select attempt_count,lease_token from public.claim_background_job(60)")).rows[0];
+      assert.equal(lease.attempt_count, attempt);
+      const state = (await db.query<{ status: string }>(`select public.retry_background_job('${retryJob}','${lease.lease_token}','retry ${attempt}') as status`)).rows[0].status;
+      assert.equal(state, attempt === 3 ? "failed" : "retrying");
+      if (attempt < 3) await db.exec(`update public.background_jobs set next_retry_at=now()-interval '1 second' where id='${retryJob}'`);
+    }
+    for (let i = 0; i < 10; i++) await db.query(`select id from public.enqueue_background_job('queue_user','queue.example','listicle_crawl','queue-depth-${i}','{}'::jsonb)`);
+    await assert.rejects(db.query("select id from public.enqueue_background_job('queue_user','queue.example','listicle_crawl','queue-depth-limit','{}'::jsonb)"), /queue is full/);
+    for (let i = 0; i < 20; i++) {
+      const rateJob = (await db.query<{ id: string }>(`select id from public.enqueue_background_job('rate_user','rate.example','audit_enrichment','rate-limit-${i}','{}'::jsonb)`)).rows[0].id;
+      await db.exec(`update public.background_jobs set status='completed' where id='${rateJob}'`);
+    }
+    await assert.rejects(db.query("select id from public.enqueue_background_job('rate_user','rate.example','audit_enrichment','rate-limit-over','{}'::jsonb)"), /rate limit reached/);
     assert.equal((await db.query<{ allowed: boolean }>(`select public.consume_forensic_teaser_rate_limit('${"a".repeat(64)}',2) as allowed`)).rows[0].allowed, true);
     assert.equal((await db.query<{ allowed: boolean }>(`select public.consume_forensic_teaser_rate_limit('${"a".repeat(64)}',2) as allowed`)).rows[0].allowed, true);
     assert.equal((await db.query<{ allowed: boolean }>(`select public.consume_forensic_teaser_rate_limit('${"a".repeat(64)}',2) as allowed`)).rows[0].allowed, false);
@@ -128,7 +167,7 @@ test("migrations 001 through 031 apply in order and expose the columns used by t
     await assert.rejects(db.query("select * from pixel_intercept_quotas"), /permission denied/);
     await assert.rejects(db.query("select * from action_audit_logs"), /permission denied/);
     await assert.rejects(db.query("select public.claim_pixel_intercept_quota('example.com')"), /permission denied/);
-    for (const table of ["ai_observation_evidence", "recovery_outcomes", "webhook_events_log", "workspace_api_keys", "autonomous_agent_runs", "ecommerce_catalog_items", "organization_members", "workspace_governance_policies", "scheduled_reports", "citation_change_events"]) await assert.rejects(db.query(`select * from ${table}`), /permission denied/);
+    for (const table of ["ai_observation_evidence", "recovery_outcomes", "webhook_events_log", "workspace_api_keys", "autonomous_agent_runs", "ecommerce_catalog_items", "organization_members", "workspace_governance_policies", "scheduled_reports", "citation_change_events", "background_jobs", "founder_weekly_scorecards"]) await assert.rejects(db.query(`select * from ${table}`), /permission denied/);
     await assert.rejects(db.query("select public.reserve_workspace_agent_scan('user_test','example.com')"), /permission denied/);
     assert.equal((await db.query<{ relrowsecurity: boolean }>("select relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname='audits'")).rows[0].relrowsecurity, true);
 

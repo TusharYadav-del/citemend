@@ -1,11 +1,11 @@
 import { auth } from "@clerk/nextjs/server";
+import { randomUUID } from "node:crypto";
 import { createServerDatabase } from "@/lib/supabase-server";
-import { compareProductClaims, mapBulkProductRedirects, parseProductFeed, parseShopifyProductSitemap, verifyProductUrl } from "@/lib/ecommerce-validator";
-import { decryptShopifyAccessToken } from "@/lib/shopify";
+import { compareProductClaims, mapBulkProductRedirects, parseProductFeed, verifyProductUrl } from "@/lib/ecommerce-validator";
 import { readRequestJson } from "@/lib/read-request-json";
 import { generateUrlEmbeddings, normalizeUrlEmbedding, urlEmbeddingModel } from "@/lib/gemini";
 import { urlPathKeywords } from "@/lib/url-keywords";
-import { publicFetch } from "@/lib/public-http";
+import { enqueueBackgroundJob, normalizeIdempotencyKey } from "@/lib/job-queue";
 
 const json = (data: unknown, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "private, no-store" } });
 export async function GET(request: Request) {
@@ -31,32 +31,22 @@ export async function POST(request: Request) {
   const input = body.value as Record<string, unknown>; const domain = typeof input.domain === "string" ? input.domain.toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "") : "";
   if (!/^(?=.{1,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(domain)) return json({ error: "Provide a valid workspace domain." }, 400);
   const db = createServerDatabase(); const owns = await db.from("audits").select("id").eq("user_id", userId).eq("domain", domain).limit(1); if (!owns.data?.length) return json({ error: "Workspace not found." }, 404);
-  let records: Record<string, unknown>[] = []; let platform = "feed";
   try {
     if (input.source === "shopify") {
-      platform = "shopify"; const connections = await db.from("cms_connections").select("shop_subdomain,access_token").eq("user_id", userId).eq("domain", domain).eq("platform", "shopify").limit(1);
-      const c = connections.data?.[0] as { shop_subdomain?: string; access_token?: string } | undefined; if (!c?.shop_subdomain || !c.access_token) return json({ error: "Connect Shopify before syncing." }, 409);
-      const token=decryptShopifyAccessToken(c.access_token);let next:string|null=`https://${c.shop_subdomain}/admin/api/2026-01/products.json?limit=250`;
-      for(let page=0;next&&page<20;page++){const response=await fetch(next,{headers:{"X-Shopify-Access-Token":token,Accept:"application/json"},redirect:"error",signal:AbortSignal.timeout(12000)});if(!response.ok)return json({error:`Shopify catalog returned HTTP ${response.status}.`},502);const parsed=await response.json() as {products?:Record<string,unknown>[]};records.push(...(parsed.products??[]));const link=response.headers.get("link")??"";const match=/<([^>]+)>;\s*rel="next"/.exec(link);next=match?.[1]??null;if(records.length>5000)return json({error:"Catalog exceeds the 5,000 item sync limit."},413);if(next&&new URL(next).hostname!==c.shop_subdomain)return json({error:"Shopify returned an unexpected pagination host."},502);}
-    } else if (input.source === "sitemap") { platform = "shopify_sitemap";let xml=typeof input.xml==="string"?input.xml:"";if(!xml){const response=await publicFetch(`https://${domain}/sitemap_products_1.xml`,{method:"GET",headers:{Range:"bytes=0-1048575"},signal:AbortSignal.timeout(10000)});if(!response.ok)return json({error:`Product sitemap returned HTTP ${response.status}.`},502);xml=(await response.text()).slice(0,1_048_576)}records=parseShopifyProductSitemap(xml).map(url=>({url})); }
-    else if ((input.source === "csv" || input.source === "json") && typeof input.content === "string") records = parseProductFeed(input.content, input.source);
-    else return json({ error: "Select Shopify, a product sitemap, or a CSV/JSON feed." }, 400);
-    if (records.length > 5000) return json({ error: "Catalog exceeds the 5,000 item sync limit." }, 413);
-    const rows = [];
-    for (const product of records) {
-      const variants = Array.isArray(product.variants) ? product.variants as Record<string, unknown>[] : [product];
-      for (const variant of variants) {
-        const rawValue = variant.url ?? variant.public_url ?? product.url;
-        const defaultUrl = product.handle ? `https://${domain}/products/${String(product.handle)}${variant.id ? `?variant=${String(variant.id)}` : ""}` : "";
-        const rawUrl = String(rawValue ?? defaultUrl);
-        let validation: Awaited<ReturnType<typeof verifyProductUrl>> | null = null; try { validation = await verifyProductUrl(rawUrl); } catch { /* rejected SSRF or network error is retained as unknown */ }
-        const id = String(variant.id ?? product.id ?? variant.sku ?? variant.sku_id ?? rawUrl).slice(0, 200);
-        const price = Number(variant.price ?? product.price); const available = variant.available ?? product.available;
-        rows.push({ user_id: userId, workspace_domain: domain, platform, external_item_id: id, canonical_url: validation?.finalUrl ?? (rawUrl || null), product_json: { ...product, variant_sku: variant.sku ?? null, catalog_price: Number.isFinite(price) ? price : null, catalog_in_stock: typeof available === "boolean" ? available : null, http_status: validation?.status ?? null, jsonld: validation?.facts ?? [], validation_error: validation ? null : "unverified" } });
-      }
-    }
-    if(rows.length>5000)return json({error:"Catalog exceeds the 5,000 variant sync limit."},413);
-    for (let offset = 0; offset < rows.length; offset += 100) { const saved = await db.from("ecommerce_catalog_items").upsert(rows.slice(offset, offset + 100), { onConflict: "user_id,workspace_domain,platform,external_item_id" }); if (saved.error) throw saved.error; }
-    return json({ synced: rows.length, platform });
-  } catch (error) { return json({ error: error instanceof Error ? error.message : "Catalog sync failed." }, 502); }
+      const connection = await db.from("cms_connections").select("id").eq("user_id", userId).eq("domain", domain).eq("platform", "shopify").limit(1);
+      if (connection.error) throw connection.error;
+      if (!connection.data?.length) return json({ error: "Connect Shopify before syncing." }, 409);
+    } else if (input.source === "sitemap") {
+      if (typeof input.xml !== "undefined" && (typeof input.xml !== "string" || input.xml.length > 1_048_576)) return json({ error: "Product sitemap input must be text under 1 MiB." }, 413);
+    } else if (input.source === "csv" || input.source === "json") {
+      if (typeof input.content !== "string" || input.content.length > 1_000_000) return json({ error: "Provide a CSV/JSON feed up to 1 MB." }, 400);
+      try { parseProductFeed(input.content, input.source); } catch { return json({ error: "The product feed could not be parsed." }, 400); }
+    } else return json({ error: "Select Shopify, a product sitemap, or a CSV/JSON feed." }, 400);
+    const key = normalizeIdempotencyKey(request.headers.get("idempotency-key"), randomUUID());
+    const queued = await enqueueBackgroundJob(db, { userId, domain, type: "ecommerce_sync", key, payload: { source: input.source, ...(typeof input.content === "string" ? { content: input.content } : {}), ...(typeof input.xml === "string" ? { xml: input.xml } : {}) } });
+    return json({ jobId: queued.id, status: queued.status, progressPercent: queued.progress_percent, currentStepLabel: queued.current_step_label }, 202);
+  } catch (error) {
+    if (error instanceof Error && /queue is full|rate limit reached/i.test(error.message)) return json({ error: error.message }, 429);
+    return json({ error: error instanceof Error ? error.message : "Catalog sync failed." }, 502);
+  }
 }

@@ -1,16 +1,15 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import { CitationProviderError } from "./citation-probe";
 import { AuditInputError, runAudit, validateAuditInput } from "./audit-pipeline";
 import { AuditStorageError, persistAudit } from "./audit-store";
 import { hasProSubscription } from "./subscription";
 import { reserveFreeAudit, releaseFreeAudit } from "./free-audit";
-import { findCompetitor404Opportunities } from "./hijacker";
-import { inspectThirdPartyCitations } from "./listicle-crawler";
-import { detectEntityPricingTruth } from "./entity-truth";
 import { stampAgencyProfile } from "./agency-store";
 import { getAuditQuota } from "./audit-quota";
 import { createServerDatabase } from "./supabase-server";
 import { ensureWorkspaceOperatingBaseline } from "./operating-metrics";
+import { enqueueBackgroundJob, normalizeIdempotencyKey } from "./job-queue";
 
 type AuditPostDependencies = {
   isConfigured?: () => boolean;
@@ -19,9 +18,6 @@ type AuditPostDependencies = {
   hasPro?: typeof hasProSubscription;
   reserveFree?: typeof reserveFreeAudit;
   releaseFree?: typeof releaseFreeAudit;
-  hijack?: typeof findCompetitor404Opportunities;
-  crawlListicles?: typeof inspectThirdPartyCitations;
-  entityTruth?: typeof detectEntityPricingTruth;
 };
 
 export function createAuditPostHandler(dependencies: AuditPostDependencies = {}) {
@@ -36,9 +32,6 @@ export function createAuditPostHandler(dependencies: AuditPostDependencies = {})
   const hasPro = dependencies.hasPro ?? hasProSubscription;
   const reserveFree = dependencies.reserveFree ?? reserveFreeAudit;
   const releaseFree = dependencies.releaseFree ?? releaseFreeAudit;
-  const hijack = dependencies.hijack ?? findCompetitor404Opportunities;
-  const crawlListicles = dependencies.crawlListicles ?? inspectThirdPartyCitations;
-  const entityTruth = dependencies.entityTruth ?? detectEntityPricingTruth;
 
   return async function handleAuditPost(request: Request): Promise<Response> {
     if (!isConfigured()) {
@@ -76,10 +69,24 @@ export function createAuditPostHandler(dependencies: AuditPostDependencies = {})
       input = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks)));
     } catch { return Response.json({ error: "Invalid JSON body." }, { status: 400 }); }
 
-    let domain: string;
-    try { domain = validateAuditInput(input).domain; }
+    let normalizedInput: ReturnType<typeof validateAuditInput>;
+    try { normalizedInput = validateAuditInput(input); }
     catch (error) {
       return Response.json({ error: error instanceof AuditInputError ? error.message : "Invalid audit input." }, { status: 400 });
+    }
+    const domain = normalizedInput.domain;
+    const buyerPromptCount = normalizedInput.buyerPrompts?.length ?? 1;
+    let queueKey: string | null = null;
+    if (buyerPromptCount > 1) {
+      try { queueKey = normalizeIdempotencyKey(request.headers.get("idempotency-key"), randomUUID()); }
+      catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Invalid idempotency key." }, { status: 400 }); }
+      if (request.headers.has("idempotency-key")) {
+        try {
+          const existing = await createServerDatabase().from("background_jobs").select("id,status,progress_percent,current_step_label")
+            .eq("user_id", userId).eq("workspace_domain", domain).eq("job_key", queueKey).maybeSingle();
+          if (existing.data) return Response.json({ jobId: existing.data.id, status: existing.data.status, progressPercent: existing.data.progress_percent, currentStepLabel: existing.data.current_step_label }, { status: 202, headers: { "Cache-Control": "private, no-store" } });
+        } catch { /* The enqueue below returns the controlled storage error if the queue is not installed. */ }
+      }
     }
 
     let isPro: boolean;
@@ -88,7 +95,7 @@ export function createAuditPostHandler(dependencies: AuditPostDependencies = {})
 
     let quota: Awaited<ReturnType<typeof getAuditQuota>> | null = null;
     if (!dependencies.hasPro) {
-      try { quota = await getAuditQuota(userId, validateAuditInput(input).buyerPrompts?.length ?? 1); }
+      try { quota = await getAuditQuota(userId, buyerPromptCount); }
       catch { return Response.json({ error: "Tier usage is temporarily unavailable. Apply the current evidence and quota migration, then retry." }, { status: 503 }); }
       if (!quota.allowed) return Response.json({ error: `This audit would exceed the ${quota.tier.replaceAll("_", " ")} ${quota.reason.replaceAll("_", " ")} quota.`, code: "TIER_QUOTA_EXCEEDED", tier: quota.tier, quota: quota.reason }, { status: 429 });
     }
@@ -114,61 +121,44 @@ export function createAuditPostHandler(dependencies: AuditPostDependencies = {})
     try { await ensureWorkspaceOperatingBaseline(createServerDatabase(), userId, domain, auditStartedAt); }
     catch { /* Metrics telemetry must never block a valid audit. */ }
 
+    if (buyerPromptCount > 1 && queueKey) {
+      try {
+        const job = await enqueueBackgroundJob(createServerDatabase(), {
+          userId, domain, type: "audit_scan", key: queueKey,
+          payload: { input: normalizedInput, reservation: reservation ?? null, auditStartedAt, sitemapPageLimit: quota?.maxSitemapPages ?? null, isPro },
+        });
+        const queuedReservation = job.payload_json.reservation && typeof job.payload_json.reservation === "object"
+          ? job.payload_json.reservation as { id?: unknown } : null;
+        if (reservation && queuedReservation?.id !== reservation.id) await releaseFree(userId, reservation.id, reservation.createdAt).catch(() => {});
+        return Response.json({ jobId: job.id, status: job.status, progressPercent: job.progress_percent, currentStepLabel: job.current_step_label }, { status: 202, headers: { "Cache-Control": "private, no-store" } });
+      } catch (error) {
+        if (reservation) await releaseFree(userId, reservation.id, reservation.createdAt).catch(() => {});
+        if (error instanceof Error && /queue is full|rate limit reached/i.test(error.message)) return Response.json({ error: error.message }, { status: 429 });
+        return Response.json({ error: "The background scan queue is unavailable. Apply the background jobs migration and retry." }, { status: 503 });
+      }
+    }
+
     try {
-      const report = await execute(input, { ...(quota ? { sitemapPageLimit: quota.maxSitemapPages } : {}), save: (value, owner) => persistAudit(value, owner, reservation, undefined, auditStartedAt) }, userId);
-      let hijackResult: Awaited<ReturnType<typeof findCompetitor404Opportunities>> | null = null;
-      let listicleResult: Awaited<ReturnType<typeof inspectThirdPartyCitations>> | null = null;
-      let entityTruthResult: Awaited<ReturnType<typeof detectEntityPricingTruth>> | null = null;
+      const report = await execute(normalizedInput, { ...(quota ? { sitemapPageLimit: quota.maxSitemapPages } : {}), save: (value, owner) => persistAudit(value, owner, reservation, undefined, auditStartedAt) }, userId);
+      let enrichmentJobId: string | null = null;
       if (report.persistence.status === "saved" && report.auditId) {
         if (isPro) {
           try { await stampAgencyProfile(userId, report.domain, report.auditId); }
           catch { report.warnings?.push("White-label settings could not be applied to this saved audit."); }
         }
         try {
-          hijackResult = await hijack({
-            auditId: report.auditId, domain: report.domain, competitorDomains: report.competitorDomains ?? [],
-            citationUrls: report.extractedUrls, prompt: (report.buyerPrompts ?? [report.buyerPrompt]).join("\n"),
-            citedEngine: report.providerUsed?.startsWith("groq-") ? "Groq+Tavily" : report.providerUsed ?? "unknown",
-            responseText: report.generatedText,
+          const job = await enqueueBackgroundJob(createServerDatabase(), {
+            userId, domain: report.domain, type: "audit_enrichment", key: `enrichment:${report.auditId}`,
+            payload: { auditId: report.auditId, domain: report.domain, buyerPrompt: report.buyerPrompt,
+              buyerPrompts: report.buyerPrompts ?? [report.buyerPrompt], competitorDomains: report.competitorDomains ?? [],
+              extractedUrls: report.extractedUrls, providerUsed: report.providerUsed ?? "unknown", generatedText: report.generatedText },
           });
-          if (hijackResult.warning) report.warnings.push(hijackResult.warning);
-        } catch {
-          report.warnings.push("Competitor citation analysis was temporarily unavailable.");
-        }
-        if (hijackResult) {
-          try {
-            listicleResult = await crawlListicles({
-              auditId: report.auditId, domain: report.domain, competitorDomains: report.competitorDomains ?? [],
-              thirdPartyUrls: hijackResult.classifications.filter(item => item.bucket === "third_party_source").map(item => item.url),
-              prompt: (report.buyerPrompts ?? [report.buyerPrompt]).join("\n"),
-              citedEngine: report.providerUsed?.startsWith("groq-") ? "Groq+Tavily" : report.providerUsed ?? "unknown",
-            });
-            if (listicleResult.warning) report.warnings.push(listicleResult.warning);
-          } catch {
-            report.warnings.push("Listicle and Reddit citation analysis was temporarily unavailable.");
-          }
-        }
-        try {
-          entityTruthResult = await entityTruth({
-            auditId: report.auditId, domain: report.domain,
-            prompt: (report.buyerPrompts ?? [report.buyerPrompt]).find(prompt => /(price|pricing|cost|plan|tier|free|feature|compare|comparison|alternative)/i.test(prompt)) ?? report.buyerPrompt,
-            answer: report.generatedText,
-          });
-        } catch { report.warnings.push("Pricing truth comparison was temporarily unavailable."); }
+          enrichmentJobId = job.id;
+        } catch { report.warnings?.push("The audit is saved; background competitor enrichment could not be queued."); }
       }
-      const opportunities = [...(hijackResult?.opportunities ?? []), ...(listicleResult?.opportunities ?? [])];
-      const visibleOpportunities = isPro ? opportunities : opportunities.map((opportunity, index) => index < 2 ? opportunity : {
-        ...opportunity,
-        target_url: "🔒 Upgrade to Pro to unlock hijack target",
-        dead_competitor_url: "🔒 Upgrade to Pro to unlock hijack target",
-        contact_email_or_link: "🔒 Upgrade to Pro to unlock hijack target",
-      });
       return Response.json({
         ...report,
-        citationClassifications: hijackResult?.classifications ?? [],
-        hijackOpportunities: visibleOpportunities,
-        hijackOpportunityCount: opportunities.length,
-        entityTruth: entityTruthResult,
+        ...(enrichmentJobId ? { enrichmentJobId, enrichmentStatus: "queued" } : {}),
       }, { status: report.persistence.status === "saved" ? 201 : 200 });
     } catch (error) {
       if (error instanceof AuditInputError) return Response.json({ error: error.message }, { status: 400 });

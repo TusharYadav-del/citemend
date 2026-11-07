@@ -90,9 +90,9 @@ test("default per-prompt cost enables the Pro gross-margin estimate", (context) 
   for (const name of names) delete process.env[name];
   context.after(() => { for (const [name, value] of old) { if (value === undefined) delete process.env[name]; else process.env[name] = value; } });
   const metrics = calculateWorkspaceOperatingMetrics({ workspaceCreatedAt: null, audits: [], recoveryActions: [], deploymentActions: [], outcomes: [], evidenceById: new Map(), tier: "pro", monthlyPriceUsd: 39, monthlyAuditCount: 1, averagePromptCount: 1 });
-  assert.equal(metrics.gross_margin_estimate.estimated_cost_per_audit_usd, 0.028);
-  assert.equal(metrics.gross_margin_estimate.estimated_monthly_scan_api_cost_usd, 0.028);
-  assert.equal(Math.round((metrics.gross_margin_estimate.estimated_gross_margin_percent ?? 0) * 100) / 100, 99.93);
+  assert.equal(metrics.gross_margin_estimate.estimated_cost_per_audit_usd, 0.278);
+  assert.equal(metrics.gross_margin_estimate.estimated_monthly_scan_api_cost_usd, 0.278);
+  assert.equal(Math.round((metrics.gross_margin_estimate.estimated_gross_margin_percent ?? 0) * 100) / 100, 99.29);
   assert.equal(metrics.gross_margin_estimate.target_met, true);
 });
 
