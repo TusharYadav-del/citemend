@@ -30,10 +30,10 @@ const scenarios = [
   },
 ] as const;
 
-export function MarketingRecoveryPreview() {
+export function MarketingRecoveryPreview({ embedded = false }: { embedded?: boolean }) {
   const [selected, setSelected] = useState<(typeof scenarios)[number]["id"]>("broken");
   const scenario = scenarios.find(item => item.id === selected)!;
-  return <div className="cm-container pb-8 sm:pb-12" role="region" aria-label="Interactive Recovery Center preview">
+  return <div className={embedded ? "min-w-0" : "cm-container pb-8 sm:pb-12"} role="region" aria-label="Interactive Recovery Center preview">
     <div className="overflow-hidden rounded-xl border border-white/[.08] bg-[#0D1119] shadow-[0_28px_80px_-40px_#000]">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[.08] px-4 py-3 sm:px-5"><div className="flex items-center gap-2"><span className="grid size-7 place-items-center rounded-lg bg-emerald-300/10 text-emerald-300"><ShieldCheck className="size-4" /></span><span className="text-xs font-semibold text-white">Recovery Center · Citation forensics</span></div><span className="rounded-md border border-amber-300/20 px-2 py-1 font-mono text-[10px] text-amber-200">INTERACTIVE SAMPLE · NO LIVE CHECK</span></div>
       <div role="tablist" aria-label="Preview scenarios" className="flex gap-1 overflow-x-auto border-b border-white/[.08] p-2">{scenarios.map((item, index) => <button key={item.id} type="button" role="tab" id={`preview-tab-${item.id}`} aria-selected={selected === item.id} aria-controls="preview-panel" tabIndex={selected === item.id ? 0 : -1} onClick={() => setSelected(item.id)} onKeyDown={event => { if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return; event.preventDefault(); const next = (index + (event.key === "ArrowRight" ? 1 : -1) + scenarios.length) % scenarios.length; setSelected(scenarios[next].id); const tabs = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]'); tabs?.[next]?.focus(); }} className={`min-w-max rounded-lg px-3 py-2 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-emerald-300 ${selected === item.id ? "bg-emerald-300/10 text-emerald-200" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>{item.label}</button>)}</div>

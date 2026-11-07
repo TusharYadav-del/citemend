@@ -26,6 +26,7 @@ test("interactive recovery preview and currency pricing respond without claiming
   await page.goto("/");
   const preview = page.getByRole("region", { name: "Interactive Recovery Center preview" });
   await expect(preview.getByText("INTERACTIVE SAMPLE", { exact: false })).toBeVisible();
+  expect((await preview.boundingBox())?.y).toBeLessThan(400);
   await preview.getByRole("tab", { name: "Hijack dead competitor citation" }).click();
   await expect(preview.getByText("CiteMend cannot redirect a competitor domain.", { exact: false })).toBeVisible();
   await preview.getByRole("tab", { name: "Fix stale AI pricing claim" }).click();

@@ -55,22 +55,20 @@ export default function Home() {
     <section id="top" className="relative isolate border-b border-white/[.06]">
       <div aria-hidden="true" className="cm-grid pointer-events-none absolute inset-0 -z-20" />
       <div aria-hidden="true" className="cm-glow pointer-events-none absolute -top-32 right-[-15%] -z-10 size-[48rem]" />
-      <div className="cm-container grid min-h-[30rem] items-center gap-8 py-12 sm:py-14 lg:grid-cols-[1.02fr_.98fr] lg:gap-12 lg:py-16">
+      <div className="cm-container grid items-start gap-8 py-9 sm:py-11 lg:grid-cols-[1.02fr_.98fr] lg:gap-8 lg:py-12">
         <div className="cm-reveal">
           <p className="cm-kicker flex items-center gap-2"><span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-300 opacity-50" /><span className="relative size-2 rounded-full bg-emerald-300" /></span> Citation intelligence for modern teams</p>
-          <h1 className="mt-6 max-w-[48rem] text-[clamp(3.2rem,7vw,6.35rem)] font-semibold leading-[.98] tracking-[-.075em]">Own your visibility.<br /><span className="bg-gradient-to-r from-[#37f5a0] via-[#91ffd0] to-[#39d9ff] bg-clip-text text-transparent">Recover every citation.</span></h1>
-          <p className="mt-7 max-w-xl text-[15px] leading-7 text-slate-400 sm:text-[17px] sm:leading-8">Monitor AI search visibility, discover citation opportunities, detect broken references, and recover lost authority with evidence your team can act on.</p>
-          <div className="mt-8 flex flex-wrap gap-3"><a href="#audit" className="cm-button-primary cm-focus-ring">Start a free audit <ArrowRight className="size-4" /></a><a href="#how-it-works" className="cm-button-secondary cm-focus-ring">Explore the platform <ChevronRight className="size-4" /></a></div>
-          <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-[11px] text-slate-500"><span className="inline-flex items-center gap-1.5"><Check className="size-3.5 text-emerald-300" /> Evidence backed checks</span><span className="inline-flex items-center gap-1.5"><Check className="size-3.5 text-emerald-300" /> No automatic redirects</span><span className="inline-flex items-center gap-1.5"><Check className="size-3.5 text-emerald-300" /> Start with your own domain</span></div>
+          <h1 className="mt-5 max-w-[48rem] text-[clamp(3.2rem,6vw,5.35rem)] font-semibold leading-[.98] tracking-[-.075em]">Own your visibility.<br /><span className="bg-gradient-to-r from-[#37f5a0] via-[#91ffd0] to-[#39d9ff] bg-clip-text text-transparent">Recover every citation.</span></h1>
+          <p className="mt-5 max-w-xl text-[15px] leading-7 text-slate-400 sm:text-[16px]">Monitor AI search visibility, discover citation opportunities, detect broken references, and recover lost authority with evidence your team can act on.</p>
+          <div className="mt-6 max-w-xl"><LandingPreview /></div>
+          <div className="mt-5 flex flex-wrap gap-3"><a href="#audit" className="cm-button-primary cm-focus-ring">Start a free audit <ArrowRight className="size-4" /></a><a href="#how-it-works" className="cm-button-secondary cm-focus-ring">Explore the platform <ChevronRight className="size-4" /></a></div>
+          <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-[11px] text-slate-500"><span className="inline-flex items-center gap-1.5"><Check className="size-3.5 text-emerald-300" /> Evidence backed checks</span><span className="inline-flex items-center gap-1.5"><Check className="size-3.5 text-emerald-300" /> No automatic redirects</span><span className="inline-flex items-center gap-1.5"><Check className="size-3.5 text-emerald-300" /> Start with your own domain</span></div>
         </div>
-        <div className="cm-reveal cm-reveal-delay relative">
+        <div className="cm-reveal cm-reveal-delay relative lg:pt-2">
           <div className="pointer-events-none absolute -inset-8 -z-10 rounded-[3rem] bg-emerald-400/[.04] blur-3xl" />
-          <div className="mb-3 flex items-center justify-between px-1"><p className="text-[10px] font-semibold uppercase tracking-[.15em] text-slate-500">A useful first signal</p><span className="rounded-full border border-white/10 px-2.5 py-1 text-[9px] text-slate-400">Free site preview</span></div>
-          <LandingPreview />
-          <div className="mt-3 flex items-center justify-between px-1 text-[10px] text-slate-600"><span>Homepage + default sitemap availability</span><span className="cm-mono">READ ONLY</span></div>
+          <MarketingRecoveryPreview embedded />
         </div>
       </div>
-      <MarketingRecoveryPreview />
       <div className="cm-container pb-10 sm:pb-14"><div className="cm-panel grid gap-px overflow-hidden !rounded-2xl bg-white/[.06] md:grid-cols-3"><div className="bg-[#0d1119] px-5 py-4 sm:px-6"><p className="cm-kicker !text-[9px]">Find</p><p className="mt-1.5 text-xs font-medium text-slate-200">What answers cite your domain?</p></div><div className="bg-[#0d1119] px-5 py-4 sm:px-6"><p className="cm-kicker !text-[9px] !text-[#39d9ff]">Verify</p><p className="mt-1.5 text-xs font-medium text-slate-200">Which destinations are truly broken?</p></div><div className="bg-[#0d1119] px-5 py-4 sm:px-6"><p className="cm-kicker !text-[9px]">Recover</p><p className="mt-1.5 text-xs font-medium text-slate-200">Where should a lost visitor land?</p></div></div></div>
     </section>
 
