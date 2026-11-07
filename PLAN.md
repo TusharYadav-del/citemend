@@ -928,3 +928,15 @@ Annual prices are fully modeled, but no new Lemon Squeezy annual variants or oth
 - [x] Verify `npx tsc --noEmit`, `npm run lint` (zero errors; two pre-existing warnings), `npm test` (264 passed), `npm run build`, and the browser suite (15 passed against the optimized production build).
 
 The authenticated dashboard interactions still require a signed-in production smoke test. The browser suite covered the public landing, preview, pricing interaction, report print view, and anonymous access gates; it did not exercise a live Clerk session or production data.
+
+## Legal, Compliance, Help Center & Support Hub (COMPLETED IN CODE)
+
+- [x] Preserve the already-used migration 019 and add forward-only migration 034 for workspace-scoped support tickets, server-only access, indexes, and the readiness table inventory.
+- [x] Add shared printable legal pages for Terms, Privacy, Refunds, Acceptable Use, Cookies/Pixel, DPA, Security, and Subprocessors, with a common legal sidebar and last-updated date.
+- [x] Add six-category instant Help Center search, the support portal, and dashboard `? Help & Support` drawer with verified workspace/audit diagnostics, plan-based response targets, server-side ticket persistence, and optional Resend notification.
+- [x] Add public operational status checks, product changelog, About page, branded 404 recovery page, and grouped global marketing footer links.
+- [x] Add authenticated Lemon Squeezy customer-portal access from Billing so subscription cancellation can be self-served when the provider returns a valid portal URL.
+- [x] Add support validation/diagnostic/SLA tests and help article search tests; extend ordered migration/RLS and readiness checks through migration 034.
+- [x] Verify `npx tsc --noEmit`, `npm run lint`, all 267 `npm test` cases, and optimized production build.
+
+Migration 034 is covered by local ordered PGlite migration tests; apply it to hosted Supabase before accepting support tickets in production. Resend notifications require `SUPPORT_NOTIFICATION_EMAIL`, `RESEND_API_KEY`, and a verified `RESEND_FROM_EMAIL`. The user supplied `citemend.official@outlook.com` as the public Privacy & Grievance contact; a registered entity name and named statutory officer were not supplied and are not invented. Legal copy should receive local counsel review before being treated as final jurisdiction-specific legal advice or procurement representations. Dodo Payments is accurately described as not integrated in the current checkout; Lemon Squeezy portal behavior depends on configured billing and the provider's customer portal URL.

@@ -6,7 +6,7 @@ export const REQUIRED_READINESS_TABLES = [
   "autonomous_agent_runs", "ecommerce_catalog_items", "organization_members", "workspace_governance_policies",
   "scheduled_reports", "citation_change_events", "workspace_api_rate_windows", "workspace_operating_metrics",
   "case_studies", "design_partner_applications", "agency_referrals", "forensic_teaser_rate_windows",
-  "background_jobs", "founder_weekly_scorecards",
+  "background_jobs", "founder_weekly_scorecards", "support_tickets",
 ] as const;
 
 export type ReadinessStatus = "PASS" | "WARN" | "MISSING";

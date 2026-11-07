@@ -22,14 +22,14 @@ test("daily Vercel jobs and the every-minute Supabase worker use protected cron 
   ]);
 });
 
-test("migrations 001 through 033 apply in order and expose the columns used by the application", async () => {
+test("migrations 001 through 034 apply in order and expose the columns used by the application", async () => {
   const db = new PGlite({ extensions: { vector } });
   try {
     await db.exec("create role anon; create role authenticated; create role service_role bypassrls;");
     await db.exec("create schema auth; create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$; grant usage on schema auth to authenticated, service_role; grant execute on function auth.jwt() to authenticated, service_role;");
     const directory = new URL("../supabase/migrations/", import.meta.url);
     const files = (await readdir(directory)).filter(name => /^\d{3}_.+\.sql$/.test(name)).sort();
-    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 33 }, (_, index) => String(index + 1).padStart(3, "0")));
+    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 34 }, (_, index) => String(index + 1).padStart(3, "0")));
     for (const file of files) await db.exec(await readFile(new URL(file, directory), "utf8"));
     const expected: Record<string, string[]> = {
       audits: ["id", "user_id", "domain", "buyer_prompt", "status", "created_at", "completed_at", "competitor_domains", "ground_truth_pricing", "indexnow_key", "share_of_model_score", "engine_matrix_json", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text", "llms_txt_content", "webhook_url", "sitemap_url_count"],
@@ -66,6 +66,7 @@ test("migrations 001 through 033 apply in order and expose the columns used by t
       forensic_teaser_rate_windows: ["key_id", "window_started_at", "request_count"],
       background_jobs: ["id", "user_id", "workspace_domain", "job_type", "job_key", "status", "progress_percent", "current_step_label", "payload_json", "result_json", "attempt_count", "max_attempts", "continuation_pending", "next_retry_at", "lease_token", "lease_expires_at", "error_message", "created_at", "updated_at", "completed_at"],
       founder_weekly_scorecards: ["founder_user_id", "week_start", "scorecard_json", "updated_at"],
+      support_tickets: ["id", "workspace_domain", "user_id", "user_email", "category", "priority", "subject", "message", "diagnostic_context_json", "status", "created_at"],
     };
     const result = await db.query<{ table_name: string; column_name: string; is_nullable: string }>("select table_name, column_name, is_nullable from information_schema.columns where table_schema = 'public'");
     for (const [table, columns] of Object.entries(expected)) {
@@ -74,7 +75,7 @@ test("migrations 001 through 033 apply in order and expose the columns used by t
     }
     const rlsTables = await db.query<{ table_name: string; rls_enabled: boolean }>("select c.relname as table_name,c.relrowsecurity as rls_enabled from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p')");
     for (const table of Object.keys(expected)) assert.equal(rlsTables.rows.find((row) => row.table_name === table)?.rls_enabled, true, `${table} must have RLS enabled`);
-    assert.deepEqual((await db.query<{ table_name: string }>("select table_name from public.citemend_readiness_schema_status() order by table_name")).rows.length, 34);
+    assert.deepEqual((await db.query<{ table_name: string }>("select table_name from public.citemend_readiness_schema_status() order by table_name")).rows.length, 35);
     const firstJob = (await db.query<{ id: string }>("select id from public.enqueue_background_job('queue_user','queue.example','ecommerce_sync','catalog-run-1','{\"source\":\"json\"}'::jsonb)")).rows[0].id;
     const duplicateJob = (await db.query<{ id: string }>("select id from public.enqueue_background_job('queue_user','queue.example','ecommerce_sync','catalog-run-1','{\"source\":\"json\"}'::jsonb)")).rows[0].id;
     assert.equal(duplicateJob, firstJob, "idempotent enqueue returns the same job row");

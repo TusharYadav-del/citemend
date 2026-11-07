@@ -199,6 +199,12 @@
         Update: { founder_user_id?: string; week_start?: string; scorecard_json?: Record<string, unknown>; updated_at?: string };
         Relationships: [];
       };
+      support_tickets: {
+        Row: { id: string; workspace_domain: string | null; user_id: string; user_email: string; category: string; priority: string; subject: string; message: string; diagnostic_context_json: Record<string, unknown>; status: string; created_at: string };
+        Insert: { id?: string; workspace_domain?: string | null; user_id: string; user_email: string; category: string; priority?: string; subject: string; message: string; diagnostic_context_json?: Record<string, unknown>; status?: string; created_at?: string };
+        Update: { id?: string; workspace_domain?: string | null; user_id?: string; user_email?: string; category?: string; priority?: string; subject?: string; message?: string; diagnostic_context_json?: Record<string, unknown>; status?: string; created_at?: string };
+        Relationships: [];
+      };
     };
     Views: { [key in never]: never };
     Functions: {

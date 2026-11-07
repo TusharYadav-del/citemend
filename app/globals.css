@@ -149,3 +149,5 @@ body { min-height: 100vh; background: var(--background); color: var(--foreground
   .audit-report a, .audit-report p, .audit-report h1, .audit-report h2 { overflow-wrap: anywhere; }
   .audit-report .report-cta { position: static !important; border: 1px solid #d2dad5; }
 }
+
+@media print { .legal-print { background: #fff !important; color: #111 !important; } .legal-print h1,.legal-print h2,.legal-print p,.legal-print li,.legal-print a { color: #111 !important; } .legal-sidebar,.site-footer { display: none !important; } .legal-content { max-width: 100% !important; } }
