@@ -73,10 +73,10 @@
 | `rescued_ai_visits` | Rescued visitor telemetry | Shipped |
 | `workspace_integrations` | Shopify, Slack/Discord, and agency settings | Shipped |
 | `pixel_intercept_quotas` | Atomic per-domain interceptor quota | Shipped |
-| `background_jobs` | Tenant-scoped idempotent queued work, leases, chunk progress, retries, and safe result status | Shipped in code; apply migration 032 to hosted Supabase |
-| `founder_weekly_scorecards` | Founder-only weekly Section 9 operating target inputs | Shipped in code; apply migration 032 to hosted Supabase |
+| `background_jobs` | Tenant-scoped idempotent queued work, leases, chunk progress, retries, and safe result status | Shipped in code; migration 032 confirmed hosted |
+| `founder_weekly_scorecards` | Founder-only weekly Section 9 operating target inputs | Shipped in code; migration 032 confirmed hosted |
 
-Migration files are numbered 001-032 and the local schema test applies them in order, then compares TypeScript row fields and SQL nullability. The user confirmed hosted application of migrations through 031 during the roadmap work. Migration 032 passed local ordered schema/queue tests but still needs to be applied to hosted Supabase before deploying the background queue worker and founder scorecard storage.
+Migration files are numbered 001-033 and the local schema test applies them in order, then compares TypeScript row fields and SQL nullability. The user confirmed hosted application of migration 032. Migration 033 configures the protected background worker through the existing Supabase Vault values and remains to be applied after the deployment succeeds.
 
 ## Security and operational checks
 
@@ -131,7 +131,7 @@ The score is for repository implementation and automated QA, not customer produc
 | 11 | Days 161-170: citation change and predictive intelligence | 100% shipped | Final suite passed |
 | 12 | Days 171-180: operating metrics, model registry and master QA | 100% shipped | Final suite passed |
 
-**Repository score: 12/12 roadmap months and Sprints 1–11 (Days 1–365) implemented and tested.** Remaining live checks are operational prerequisites, not silently included in this score: earlier plan entries identify pending billing/webhook activation, signed-in or provider checks, hosted migration 032, and live Shopify/Cloudflare behavior. Annual plans are priced with estimated-cost floors, but provider variants are not configured by this code. Cost defaults are enabled; set `CITEMEND_MODEL_COST_*_USD_PER_CALL` and `CITEMEND_ESTIMATED_INFRA_COST_PER_AUDIT_USD` to match measured usage or provider invoices.
+**Repository score: 12/12 roadmap months and Sprints 1–11 (Days 1–365) implemented and tested.** Remaining live checks are operational prerequisites, not silently included in this score: earlier plan entries identify pending billing/webhook activation, signed-in or provider checks, hosted migration 033, and live Shopify/Cloudflare behavior. Annual plans are priced with estimated-cost floors, but provider variants are not configured by this code. Cost defaults are enabled; set `CITEMEND_MODEL_COST_*_USD_PER_CALL` and `CITEMEND_ESTIMATED_INFRA_COST_PER_AUDIT_USD` to match measured usage or provider invoices.
 
 ### Final master QA run (2026-11-07)
 
@@ -139,6 +139,6 @@ The score is for repository implementation and automated QA, not customer produc
 - `npm run lint`: pass with zero errors; two existing unused-parameter warnings remain in `app/layout.tsx`.
 - `npm test`: pass (264 tests; includes five end-to-end First 30-Day Definition of Done checks).
 - `npm audit --omit=dev`: pass, zero production dependency vulnerabilities.
-- `npm run build`: pass (`.next-sprint11`, isolated output directory).
+- `npm run build`: pass (`.next-sprint11-final`, isolated output directory after the cron scheduler adjustment).
 
-Sprint 10/11 additions are covered by `lib/job-queue-core.ts`, `lib/job-queue.ts`, `lib/background-job-processor.ts`, `app/api/jobs/`, `app/api/cron/background-jobs/`, `lib/billing.ts`, `lib/unit-economics.ts`, `lib/founder-os.ts`, `/dashboard/founder-os`, migration 032, and `tests/definition-of-done.test.ts` / `tests/sprint10-11-foundation.test.ts`. Annual plan prices and gross-margin guardrails are estimates; new Lemon Squeezy variants remain to be configured. The user has not yet confirmed hosted migration 032 application.
+Sprint 10/11 additions are covered by `lib/job-queue-core.ts`, `lib/job-queue.ts`, `lib/background-job-processor.ts`, `app/api/jobs/`, `app/api/cron/background-jobs/`, `lib/billing.ts`, `lib/unit-economics.ts`, `lib/founder-os.ts`, `/dashboard/founder-os`, migrations 032/033, and `tests/definition-of-done.test.ts` / `tests/sprint10-11-foundation.test.ts`. Vercel's Hobby plan does not allow the every-minute worker schedule, so migration 033 registers it through Supabase pg_cron and Vercel retains its two daily cron entries. Annual plan prices and gross-margin guardrails are estimates; new Lemon Squeezy variants remain to be configured. The user confirmed hosted migration 032; hosted migration 033 remains pending. The production deployment needs to succeed before the public worker route can be authenticated and smoke-tested.

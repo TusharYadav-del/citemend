@@ -899,10 +899,10 @@ Migration 031 passed ordered local PGlite migration tests. It extends the alread
 - [x] Move multi-prompt audits, competitor/listicle enrichment and outbound crawl, and chunked ecommerce catalog sync behind a cron worker; return job IDs promptly and add owner/workspace-scoped polling endpoints and dashboard progress.
 - [x] Keep retries idempotent across partial audit persistence, checkpoint each multi-prompt provider result, and avoid counting successful chunk continuation as a failed attempt.
 - [x] Add an end-to-end Definition of Done suite covering useful audit persistence, all eight URL states and DNS-pinned SSRF rejection, guarded redirect preview/approval/deployment/rollback with immutable action logs, separated technical/citation milestones, and reproducible partner/evidence provenance.
-- [x] Schedule the protected Vercel worker at one-minute intervals and verify migrations 001–032 in ordered PGlite coverage.
+- [x] Schedule the protected worker with Supabase pg_cron at one-minute intervals, keeping Vercel's two supported daily jobs, and verify migrations 001–033 in ordered PGlite coverage.
 - [x] Verify TypeScript, lint, the full 264-test suite, production dependency audit, and optimized production build.
 
-Migration 032 passed the ordered local migration and worker tests. The user has not yet confirmed that migration 032 was applied to hosted Supabase; apply `supabase/migrations/032_background_jobs_and_founder_os.sql` before deploying the new queue routes or cron worker. Multi-prompt scans now return job IDs; single-prompt audits preserve the existing synchronous flow while enrichment is queued.
+Migrations 032 and 033 passed ordered local migration tests. The user confirmed migration 032 was applied to hosted Supabase. Apply `supabase/migrations/033_background_worker_schedule.sql` after the new worker route is deployed; it registers the worker through the existing Vault `app_base_url` and `cron_secret` values. Vercel's Hobby plan rejects jobs that run more than once daily, so `vercel.json` retains only the existing daily retention and report jobs. Multi-prompt scans now return job IDs; single-prompt audits preserve the existing synchronous flow while enrichment is queued.
 
 ## Sprint 11 — Days 286–365: Annual Contract Planning, Margin Guardrails & Founder OS (COMPLETED IN CODE)
 
@@ -916,4 +916,4 @@ Annual prices are fully modeled, but no new Lemon Squeezy annual variants or oth
 
 ### Final Sprint 1–11 repository scorecard
 
-**Days 1–365: implementation and automated QA complete in the repository.** The final checks on 2026-11-07 passed: TypeScript, lint (0 errors; two existing warnings in `app/layout.tsx`), 264 tests, the production dependency audit (0 vulnerabilities), and the optimized production build. Hosted migration 032, annual payment-provider variants, and production deployment/provider checks remain external setup items; see `AUDIT_INVENTORY.md`.
+**Days 1–365: implementation and automated QA complete in the repository.** The final scheduler-adjusted checks on 2026-11-07 passed: TypeScript, lint (0 errors; two existing warnings), 264 tests, zero production dependency vulnerabilities, and optimized production build. Hosted migration 033, annual payment-provider variants, and successful Vercel redeployment remain the outstanding external setup items; see `AUDIT_INVENTORY.md`.

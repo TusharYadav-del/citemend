@@ -8,10 +8,6 @@
     {
       "path": "/api/cron/scheduled-reports",
       "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/cron/background-jobs",
-      "schedule": "* * * * *"
     }
   ]
 }
