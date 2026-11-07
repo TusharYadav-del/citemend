@@ -902,7 +902,7 @@ Migration 031 passed ordered local PGlite migration tests. It extends the alread
 - [x] Schedule the protected worker with Supabase pg_cron at one-minute intervals, keeping Vercel's two supported daily jobs, and verify migrations 001–033 in ordered PGlite coverage.
 - [x] Verify TypeScript, lint, the full 264-test suite, production dependency audit, and optimized production build.
 
-Migrations 032 and 033 passed ordered local migration tests. The user confirmed migration 032 was applied to hosted Supabase. Apply `supabase/migrations/033_background_worker_schedule.sql` after the new worker route is deployed; it registers the worker through the existing Vault `app_base_url` and `cron_secret` values. Vercel's Hobby plan rejects jobs that run more than once daily, so `vercel.json` retains only the existing daily retention and report jobs. Multi-prompt scans now return job IDs; single-prompt audits preserve the existing synchronous flow while enrichment is queued.
+Migrations 032 and 033 passed ordered local migration tests. The user confirmed migration 032 was applied to hosted Supabase. Commit `f6f723a` is deployed; `/api/cron/background-jobs` responds 401 to an invalid bearer token, and the Vercel production variable list confirms both `CRON_SECRET` and `CITEMEND_FOUNDER_USER_IDS` exist without exposing their values. Apply `supabase/migrations/033_background_worker_schedule.sql` to install the worker schedule using Vault `app_base_url` and `cron_secret`; a valid authenticated worker response has not yet been observed. Vercel's Hobby plan rejects jobs that run more than once daily, so `vercel.json` retains only the existing daily retention and report jobs. Multi-prompt scans now return job IDs; single-prompt audits preserve the existing synchronous flow while enrichment is queued.
 
 ## Sprint 11 — Days 286–365: Annual Contract Planning, Margin Guardrails & Founder OS (COMPLETED IN CODE)
 
@@ -916,4 +916,4 @@ Annual prices are fully modeled, but no new Lemon Squeezy annual variants or oth
 
 ### Final Sprint 1–11 repository scorecard
 
-**Days 1–365: implementation and automated QA complete in the repository.** The final scheduler-adjusted checks on 2026-11-07 passed: TypeScript, lint (0 errors; two existing warnings), 264 tests, zero production dependency vulnerabilities, and optimized production build. Hosted migration 033, annual payment-provider variants, and successful Vercel redeployment remain the outstanding external setup items; see `AUDIT_INVENTORY.md`.
+**Days 1–365: implementation and automated QA complete in the repository.** The final scheduler-adjusted checks on 2026-11-07 passed: TypeScript, lint (0 errors; two existing warnings), 264 tests, zero production dependency vulnerabilities, and optimized production build. Commit `f6f723a` is live. Hosted migration 033, annual payment-provider variants, and a valid authenticated worker response remain outstanding; see `AUDIT_INVENTORY.md`.
