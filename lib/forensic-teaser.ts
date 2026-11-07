@@ -20,10 +20,15 @@ export type ForensicTeaserReport = {
   runMode: "groq_tavily_modeled_answer" | "page_only";
   diagnosticSummary: string;
   citationSummary: { modeledAnswerAvailable: boolean; ownDomainUrlMentions: number | null; verifiedBrokenUrls: number | null; missingCitationCount: number | null; brokenOrMissingCount: number | null };
-  pageEvidence: { httpStatus: number | null; sitemapCheckAvailable: boolean; homepageInSitemap: boolean | null; robotsAllows: boolean | null; structuredDataBlocks: number; lastModified: string | null; lexicalPromptCoverage: number | null };
+  pageEvidence: { httpStatus: number | null; sitemapCheckAvailable: boolean; homepageInSitemap: boolean | null; robotsAllows: boolean | null; structuredDataBlocks: number; lastModified: string | null; extractionStatus: "available" | "unknown"; extractedTextLength: number; extractedTextPreview: string; lexicalPromptCoverage: number | null };
   findings: TeaserFinding[];
   limits: string[];
 };
+
+export function summarizeTeaserDiagnosis(input: { httpStatus: number | null; verifiedBrokenUrls: number | null; blockerKinds: string[] }): string {
+  if (input.httpStatus === 200 && input.verifiedBrokenUrls === 0) return "No Verified Citation Failure Detected";
+  return input.blockerKinds.length ? `Observed ${input.blockerKinds.length} potential blocker signal${input.blockerKinds.length === 1 ? "" : "s"}: ${[...new Set(input.blockerKinds)].join(", ")}.` : "No verified blocker was observable in this single scan.";
+}
 
 export function normalizeTeaserDomain(value: unknown): string {
   if (typeof value !== "string" || value.trim().length > 260) throw new TypeError("Enter a public domain such as example.com.");
@@ -100,7 +105,9 @@ export async function runPublicForensicTeaser(domain: string, buyerPrompt: strin
   const robotsAllows = robotsResult.status === "fulfilled" ? robotsResult.value : null;
   const page = pageResult.status === "fulfilled" ? pageResult.value : null;
   const probe = probeResult.status === "fulfilled" ? probeResult.value : null;
-  const promptCoverage = page ? measureBuyerPromptCoverage(buyerPrompt, page.title, page.featureClaims) : null;
+  const usableText = page?.visibleText.trim() ?? "";
+  const extractionStatus = usableText.replace(/[^\p{L}\p{N}]/gu, "").length >= 12 ? "available" : "unknown";
+  const promptCoverage = page && extractionStatus === "available" ? measureBuyerPromptCoverage(buyerPrompt, page.title, page.featureClaims, usableText) : null;
   const ownDomainUrls = probe ? extractTextUrls(probe.text).filter((url) => belongsToDomain(url, origin.hostname)).slice(0, 8) : [];
   const checkedOwnUrls = await Promise.all(ownDomainUrls.map((url) => verifyUrl(url)));
   const brokenCount = probe ? checkedOwnUrls.filter((result) => result.state === "404" || result.state === "410").length : null;
@@ -115,11 +122,6 @@ export async function runPublicForensicTeaser(domain: string, buyerPrompt: strin
     kind: "discoverability",
     observableEvidence: [homeInSitemap === false ? "The homepage was not found in the successfully fetched sitemap." : "The site's robots.txt disallows the homepage."],
     diagnosticHypotheses: ["Reduced crawl discovery may limit opportunities for pages on this domain to appear in search-grounded answers."],
-  });
-  if (promptCoverage !== null && promptCoverage < 0.35 || probe && ownDomainUrls.length === 0) findings.push({
-    kind: "retrieval",
-    observableEvidence: [probe && ownDomainUrls.length === 0 ? "This single modeled answer returned no URL on the submitted domain." : `Deterministic word overlap between the prompt and homepage text was ${Math.round((promptCoverage ?? 0) * 100)}%.`],
-    diagnosticHypotheses: ["The homepage may not clearly match this buyer prompt. Word overlap and one modeled answer are limited signals, not a model-retrieval measurement."],
   });
   if (thirdPartySchemaCount > (page?.jsonLd.length ?? 0)) findings.push({
     kind: "citation_selection",
@@ -138,14 +140,16 @@ export async function runPublicForensicTeaser(domain: string, buyerPrompt: strin
     observableEvidence: [`A DNS-pinned HTTP check confirmed ${targetStatus === 404 || targetStatus === 410 ? `the homepage returned ${targetStatus}` : `${checkedOwnUrls.filter((result) => result.state === "404" || result.state === "410").length} same-domain answer URL(s) returned 404 or 410`}.`],
     diagnosticHypotheses: ["A confirmed missing or removed destination can stop readers and crawlers from reaching the cited content."],
   });
-  const diagnosticSummary = findings.length ? `Observed ${findings.length} potential blocker signal${findings.length === 1 ? "" : "s"}: ${[...new Set(findings.map((item) => item.kind))].join(", ")}.` : "No blocker signal was observable in this single scan.";
+  const verifiedBrokenUrls = brokenCount ?? 0;
+  const cleanVerifiedState = targetStatus === 200 && brokenCount !== null && verifiedBrokenUrls === 0;
+  const diagnosticSummary = summarizeTeaserDiagnosis({ httpStatus: targetStatus, verifiedBrokenUrls: cleanVerifiedState ? verifiedBrokenUrls : brokenCount, blockerKinds: findings.map(item => item.kind) });
   return {
     domain: origin.hostname,
     status: probe && page && targetStatus !== null ? "complete" : "partial",
     runMode: probe ? "groq_tavily_modeled_answer" : "page_only",
     diagnosticSummary,
     citationSummary: { modeledAnswerAvailable: !!probe, ownDomainUrlMentions: probe ? ownDomainUrls.length : null, verifiedBrokenUrls: brokenCount, missingCitationCount: missingCount, brokenOrMissingCount },
-    pageEvidence: { httpStatus: targetStatus, sitemapCheckAvailable: sitemapAvailable, homepageInSitemap: homeInSitemap, robotsAllows, structuredDataBlocks: page?.jsonLd.length ?? 0, lastModified: page?.updatedAt ?? null, lexicalPromptCoverage: promptCoverage },
+    pageEvidence: { httpStatus: targetStatus, sitemapCheckAvailable: sitemapAvailable, homepageInSitemap: homeInSitemap, robotsAllows, structuredDataBlocks: page?.jsonLd.length ?? 0, lastModified: page?.updatedAt ?? null, extractionStatus, extractedTextLength: usableText.length, extractedTextPreview: usableText.slice(0, 1600), lexicalPromptCoverage: promptCoverage },
     findings,
     limits: [
       "The answer profile is a single Groq-generated simulation with Tavily search context, not a native ChatGPT, Perplexity, Gemini, or Claude observation.",

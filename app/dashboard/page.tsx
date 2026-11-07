@@ -54,6 +54,8 @@ import { WorkspaceModeSwitcher } from "@/components/ui/workspace-mode-switcher";
 import { HelpSupportDrawer } from "@/components/help-support-drawer";
 import { ManageSubscriptionButton } from "@/components/manage-subscription-button";
 import { RecoveryCenter, type RecoveryEvidence, type RecoveryOutcome } from "@/components/recovery-center";
+import { CitationEvidenceImport } from "@/components/citation-evidence-import";
+import { EvidenceCategoryBadge } from "@/components/evidence-category-badge";
 import type { SidebarItem } from "@/components/ui/sidebar";
 
 function MetricCards({ audits, rescued, deployments, citations, activeWorkspaces }: { audits: UserAuditHistoryItem[]; rescued: number | null; deployments: number | null; citations: number | null; activeWorkspaces: number }) {
@@ -91,7 +93,7 @@ function AuditCard({ audit, gap }: { gap?: CitationGap; audit: UserAuditHistoryI
       </div>
       <p className="mt-4 text-xs text-slate-400">Anyone with the report link can view its findings.</p><Link href={`/audit/${audit.id}`} className="mt-2 inline-block text-sm font-medium text-emerald-300 hover:underline">Open shareable report &rarr;</Link><p className="mt-5 text-sm text-slate-400">{brokenLinks.length} confirmed broken link{brokenLinks.length === 1 ? "" : "s"}</p>
       {brokenLinks.length > 0 && <a href="#recovery-command" className="mt-2 inline-block text-xs font-semibold text-emerald-300 hover:underline">Inspect these URLs in Recovery Center →</a>}
-      {Array.isArray(audit.engine_matrix_json) && audit.engine_matrix_json.length > 0 && <section className="mt-5 border-t border-white/10 pt-4" aria-label="Multi-engine citation matrix"><h3 className="text-sm font-semibold text-white">Multi-Engine Citation Matrix <span className="text-slate-400">· Buyer Prompt Breakdown</span></h3><p className="mt-1 text-xs text-slate-500">Separate synthesis profiles share Tavily grounding; they do not query the named engines directly.</p><div className="mt-3 space-y-3">{[...new Set((audit.engine_matrix_json as EngineMatrixRow[]).map(row => row.prompt))].map(prompt => <div key={prompt} className="rounded-lg bg-black/20 p-3"><p className="text-xs font-medium text-slate-200">{prompt}</p><div className="mt-2 grid gap-2 sm:grid-cols-2">{ENGINE_PROFILES.map(engine => { const row = (audit.engine_matrix_json as EngineMatrixRow[]).find(item => item.prompt === prompt && item.engine === engine); if (!row) return null; const label = describeEngineStatus(row); return <div key={engine} className="rounded-md border border-white/5 p-2 text-xs"><p className="font-medium text-slate-300">{engine}</p><p className="mt-1 text-slate-400">{label}</p>{row.provider && <small>{row.provider}</small>}{row.citedUrl && <a className="mt-1 block break-all text-emerald-300 hover:underline" href={row.citedUrl} target="_blank" rel="noreferrer">{row.citedUrl}</a>}</div>; })}</div><div className="mt-2 flex flex-wrap gap-2 text-[11px]"><Link href="/#audit" className="rounded border border-emerald-400/20 px-2 py-1 text-emerald-300">⚡ Generate Capsule to Win Engine</Link><Link href="/dashboard/pixel" className="rounded border border-white/10 px-2 py-1 text-slate-300">🛠️ View Active 301 Recovery</Link><a href="#recovery-command" className="rounded border border-white/10 px-2 py-1 text-slate-300">🔥 View Reddit Source Thread</a></div></div>)}</div></section>}
+      {Array.isArray(audit.engine_matrix_json) && audit.engine_matrix_json.length > 0 && <section className="mt-5 border-t border-white/10 pt-4" aria-label="Multi-engine citation matrix"><h3 className="text-sm font-semibold text-white">Multi-Engine Citation Matrix <span className="text-slate-400">· Buyer Prompt Breakdown</span></h3><p className="mt-1 text-xs text-slate-500">Separate synthesis profiles share Tavily grounding; they do not query the named engines directly.</p><div className="mt-3 space-y-3">{[...new Set((audit.engine_matrix_json as EngineMatrixRow[]).map(row => row.prompt))].map(prompt => <div key={prompt} className="rounded-lg bg-black/20 p-3"><p className="text-xs font-medium text-slate-200">{prompt}</p><div className="mt-2 grid gap-2 sm:grid-cols-2">{ENGINE_PROFILES.map(engine => { const row = (audit.engine_matrix_json as EngineMatrixRow[]).find(item => item.prompt === prompt && item.engine === engine); if (!row) return null; const label = describeEngineStatus(row); return <div key={engine} className="rounded-md border border-white/5 p-2 text-xs"><p className="font-medium text-slate-300">{engine}</p><p className="mt-1 text-slate-400">{label}</p><EvidenceCategoryBadge category="estimate" className="mt-1" />{row.provider && <small>{row.provider}</small>}{row.citedUrl && <a className="mt-1 block break-all text-emerald-300 hover:underline" href={row.citedUrl} target="_blank" rel="noreferrer">{row.citedUrl}</a>}</div>; })}</div><div className="mt-2 flex flex-wrap gap-2 text-[11px]"><Link href="/#audit" className="rounded border border-emerald-400/20 px-2 py-1 text-emerald-300">⚡ Generate Capsule to Win Engine</Link><Link href="/dashboard/pixel" className="rounded border border-white/10 px-2 py-1 text-slate-300">🛠️ View Active 301 Recovery</Link><a href="#recovery-command" className="rounded border border-white/10 px-2 py-1 text-slate-300">🔥 View Reddit Source Thread</a></div></div>)}</div></section>}
       {gap && <div id="citation-gaps"><CitationGapPanel domain={audit.domain} gap={gap} /></div>}
     </article>
   );
@@ -120,6 +122,7 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
   try { gaps = await getAuditCitationGaps(ownerIds); } catch {}
 
   let activeRules = new Set<string>();
+  let destinationRequestsServed: Record<string, number> = {};
   let syncedLinks: string[] = [];
   let rescued: number | null = null;
   let deploymentCount: number | null = null;
@@ -158,7 +161,7 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
       }
     } else { deploymentCount = 0; citationCount = 0; }
     const [rulesResult, cmsResult, llmsResult, webhookResult, eventResult, opportunityResult, actionLogResult] = await Promise.all([
-      db.from("redirect_rules").select("source_host,source_path,target_url,synced_to_cms,source_link_id").in("user_id", ownerIds).eq("active", true).eq("is_active", true).limit(500),
+      db.from("redirect_rules").select("source_host,source_path,target_url,synced_to_cms,source_link_id,hits_recovered").in("user_id", ownerIds).eq("active", true).eq("is_active", true).limit(500),
       db.from("cms_connections").select("id").in("user_id", ownerIds).eq("platform", "shopify").limit(1),
       db.from("audits").select("id").in("user_id", ownerIds).not("llms_txt_content", "is", null).limit(1),
       db.from("audits").select("id").in("user_id", ownerIds).not("webhook_url", "is", null).limit(1),
@@ -170,6 +173,7 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
     const rules = (rulesResult.data ?? []).filter(rule => !selectedDomain || rule.source_host === selectedDomain);
     activeRules = new Set(rules.map((rule) => `${rule.source_host}:${rule.source_path}`));
     syncedLinks = rules.filter(rule => rule.synced_to_cms && rule.source_link_id).map(rule => rule.source_link_id!);
+    destinationRequestsServed = Object.fromEntries(rules.filter(rule => rule.source_link_id).map(rule => [rule.source_link_id!, rule.hits_recovered ?? 0]));
     exportRules = rules.map((rule) => ({ source_path: rule.source_path, target_url: rule.target_url }));
     const savedOpportunities = opportunityResult.data ?? [];
     actionLogs = actionLogResult.data ?? [];
@@ -181,9 +185,9 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
       visibleByAudit.set(auditId, position + 1);
       return position < 2 ? item : {
         ...item,
-        target_url: "🔒 Upgrade to Pro to unlock hijack target",
-        dead_competitor_url: "🔒 Upgrade to Pro to unlock hijack target",
-        contact_email_or_link: "🔒 Upgrade to Pro to unlock hijack target",
+        target_url: "🔒 Upgrade to Pro to unlock outreach opportunity",
+        dead_competitor_url: "🔒 Upgrade to Pro to unlock outreach opportunity",
+        contact_email_or_link: "🔒 Upgrade to Pro to unlock outreach opportunity",
       };
     });
     onboarding = {
@@ -211,7 +215,7 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
       <div className="grid min-w-0 flex-1 grid-cols-12 gap-x-4 px-4 py-6 sm:px-6 sm:py-8">
       <div className="col-span-12">
       <div id="overview" className="scroll-mt-8">
-        <PageHeader eyebrow={`${access.organizationId ? `${access.role} organization member · ` : ""}Live telemetry · ${audits.length} saved scans`} title="Command Center" description="Monitor citations, recover links, and pursue hijack opportunities." actions={<><CommandPalette key={selectedDomain} items={navItems} domains={allDomains} selectedDomain={selectedDomain} canScan={canWorkspace(access.role, "scan")} canApprove={canApprove} latestAuditId={latestReport?.id} /><BackgroundJobsPanel domain={selectedDomain || undefined} /><HelpSupportDrawer workspaceDomain={selectedDomain || undefined} latestAuditId={latestReport?.id} /><UserButton /></>} />
+        <PageHeader eyebrow={`${access.organizationId ? `${access.role} organization member · ` : ""}Live telemetry · ${audits.length} saved scans`} title="Command Center" description="Monitor citations, recover links, and review Replacement Content Opportunities." actions={<><CommandPalette key={selectedDomain} items={navItems} domains={allDomains} selectedDomain={selectedDomain} canScan={canWorkspace(access.role, "scan")} canApprove={canApprove} latestAuditId={latestReport?.id} /><BackgroundJobsPanel domain={selectedDomain || undefined} /><HelpSupportDrawer workspaceDomain={selectedDomain || undefined} latestAuditId={latestReport?.id} /><UserButton /></>} />
         <div className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-white/[.08] bg-white/[.02] p-3">
           <DomainSwitcher domains={allDomains} selected={selectedDomain} />
           <WorkspaceModeSwitcher role={access.role} ecommerceAvailable={access.organizationId === null} />
@@ -229,8 +233,8 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
       <Suspense fallback={<OperatingMetricsSkeleton />}><WorkspaceOperatingMetrics domain={selectedDomain || allDomains[0] || ""} ownerUserIds={ownerIds} actorUserIds={[...new Set([...ownerIds, userId])]} organizationId={access.organizationId} /></Suspense>
       {latestReport && <section aria-label="Quick tools" className="mb-6 rounded-xl border border-white/10 bg-white/[0.03] p-4"><h2 className="text-sm font-semibold text-white">Quick Tools</h2><a href={`/audit/${latestReport.id}?print=1`} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg border border-emerald-400/30 px-3 py-2 text-xs font-semibold text-emerald-300">Export Report / Save as PDF</a><p className="mt-2 text-xs text-slate-500">Opens the latest report for {latestReport.domain}.</p></section>}
       {access.organizationId===null&&<AuditAnalysisTools auditId={latestReport?.id} />}
-      <div id="ai-scanner" className="mb-3 scroll-mt-8 rounded-xl border border-white/10 bg-white/[0.02] p-4"><h2 className="text-sm font-semibold">AI Scanner</h2><p className="mt-1 text-xs text-slate-400">Run a saved, search-grounded buyer prompt audit and review its recorded sources.</p>{canWorkspace(access.role,"scan")&&<Link href="/#audit" className="mt-2 inline-block text-xs text-emerald-300">Start an audit →</Link>}</div>
-      <RecoveryCenter rows={recoveryRows} evidence={recoveryEvidence} outcomes={recoveryOutcomes} logs={actionLogs} canApprove={canApprove} isPro={isPro} activeRules={[...activeRules]} syncedLinks={syncedLinks} pendingOnly={params.recovery === "pending"} evidenceError={recoveryEvidenceError} />
+      <div id="ai-scanner" className="mb-3 scroll-mt-8 rounded-xl border border-white/10 bg-white/[0.02] p-4"><h2 className="text-sm font-semibold">AI Scanner</h2><p className="mt-1 text-xs text-slate-400">Run a saved, search-grounded buyer prompt audit and review its recorded sources.</p>{canWorkspace(access.role,"scan")&&<Link href="/#audit" className="mt-2 inline-block text-xs text-emerald-300">Start an audit →</Link>}<div className="mt-4"><CitationEvidenceImport auditId={latestReport?.id} domain={selectedDomain || latestReport?.domain} /></div></div>
+      <RecoveryCenter rows={recoveryRows} evidence={recoveryEvidence} outcomes={recoveryOutcomes} logs={actionLogs} canApprove={canApprove} isPro={isPro} activeRules={[...activeRules]} syncedLinks={syncedLinks} pendingOnly={params.recovery === "pending"} evidenceError={recoveryEvidenceError} destinationRequestsServed={destinationRequestsServed} auditId={latestReport?.id} workspaceDomain={selectedDomain || latestReport?.domain} />
       {access.organizationId === null && <EcommerceCatalogPanel domain={selectedDomain || allDomains[0] || ""} />}
       <section id="competitor-intelligence" className="scroll-mt-8"><div id="outreach">{access.organizationId === null && <OpportunityCommandCenter opportunities={opportunities} brokenLinks={recoveryRows} syncedLinks={syncedLinks} actionLogs={actionLogs} />}</div></section>
       <div id="automations">{access.organizationId===null&&<><WeeklyMonitoring isPro={isPro} /><AutonomousAgentQueue auditId={latestReport?.id} domain={latestReport?.domain ?? selectedDomain} recoveryLinks={(latestReport?.broken_links ?? []).map(link => ({ id: link.id, cited_url: link.cited_url, suggested_redirect: link.suggested_redirect, approval_status: link.approval_status, http_status: link.http_status }))} opportunities={opportunities.filter(item => item.audit_id === latestReport?.id).map(item => ({ id: item.id, prompt_query: item.prompt_query, opportunity_type: item.opportunity_type }))} /></>}</div>

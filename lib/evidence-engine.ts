@@ -1,5 +1,7 @@
 import "server-only";
 import { createServerDatabase } from "./supabase-server";
+export { classifyEvidenceCategory, EVIDENCE_CATEGORY_LABELS } from "./evidence-categories";
+export type { EvidenceCategory } from "./evidence-categories";
 
 export type ObservationInput = {
   audit_id: string; domain: string; prompt_query: string; prompt_version?: string; provider: string;

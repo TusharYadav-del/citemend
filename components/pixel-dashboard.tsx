@@ -199,7 +199,7 @@ export default function PixelDashboard({ initialData, appOrigin, initialError = 
           <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-medium text-[#53704e] hover:underline"><ArrowLeft className="size-4" /> Dashboard</Link>
           <p className="mt-5 text-[10px] font-semibold tracking-[.18em] text-[#53704e]">PIXEL &amp; RECOVERED TRAFFIC</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[#182c25]">Turn AI 404s into recovered visits</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#68736b]">Install the lightweight pixel, then monitor AI referrals and the redirects recovering your visitors.</p>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#68736b]">The CiteMend Browser Script observes eligible 404 events and provides client-side fallback navigation. A permanent HTTP 301 must be deployed by your server or edge host.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">{data.domains.length > 1 && <label className="grid gap-1 text-xs font-medium text-[#68736b]">Domain<select className="h-10 min-w-52 rounded-lg border border-[#dfe5dc] bg-white px-3 text-sm text-[#182c25]" value={data.domain} onChange={event => void load(event.target.value)}>{data.domains.map(domain => <option key={domain}>{domain}</option>)}</select></label>}
           <ShopifySyncModal domain={data.domain} redirectRules={activeRules.map(rule => ({ id: rule.id, sourcePath: rule.source_path }))} onSynced={() => void load(data.domain, true)} />
@@ -215,7 +215,7 @@ export default function PixelDashboard({ initialData, appOrigin, initialError = 
 
       <section className="mb-8 rounded-2xl border border-[#dfe5dc] bg-white p-5 shadow-sm sm:p-7">
         <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-          <div><p className="text-xs font-semibold uppercase tracking-[.12em] text-[#557447]">Install your pixel</p><h2 className="mt-2 text-xl font-semibold text-[#182c25]">1-Minute Installation</h2><p className="mt-1 text-sm text-[#68736b]">Add one line to your site head. It only runs on detected 404 pages.</p></div>
+          <div><p className="text-xs font-semibold uppercase tracking-[.12em] text-[#557447]">Install CiteMend Browser Script</p><h2 className="mt-2 text-xl font-semibold text-[#182c25]">CiteMend Browser Script Installation</h2><p className="mt-1 text-sm text-[#68736b]">This client-side observer handles eligible 404s; it is not a server HTTP 301. For permanent redirects, deploy an approved rule at your host (Vercel, Cloudflare, Shopify, or Next.js).</p></div>
           {data.domain && <span className="rounded-full bg-[#f1f5ed] px-3 py-1.5 text-xs font-medium text-[#44653c]">{data.domain}</span>}
         </div>
         {loading ? <div className="h-24 animate-pulse rounded-xl bg-[#f1f4ed]" /> : !data.domain ? <div className="rounded-xl border border-dashed border-[#d6dfce] p-5 text-sm leading-6 text-[#68736b]">Run an audit while signed in to associate a domain with your account. Its domain will appear here with a ready-to-copy snippet.</div> : <>

@@ -4,12 +4,12 @@ import { publicFetch, assertPublicUrl } from "./public-http";
 import { tracePublicRedirects } from "./seo";
 
 export type CorePageType = "homepage" | "pricing" | "product" | "docs";
-export type PageEntity = { type: CorePageType; url: string; state: string; canonical: string | null; title: string; prices: string[]; planNames: string[]; planPrices: Record<string, string[]>; featureClaims: string[]; jsonLd: string[]; updatedAt: string | null };
+export type PageEntity = { type: CorePageType; url: string; state: string; canonical: string | null; title: string; visibleText: string; prices: string[]; planNames: string[]; planPrices: Record<string, string[]>; featureClaims: string[]; jsonLd: string[]; updatedAt: string | null };
 const pricePattern = /(?:\$|USD\s?)(?:\d{1,3}(?:,\d{3})*|\d+)(?:\.\d{2})?(?:\s*\/\s*(?:month|mo|year|yr))?|(?:₹|INR\s?)[\d,]+(?:\s*\/\s*(?:month|mo|year))?/gi;
 const CAP = 1_000_000;
 
 export function extractPageEntity(type: CorePageType, url: string, html: string, state = "200"): PageEntity {
-  const $ = load(html); $("script:not([type='application/ld+json']),style,nav,footer,header").remove();
+  const $ = load(html); $("script:not([type='application/ld+json']),style,nav,footer,header,noscript,svg,template,iframe,form,[hidden],[aria-hidden='true']").remove();
   const text = $("body").text().replace(/\s+/g, " ").trim();
   const canonical = $("link[rel='canonical']").first().attr("href");
   const prices = [...new Set(text.match(pricePattern) ?? [])].slice(0, 40);
@@ -20,7 +20,7 @@ export function extractPageEntity(type: CorePageType, url: string, html: string,
   const updatedAt = $("time[datetime],meta[property='article:modified_time'],meta[name='last-modified']").first().attr("datetime") ?? $("meta[property='article:modified_time'],meta[name='last-modified']").first().attr("content") ?? null;
   let safeCanonical: string | null = null;
   if (canonical) { try { const parsed = new URL(canonical, url); if (parsed.protocol === "https:") safeCanonical = parsed.href; } catch {} }
-  return { type, url, state, canonical: safeCanonical, title: $("title").first().text().trim().slice(0, 200), prices, planNames, planPrices, featureClaims, jsonLd, updatedAt };
+  return { type, url, state, canonical: safeCanonical, title: $("title").first().text().trim().slice(0, 200), visibleText: text.slice(0, 50_000), prices, planNames, planPrices, featureClaims, jsonLd, updatedAt };
 }
 
 export async function fetchCorePage(domain: string, type: CorePageType): Promise<PageEntity> {
@@ -40,12 +40,12 @@ export async function fetchCorePage(domain: string, type: CorePageType): Promise
       return extractPageEntity(type, final.href, Buffer.concat(chunks).toString("utf8"));
     } catch { /* Alternate product/docs page names are tried within the same verified host. */ }
   }
-  return { type, url: new URL(paths[type][0], origin).href, state: "unknown", canonical: null, title: "", prices: [], planNames: [], planPrices: {}, featureClaims: [], jsonLd: [], updatedAt: null };
+  return { type, url: new URL(paths[type][0], origin).href, state: "unknown", canonical: null, title: "", visibleText: "", prices: [], planNames: [], planPrices: {}, featureClaims: [], jsonLd: [], updatedAt: null };
 }
 
 /** Fetches the exact externally cited page through the same DNS-pinned public HTTP guard. */
 export async function fetchCitedPage(value: string): Promise<PageEntity> {
-  const empty = (url: string, state: string): PageEntity => ({ type: "homepage", url, state, canonical: null, title: "", prices: [], planNames: [], planPrices: {}, featureClaims: [], jsonLd: [], updatedAt: null });
+  const empty = (url: string, state: string): PageEntity => ({ type: "homepage", url, state, canonical: null, title: "", visibleText: "", prices: [], planNames: [], planPrices: {}, featureClaims: [], jsonLd: [], updatedAt: null });
   try {
     const initial = assertPublicUrl(value);
     const trace = await tracePublicRedirects(initial.href);

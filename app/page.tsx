@@ -4,21 +4,19 @@ import { Activity, ArrowRight, Bot, Check, ChevronRight, CircleHelp, Cloud, Code
 import AuditDashboard from "@/components/audit-dashboard";
 import LandingPreview from "@/components/landing-preview";
 import LiveInterceptorDemo from "@/components/LiveInterceptorDemo";
-import PricingHypothesis from "@/components/PricingHypothesis";
 import CitationNetwork from "@/components/citation-network";
-import CheckoutButton from "@/components/CheckoutButton";
 import { MarketingRecoveryPreview } from "@/components/marketing-recovery-preview";
 import { SiteFooter } from "@/components/site-footer";
 
 export const metadata: Metadata = {
-  title: "CiteMend | Own Your Visibility. Recover Every Citation.",
-  description: "Monitor AI search visibility, discover broken citations, and recover lost authority with verified redirects and clear evidence.",
+  title: "CiteMend | Repair Broken AI Citations",
+  description: "Inspect broken AI citations, review relevant replacements, and verify approved redirects across content libraries and website migrations.",
 };
 
 const features = [
   { icon: Radar, title: "AI citation monitoring", text: "Audit buyer questions against search grounded results, then inspect the URLs and evidence behind each finding." },
   { icon: FileSearch, title: "Broken citation recovery", text: "Confirm dead links with HTTP checks and review a live, same domain replacement before making a change." },
-  { icon: Activity, title: "Competitor opportunities", text: "Find broken competitor citations and map them to relevant pages you can verify." },
+  { icon: Activity, title: "Broken-Source Outreach", text: "Find publisher links to dead external resources, map a relevant replacement on your site, and request a link update." },
   { icon: Globe2, title: "Listicles and source mapping", text: "Trace cited roundups and Reddit threads to understand where category answers are coming from." },
   { icon: ShieldCheck, title: "Entity and pricing truth", text: "Compare saved pricing facts with answer text and prepare a reviewable structured data patch." },
   { icon: Sparkles, title: "Citation capsules", text: "Draft grounded, reusable answer content from your own site evidence." },
@@ -56,16 +54,17 @@ export default function Home() {
     <section id="top" className="relative isolate border-b border-white/[.06]">
       <div aria-hidden="true" className="cm-grid pointer-events-none absolute inset-0 -z-20" />
       <div aria-hidden="true" className="cm-glow pointer-events-none absolute -top-32 right-[-15%] -z-10 size-[48rem]" />
-      <div className="cm-container grid items-start gap-8 py-9 sm:py-11 lg:grid-cols-[1.02fr_.98fr] lg:gap-8 lg:py-12">
+      <div className="cm-container grid min-w-0 items-start gap-8 overflow-x-hidden py-9 sm:py-11 lg:grid-cols-[1.02fr_.98fr] lg:gap-8 lg:py-12">
         <div className="cm-reveal">
-          <p className="cm-kicker flex items-center gap-2"><span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-300 opacity-50" /><span className="relative size-2 rounded-full bg-emerald-300" /></span> Citation intelligence for modern teams</p>
-          <h1 className="mt-5 max-w-[48rem] text-[clamp(3.2rem,6vw,5.35rem)] font-semibold leading-[.98] tracking-[-.075em]">Own your visibility.<br /><span className="bg-gradient-to-r from-[#37f5a0] via-[#91ffd0] to-[#39d9ff] bg-clip-text text-transparent">Recover every citation.</span></h1>
-          <p className="mt-5 max-w-xl text-[15px] leading-7 text-slate-400 sm:text-[16px]">Monitor AI search visibility, discover citation opportunities, detect broken references, and recover lost authority with evidence your team can act on.</p>
+          <p className="cm-kicker flex flex-wrap items-center gap-2 break-words"><span className="relative flex size-2 shrink-0"><span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-300 opacity-50" /><span className="relative size-2 rounded-full bg-emerald-300" /></span> Citation recovery for SEO agencies and B2B SaaS teams</p>
+          <h1 className="mt-5 max-w-[48rem] break-words text-[clamp(2.45rem,9.4vw,5.35rem)] font-semibold leading-[.98] tracking-[-.065em]">Find broken AI citations. Repair the destination. Verify the result.</h1>
+          <p className="mt-5 max-w-xl break-words text-[15px] leading-7 text-slate-400 sm:text-[16px]">CiteMend helps teams inspect cited URLs, review relevant replacements, and verify approved redirects — with an evidence trail for every action.</p>
+          <p className="mt-3 max-w-xl text-xs leading-5 text-slate-500">Built for SEO agencies and B2B SaaS teams managing content libraries and website migrations.</p>
           <div className="mt-6 max-w-xl"><LandingPreview /></div>
           <div className="mt-5 flex flex-wrap gap-3"><a href="#audit" className="cm-button-primary cm-focus-ring">Start a free audit <ArrowRight className="size-4" /></a><a href="#how-it-works" className="cm-button-secondary cm-focus-ring">Explore the platform <ChevronRight className="size-4" /></a></div>
           <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-[11px] text-slate-500"><span className="inline-flex items-center gap-1.5"><Check className="size-3.5 text-emerald-300" /> Evidence backed checks</span><span className="inline-flex items-center gap-1.5"><Check className="size-3.5 text-emerald-300" /> No automatic redirects</span><span className="inline-flex items-center gap-1.5"><Check className="size-3.5 text-emerald-300" /> Start with your own domain</span></div>
         </div>
-        <div className="cm-reveal cm-reveal-delay relative lg:pt-2">
+        <div className="cm-reveal cm-reveal-delay relative min-w-0 lg:pt-2">
           <div className="pointer-events-none absolute -inset-8 -z-10 rounded-[3rem] bg-emerald-400/[.04] blur-3xl" />
           <MarketingRecoveryPreview embedded />
         </div>
@@ -88,7 +87,12 @@ export default function Home() {
 
     <section className="border-y border-white/[.06] bg-[#0a0e14] py-16"><div className="cm-container"><div className="flex flex-wrap items-center justify-between gap-7"><div><p className="cm-kicker">Fits into your workflow</p><h2 className="mt-3 text-2xl font-semibold tracking-tight">Connect the tools you already use.</h2></div><div className="flex flex-wrap gap-2">{integrations.map(({ icon: Icon, name }) => <span key={name} className="inline-flex items-center gap-2 rounded-full border border-white/[.08] bg-white/[.025] px-3.5 py-2.5 text-xs font-medium text-slate-300"><Icon className="size-3.5 text-slate-500" />{name}</span>)}</div></div></div></section>
 
-    <section id="pricing" className="cm-container py-[var(--space-section)]"><div className="mx-auto max-w-2xl text-center"><p className="cm-kicker">Straightforward access</p><h2 className="mt-4 text-3xl font-semibold tracking-[-.055em] sm:text-5xl">Start with evidence. Scale when you need to.</h2><p className="mt-4 text-sm leading-7 text-slate-400">Compare USD and INR planning ranges. Current beta checkout is listed separately below.</p></div><PricingHypothesis /><div className="mx-auto mt-6 max-w-7xl rounded-xl border border-white/[.08] bg-white/[.02] p-5"><h3 className="text-sm font-semibold text-white">Current beta checkout</h3><p className="mt-1 text-xs leading-5 text-slate-400">The configured monthly products are Pro at $39 and Agency at $249. These are separate from the six-tier contract planning ranges above.</p><div className="mt-4 flex flex-wrap gap-3">{clerkConfigured ? <><div><p className="mb-2 font-mono text-xs text-emerald-200">PRO · $39/MONTH</p><CheckoutButton plan="pro" /></div><div><p className="mb-2 font-mono text-xs text-emerald-200">AGENCY · $249/MONTH</p><CheckoutButton plan="agency" /></div></> : <Link href="/dashboard" className="cm-button-secondary cm-focus-ring">Explore the workspace <ArrowRight className="size-3.5" /></Link>}</div></div><p className="mx-auto mt-5 max-w-3xl text-center text-[10px] leading-5 text-slate-600">Plan availability depends on your account and live checkout configuration. No listed feature guarantees placement in any AI answer.</p></section>
+    <section id="pricing" className="cm-container overflow-x-hidden py-[var(--space-section)]"><div className="mx-auto max-w-2xl text-center"><p className="cm-kicker">Straightforward access</p><h2 className="mt-4 text-[clamp(1.8rem,7vw,3rem)] font-semibold tracking-[-.055em]">Start with evidence. Scale when you need to.</h2><p className="mt-4 text-sm leading-7 text-slate-400">One clear offer for each stage of recovery work.</p></div><div className="mt-10 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[
+      { name: "Free Diagnostic", price: "$0 / ₹0", description: "Inspect cited URLs, verify HTTP destination states, and preview sample recovery mappings.", cta: "Run free scan", href: "/forensic-scan" },
+      { name: "Paid Pilot / Starter", price: "$49/mo · ₹3,999/mo", description: "1 domain workspace, imported or observed citation verification, approved redirect workflows, rollback, and an evidence trail.", cta: "Connect workspace", href: "/dashboard" },
+      { name: "Agency & Growth", price: "$249/mo · ₹19,999/mo", description: "Multi-client workspaces, bulk citation evidence import, broken-source outreach workflows, and client-ready before/after reports.", cta: "Explore agency workflows", href: "/solutions/agencies" },
+      { name: "Custom / Enterprise", price: "Contact for Quote", description: "Scoped to validated multi-domain deployments, RBAC, and custom integrations.", cta: "Talk to our team", href: "/support?category=enterprise_security" },
+    ].map(plan => <article key={plan.name} className="flex min-w-0 flex-col rounded-2xl border border-white/[.09] bg-[#0d121a] p-5"><h3 className="text-sm font-semibold text-white">{plan.name}</h3><p className="mt-4 break-words text-[clamp(1.2rem,5vw,1.6rem)] font-semibold tracking-tight text-emerald-200">{plan.price}</p><p className="mt-3 flex-1 text-xs leading-6 text-slate-400">{plan.description}</p><Link href={plan.href} className="cm-button-secondary cm-focus-ring mt-5 justify-center text-center text-xs">{plan.cta}<ArrowRight className="size-3.5" /></Link></article>)}</div><p className="mx-auto mt-5 max-w-3xl text-center text-[10px] leading-5 text-slate-600">A redirect is never deployed automatically. AI answer visibility is observed, not guaranteed.</p></section>
 
     <section id="audit" className="cm-surface-light scroll-mt-12 border-y border-white/10 px-5 py-16 sm:px-8 sm:py-20"><div className="mx-auto max-w-7xl"><div className="mx-auto mb-9 max-w-2xl text-center"><p className="text-xs font-bold uppercase tracking-[.17em] text-emerald-800">Your first audit</p><h2 className="mt-3 text-3xl font-semibold tracking-[-.05em] sm:text-5xl">See what buyers and answer engines can reach.</h2><p className="mt-4 text-sm leading-7 text-slate-600">Use a real buyer question. We’ll show checked results, confirmed broken links, and next steps in your workspace.</p></div><AuditDashboard liveEnabled={clerkConfigured} clerkConfigured={clerkConfigured} embedded /></div></section>
 

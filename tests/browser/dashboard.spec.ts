@@ -13,7 +13,7 @@ test.afterEach(({ page }) => expect(browserErrors.get(page)).toEqual([]));
 
 test("public landing shows the sign-in gate without a fabricated audit score", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Own your visibility.");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Find broken AI citations. Repair the destination. Verify the result.");
   await expect(page.getByLabel("Domain for free preview")).toBeVisible();
   await expect(page.getByTestId("health-score")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Sign in to run your audit" })).toBeVisible();
@@ -22,19 +22,21 @@ test("public landing shows the sign-in gate without a fabricated audit score", a
   await expect(page.getByRole("button", { name: "Run AI Audit", exact: true })).toHaveCount(0);
 });
 
-test("interactive recovery preview and currency pricing respond without claiming live proof", async ({ page }) => {
+test("interactive recovery preview and four-tier pricing avoid internal cost disclosures", async ({ page }) => {
   await page.goto("/");
   const preview = page.getByRole("region", { name: "Interactive Recovery Center preview" });
   await expect(preview.getByText("INTERACTIVE SAMPLE", { exact: false })).toBeVisible();
   expect((await preview.boundingBox())?.y).toBeLessThan(400);
-  await preview.getByRole("tab", { name: "Hijack dead competitor citation" }).click();
+  await preview.getByRole("tab", { name: "Broken-Source Outreach" }).click();
   await expect(preview.getByText("CiteMend cannot redirect a competitor domain.", { exact: false })).toBeVisible();
   await preview.getByRole("tab", { name: "Fix stale AI pricing claim" }).click();
   await expect(preview.getByText("A 301 is not appropriate for a live pricing page.", { exact: false })).toBeVisible();
-  const currency = page.getByRole("group", { name: "Pricing currency" });
-  await currency.getByRole("button", { name: /INR/ }).click();
-  await expect(currency.getByRole("button", { name: /INR/ })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByText("For Multi-Client SEO/GEO Agencies")).toBeVisible();
+  const pricing = page.locator("#pricing");
+  for (const tier of ["Free Diagnostic", "Paid Pilot / Starter", "Agency & Growth", "Custom / Enterprise"]) await expect(pricing.getByRole("heading", { name: tier })).toBeVisible();
+  await expect(pricing.getByText("$49/mo · ₹3,999/mo")).toBeVisible();
+  await expect(pricing.getByText("$249/mo · ₹19,999/mo")).toBeVisible();
+  await expect(pricing.getByText("Contact for Quote")).toBeVisible();
+  await expect(pricing.getByText(/margin|exchange-rate|planning range/i)).toHaveCount(0);
 });
 
 test("free preview shows real check types and hands the domain to the protected audit", async ({ page }) => {
@@ -53,14 +55,19 @@ test("free preview shows real check types and hands the domain to the protected 
   await expect(page.getByRole("heading", { name: "Sign in to run your audit" })).toBeVisible();
 });
 
-test("mobile landing keeps the sign-in gate and navigation within the viewport", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
-  await expect(page.getByRole("button", { name: "Sign in or create an account" })).toBeVisible();
-  await page.getByRole("link", { name: "Run an audit" }).click();
-  await expect(page).toHaveURL(/#audit$/);
-  await expect(page.getByRole("heading", { name: "Sign in to run your audit" })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+test("mobile landing fits the hero and pricing across narrow phone widths", async ({ page }) => {
+  for (const width of [320, 360, 390, 430]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/");
+    const heading = page.getByRole("heading", { level: 1 });
+    await expect(heading).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `horizontal overflow at ${width}px`).toBe(true);
+    const heroBounds = await heading.boundingBox();
+    expect(heroBounds?.x ?? -1).toBeGreaterThanOrEqual(0);
+    expect((heroBounds?.x ?? 0) + (heroBounds?.width ?? width)).toBeLessThanOrEqual(width + 1);
+    await page.locator("#pricing").scrollIntoViewIfNeeded();
+    for (const tier of ["Free Diagnostic", "Paid Pilot / Starter", "Agency & Growth", "Custom / Enterprise"]) await expect(page.locator("#pricing").getByRole("heading", { name: tier })).toBeVisible();
+  }
 });
 
 test("the dashboard redirects anonymous visitors to Clerk sign-in", async ({ request }) => {

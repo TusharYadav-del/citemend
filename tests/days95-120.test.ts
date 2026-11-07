@@ -60,9 +60,9 @@ test("bulk redirect interchange, API key hashing and tier quotas", () => {
 test("all forensic issue types keep observable evidence distinct from hypotheses", () => {
   const input: ForensicInput = { targetUrl: "https://acme.test/old", targetStatus: 404, inSitemap: false, robotsAllows: false, intentSimilarity: 0.2, targetHasStructuredProof: false, citedThirdPartyHasStructuredProof: true, targetUpdatedAt: "2020-01-01T00:00:00Z", citedStatus: 410, observedCitationUrl: null };
   const findings = classifyCitationForensics(input); const kinds = new Set(findings.map(item => item.kind));
-  for (const kind of ["discoverability", "retrieval", "citation_selection", "stale_content", "broken_destination"] as const) assert.ok(kinds.has(kind));
+  for (const kind of ["discoverability", "citation_selection", "stale_content", "broken_destination"] as const) assert.ok(kinds.has(kind));
   for (const finding of findings) { assert.ok(finding.observableEvidence.length > 0); assert.ok(finding.diagnosticHypotheses.length > 0); assert.ok(!finding.observableEvidence.some(value => /caused|private weights|reasoning/i.test(value))); }
-  assert.match(findings.find(item => item.kind === "retrieval")?.observableEvidence.join(" ") ?? "", /word-overlap measure, not semantic similarity/);
+  assert.ok(!kinds.has("retrieval"), "lexical overlap alone must never create a retrieval blocker");
   assert.equal(measureBuyerPromptCoverage("best CRM for startups", "CRM", ["A customer relationship management platform for startups"]), 1);
   const facts = compareCitationPageFacts({ prices: ["$49/mo"], featureClaims: ["Built for small teams"], jsonLd: [], updatedAt: "2020-01-01" }, { prices: ["$79/mo"], featureClaims: ["Built for large teams"], jsonLd: ["Offer"], updatedAt: "2026-01-01" });
   assert.deepEqual(facts.targetPricesNotSeenOnCitedPage, ["$49/mo"]); assert.deepEqual(facts.citedClaimsNotSeenOnTarget, ["Built for large teams"]); assert.equal(facts.citedStructuredDataCount, 1);

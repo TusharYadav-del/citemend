@@ -6,7 +6,7 @@ import type { ForensicTeaserReport } from "../lib/forensic-teaser";
 const teaser: ForensicTeaserReport = {
   domain: "example.com", status: "partial", runMode: "page_only", diagnosticSummary: "Public page checks completed.",
   citationSummary: { modeledAnswerAvailable: false, ownDomainUrlMentions: null, verifiedBrokenUrls: null, missingCitationCount: null, brokenOrMissingCount: null },
-  pageEvidence: { httpStatus: 200, sitemapCheckAvailable: false, homepageInSitemap: null, robotsAllows: true, structuredDataBlocks: 0, lastModified: null, lexicalPromptCoverage: null },
+  pageEvidence: { httpStatus: 200, sitemapCheckAvailable: false, homepageInSitemap: null, robotsAllows: true, structuredDataBlocks: 0, lastModified: null, extractionStatus: "available", extractedTextLength: 120, extractedTextPreview: "Example page content", lexicalPromptCoverage: null },
   findings: [], limits: [],
 };
 const payload = {
