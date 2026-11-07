@@ -76,7 +76,7 @@
 | `background_jobs` | Tenant-scoped idempotent queued work, leases, chunk progress, retries, and safe result status | Shipped in code; migration 032 confirmed hosted |
 | `founder_weekly_scorecards` | Founder-only weekly Section 9 operating target inputs | Shipped in code; migration 032 confirmed hosted |
 
-Migration files are numbered 001-033 and the local schema test applies them in order, then compares TypeScript row fields and SQL nullability. The user confirmed hosted application of migration 032. Migration 033 configures the protected background worker through the existing Supabase Vault values and remains to be applied after the deployment succeeds.
+Migration files are numbered 001-033 and the local schema test applies them in order, then compares TypeScript row fields and SQL nullability. The user confirmed hosted application of migrations 032 and 033 and reported authenticated pg_net HTTP 200 idle-worker responses each minute.
 
 ## Security and operational checks
 
@@ -131,7 +131,7 @@ The score is for repository implementation and automated QA, not customer produc
 | 11 | Days 161-170: citation change and predictive intelligence | 100% shipped | Final suite passed |
 | 12 | Days 171-180: operating metrics, model registry and master QA | 100% shipped | Final suite passed |
 
-**Repository score: 12/12 roadmap months and Sprints 1–11 (Days 1–365) implemented and tested.** Remaining live checks are operational prerequisites, not silently included in this score: earlier plan entries identify pending billing/webhook activation, signed-in or provider checks, hosted migration 033, and live Shopify/Cloudflare behavior. Annual plans are priced with estimated-cost floors, but provider variants are not configured by this code. Cost defaults are enabled; set `CITEMEND_MODEL_COST_*_USD_PER_CALL` and `CITEMEND_ESTIMATED_INFRA_COST_PER_AUDIT_USD` to match measured usage or provider invoices.
+**Repository score: 12/12 roadmap months and Sprints 1–11 (Days 1–365) implemented and tested.** Remaining live checks are operational prerequisites, not silently included in this score: earlier plan entries identify pending billing/webhook activation, signed-in or provider checks, a non-idle worker job run, and live Shopify/Cloudflare behavior. Annual plans are priced with estimated-cost floors, but provider variants are not configured by this code. Cost defaults are enabled; set `CITEMEND_MODEL_COST_*_USD_PER_CALL` and `CITEMEND_ESTIMATED_INFRA_COST_PER_AUDIT_USD` to match measured usage or provider invoices.
 
 ### Final master QA run (2026-11-07)
 
@@ -141,4 +141,4 @@ The score is for repository implementation and automated QA, not customer produc
 - `npm audit --omit=dev`: pass, zero production dependency vulnerabilities.
 - `npm run build`: pass (`.next-sprint11-final`, isolated output directory after the cron scheduler adjustment).
 
-Sprint 10/11 additions are covered by `lib/job-queue-core.ts`, `lib/job-queue.ts`, `lib/background-job-processor.ts`, `app/api/jobs/`, `app/api/cron/background-jobs/`, `lib/billing.ts`, `lib/unit-economics.ts`, `lib/founder-os.ts`, `/dashboard/founder-os`, migrations 032/033, and `tests/definition-of-done.test.ts` / `tests/sprint10-11-foundation.test.ts`. Vercel's Hobby plan does not allow the every-minute worker schedule, so migration 033 registers it through Supabase pg_cron and Vercel retains its two daily cron entries. Annual plan prices and gross-margin guardrails are estimates; new Lemon Squeezy variants remain to be configured. The user confirmed hosted migration 032; hosted migration 033 remains pending. Commit `f6f723a` is deployed, and the production route rejects invalid bearer tokens; Vercel confirms `CRON_SECRET` exists, but its value is marked sensitive and was not exposed or successfully used for an authenticated idle-worker smoke test.
+Sprint 10/11 additions are covered by `lib/job-queue-core.ts`, `lib/job-queue.ts`, `lib/background-job-processor.ts`, `app/api/jobs/`, `app/api/cron/background-jobs/`, `lib/billing.ts`, `lib/unit-economics.ts`, `lib/founder-os.ts`, `/dashboard/founder-os`, migrations 032/033, and `tests/definition-of-done.test.ts` / `tests/sprint10-11-foundation.test.ts`. Vercel's Hobby plan does not allow the every-minute worker schedule, so migration 033 registers it through Supabase pg_cron and Vercel retains its two daily cron entries. Annual plan prices and gross-margin guardrails are estimates; new Lemon Squeezy variants remain to be configured. The user confirmed hosted migrations 032 and 033 and reported pg_net HTTP 200 idle responses at one-minute intervals without timeouts or errors. This verifies the scheduled idle path by user report; a queued non-idle job has not been observed in this audit.

@@ -22,6 +22,20 @@ test("public landing shows the sign-in gate without a fabricated audit score", a
   await expect(page.getByRole("button", { name: "Run AI Audit", exact: true })).toHaveCount(0);
 });
 
+test("interactive recovery preview and currency pricing respond without claiming live proof", async ({ page }) => {
+  await page.goto("/");
+  const preview = page.getByRole("region", { name: "Interactive Recovery Center preview" });
+  await expect(preview.getByText("INTERACTIVE SAMPLE", { exact: false })).toBeVisible();
+  await preview.getByRole("tab", { name: "Hijack dead competitor citation" }).click();
+  await expect(preview.getByText("CiteMend cannot redirect a competitor domain.", { exact: false })).toBeVisible();
+  await preview.getByRole("tab", { name: "Fix stale AI pricing claim" }).click();
+  await expect(preview.getByText("A 301 is not appropriate for a live pricing page.", { exact: false })).toBeVisible();
+  const currency = page.getByRole("group", { name: "Pricing currency" });
+  await currency.getByRole("button", { name: /INR/ }).click();
+  await expect(currency.getByRole("button", { name: /INR/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("For Multi-Client SEO/GEO Agencies")).toBeVisible();
+});
+
 test("free preview shows real check types and hands the domain to the protected audit", async ({ page }) => {
   await page.route("**/api/preview", async (route) => route.fulfill({
     status: 200, contentType: "application/json",

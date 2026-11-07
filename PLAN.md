@@ -902,7 +902,7 @@ Migration 031 passed ordered local PGlite migration tests. It extends the alread
 - [x] Schedule the protected worker with Supabase pg_cron at one-minute intervals, keeping Vercel's two supported daily jobs, and verify migrations 001–033 in ordered PGlite coverage.
 - [x] Verify TypeScript, lint, the full 264-test suite, production dependency audit, and optimized production build.
 
-Migrations 032 and 033 passed ordered local migration tests. The user confirmed migration 032 was applied to hosted Supabase. Commit `f6f723a` is deployed; `/api/cron/background-jobs` responds 401 to an invalid bearer token, and the Vercel production variable list confirms both `CRON_SECRET` and `CITEMEND_FOUNDER_USER_IDS` exist without exposing their values. Apply `supabase/migrations/033_background_worker_schedule.sql` to install the worker schedule using Vault `app_base_url` and `cron_secret`; a valid authenticated worker response has not yet been observed. Vercel's Hobby plan rejects jobs that run more than once daily, so `vercel.json` retains only the existing daily retention and report jobs. Multi-prompt scans now return job IDs; single-prompt audits preserve the existing synchronous flow while enrichment is queued.
+Migrations 032 and 033 passed ordered local migration tests. The user confirmed both were applied to hosted Supabase and reported pg_net responses from the scheduled worker at HTTP 200, without timeout or error, returning an idle status each minute. That hosted observation was reported by the user, not independently queried here; processing a non-idle queued job remains an operational smoke test. Commit `f6f723a` is deployed, and the Vercel production variable list confirms both `CRON_SECRET` and `CITEMEND_FOUNDER_USER_IDS` exist without exposing their values. Vercel's Hobby plan rejects jobs that run more than once daily, so `vercel.json` retains only the existing daily retention and report jobs. Multi-prompt scans now return job IDs; single-prompt audits preserve the existing synchronous flow while enrichment is queued.
 
 ## Sprint 11 — Days 286–365: Annual Contract Planning, Margin Guardrails & Founder OS (COMPLETED IN CODE)
 
@@ -916,4 +916,15 @@ Annual prices are fully modeled, but no new Lemon Squeezy annual variants or oth
 
 ### Final Sprint 1–11 repository scorecard
 
-**Days 1–365: implementation and automated QA complete in the repository.** The final scheduler-adjusted checks on 2026-11-07 passed: TypeScript, lint (0 errors; two existing warnings), 264 tests, zero production dependency vulnerabilities, and optimized production build. Commit `f6f723a` is live. Hosted migration 033, annual payment-provider variants, and a valid authenticated worker response remain outstanding; see `AUDIT_INVENTORY.md`.
+**Days 1–365: implementation and automated QA complete in the repository.** The final scheduler-adjusted checks on 2026-11-07 passed: TypeScript, lint (0 errors; two existing warnings), 264 tests, zero production dependency vulnerabilities, and optimized production build. Commit `f6f723a` is live. The user reported hosted migration 033 and authenticated HTTP 200 idle worker responses; a non-idle job run and annual payment-provider variants remain operational checks. See `AUDIT_INVENTORY.md`.
+
+## Post-roadmap frontend architecture upgrade (COMPLETED IN CODE)
+
+- [x] Group the dashboard's twelve workspace screens into a collapsible desktop rail and mobile drawer, with a twelve-column layout, role-aware workspace modes, and keyboard navigation.
+- [x] Add a global Cmd/Ctrl+K command palette for screens, workspace switching, background scans, forensic checks, pending approvals, and report export.
+- [x] Add the Recovery Center URL table and evidence inspector with server-verified safety preview, human approval and rollback controls, action history, and separately labeled technical and AI citation outcomes.
+- [x] Add live background job progress polling and a collapsible first-audit guide, while preserving existing queue and audit APIs.
+- [x] Add three explicitly illustrative marketing recovery scenarios and six-tier USD/INR planning prices; keep live checkout claims separate from unconfigured variants.
+- [x] Verify `npx tsc --noEmit`, `npm run lint` (zero errors; two pre-existing warnings), `npm test` (264 passed), `npm run build`, and the browser suite (15 passed against the optimized production build).
+
+The authenticated dashboard interactions still require a signed-in production smoke test. The browser suite covered the public landing, preview, pricing interaction, report print view, and anonymous access gates; it did not exercise a live Clerk session or production data.
