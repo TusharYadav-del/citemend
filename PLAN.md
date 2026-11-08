@@ -964,3 +964,12 @@ The repository's existing `.next` Turbopack persistence directory failed to open
 - [x] Verify `npx tsc --noEmit`, `npm run lint` (zero errors; two pre-existing warnings in `app/layout.tsx`), all 277 `npm test` cases, and optimized production build using `CITEMEND_BUILD_DIR=.next-outreach-complete-build`.
 
 Code and tests are complete. The user confirmed migration 035 has been applied to hosted Supabase; configure the Supabase Vault secrets and run `supabase/setup/outreach_cron.sql` when scheduling is wanted. Per user request, autonomous sending remains disabled until the live sales phase; do not enable the dashboard toggle or set `OUTREACH_ENABLED=true` yet. Configure Tavily, a dedicated outreach sender, and either the outbound webhook or Resend credentials before activation. `OUTREACH_REPLY_WEBHOOK_SECRET` protects optional reply workflow events.
+
+## Email Provider Compatibility (COMPLETED IN CODE)
+
+- [x] Add a shared server-side email transport with native Brevo REST delivery when `BREVO_API_KEY` is configured, preserving display name and personal-domain sender address.
+- [x] Route weekly digests, scheduled reports, support alerts, and outreach delivery through the shared provider logic. When Resend is used with Gmail, Yahoo, or Outlook sender domains, use `CiteMend <onboarding@resend.dev>` and keep the configured address in `reply_to`.
+- [x] Document the optional `BREVO_API_KEY` and `EMAIL_FROM` settings and add mocked tests for Resend sender sanitization and Brevo Gmail delivery; no real emails were sent.
+- [x] Verify `npx tsc --noEmit`, `npm run lint` (zero errors; two existing warnings in `app/layout.tsx`), `npm test` (279 passed), and optimized production build using `CITEMEND_BUILD_DIR=.next-email-transport-build`.
+
+`lib/founder-alerts.ts` is not present in this repository; all existing email sending call sites use the shared transport. Outreach sending remains disabled pending the live sales phase.

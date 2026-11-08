@@ -64,7 +64,7 @@ export async function runDailyOutreach() {
         const { data: savedEmail, error: emailSaveError } = await database.from("outreach_emails").insert({ prospect_id: saved.id, contact_id: contactId, campaign_id: campaign.data?.id ?? null, recipient: email, subject: message.subject, body_text: message.text, body_html: message.html, factuality_report: message.factualityReport, status: "queued" }).select("id").single();
         if (emailSaveError || !savedEmail) throw emailSaveError ?? new Error("Email draft persistence failed.");
         try {
-          const sender = process.env.OUTREACH_FROM_EMAIL?.trim() || process.env.RESEND_FROM_EMAIL?.trim();
+          const sender = process.env.OUTREACH_FROM_EMAIL?.trim() || process.env.EMAIL_FROM?.trim() || process.env.RESEND_FROM_EMAIL?.trim();
           if (!sender) throw new Error("Configure OUTREACH_FROM_EMAIL before sending.");
           const delivery = await sendOutreachEmail({ idempotencyKey: savedEmail.id, to: email, from: sender, message });
           await database.from("outreach_emails").update({ provider: delivery.provider, provider_message_id: delivery.messageId, status: "sent", sent_at: new Date().toISOString() }).eq("id", savedEmail.id);

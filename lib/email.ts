@@ -1,6 +1,6 @@
 import "server-only";
-import { Resend } from "resend";
 import { buildRedirectExport } from "./redirect-export";
+import { sendEmail } from "./email-provider";
 
 export type DigestLink = { domain: string; cited_url: string; suggested_redirect: string | null; audit_id: string };
 
@@ -24,18 +24,20 @@ export function renderWeeklyDigest(links: DigestLink[], appOrigin?: string): { s
 }
 
 export async function sendWeeklyDigest(userId: string, digestId: string, links: DigestLink[]): Promise<string> {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from = process.env.RESEND_FROM_EMAIL?.trim();
-  if (!apiKey || !from) throw new Error("Resend email is not configured.");
+  if (!process.env.BREVO_API_KEY?.trim() && !process.env.RESEND_API_KEY?.trim()) throw new Error("Email delivery is not configured.");
   if (!links.length) throw new Error("A weekly digest requires new broken links.");
   const { clerkClient } = await import("@clerk/nextjs/server");
   const user = await (await clerkClient()).users.getUser(userId);
   const recipient = user.emailAddresses.find((email) => email.id === user.primaryEmailAddressId)?.emailAddress;
   if (!recipient) throw new Error("The account has no primary email address.");
   const message = renderWeeklyDigest(links, process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, ""));
-  const { data, error } = await new Resend(apiKey).emails.send({
-    from, to: recipient, subject: message.subject, html: message.html, text: message.text,
-  }, { idempotencyKey: `weekly-${digestId}` });
-  if (error || !data?.id) throw new Error("Email provider rejected the weekly digest.");
-  return data.id;
+  const delivery = await sendEmail({
+    from: process.env.EMAIL_FROM?.trim() || process.env.RESEND_FROM_EMAIL?.trim(),
+    to: recipient,
+    subject: message.subject,
+    html: message.html,
+    text: message.text,
+    idempotencyKey: `weekly-${digestId}`,
+  });
+  return delivery.id;
 }

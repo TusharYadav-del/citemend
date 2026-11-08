@@ -2,6 +2,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { createServerDatabase } from "@/lib/supabase-server";
 import { resolveWorkspaceAccess } from "@/lib/workspace-access";
 import { createSupportPostHandler } from "@/lib/support-handler";
+import { sendEmail } from "@/lib/email-provider";
 
 export const POST = createSupportPostHandler({
   authenticate: async () => {
@@ -22,8 +23,7 @@ export const POST = createSupportPostHandler({
   },
   save: async ticket=>{const db=createServerDatabase();const {data,error}=await db.from("support_tickets").insert(ticket).select("id").single();if(error||!data)throw new Error("Ticket persistence failed");return {id:data.id};},
   notify: async ticket=>{
-    if(!process.env.RESEND_API_KEY||!process.env.SUPPORT_NOTIFICATION_EMAIL||!process.env.RESEND_FROM_EMAIL)return "not_configured";
-    const {Resend}=await import("resend");const resend=new Resend(process.env.RESEND_API_KEY);
-    const result=await resend.emails.send({from:process.env.RESEND_FROM_EMAIL,to:process.env.SUPPORT_NOTIFICATION_EMAIL,subject:`[CiteMend ${ticket.priority}] ${ticket.subject}`,text:`Ticket ${ticket.id}\nFrom: ${ticket.user_email}\nWorkspace: ${ticket.workspace_domain??"none"}\nCategory: ${ticket.category}\n\n${ticket.message}\n\nDiagnostics: ${JSON.stringify(ticket.diagnostic_context_json)}`});return !result.error;
+    if((!process.env.BREVO_API_KEY&&!process.env.RESEND_API_KEY)||!process.env.SUPPORT_NOTIFICATION_EMAIL||!(process.env.EMAIL_FROM||process.env.RESEND_FROM_EMAIL))return "not_configured";
+    await sendEmail({from:process.env.EMAIL_FROM?.trim()||process.env.RESEND_FROM_EMAIL?.trim(),to:process.env.SUPPORT_NOTIFICATION_EMAIL,subject:`[CiteMend ${ticket.priority}] ${ticket.subject}`,text:`Ticket ${ticket.id}\nFrom: ${ticket.user_email}\nWorkspace: ${ticket.workspace_domain??"none"}\nCategory: ${ticket.category}\n\n${ticket.message}\n\nDiagnostics: ${JSON.stringify(ticket.diagnostic_context_json)}`});return true;
   },
 });

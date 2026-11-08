@@ -21,9 +21,11 @@ test("scheduled-report cron requires the configured bearer secret", async () => 
 });
 
 test("verificationId limits a local cron run to the seeded due report", async () => {
-  const previous = { secret: process.env.CRON_SECRET, resend: process.env.RESEND_API_KEY, sender: process.env.RESEND_FROM_EMAIL, supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL, supabaseKey: process.env.SUPABASE_SECRET_KEY };
+  const previous = { secret: process.env.CRON_SECRET, resend: process.env.RESEND_API_KEY, brevo: process.env.BREVO_API_KEY, emailFrom: process.env.EMAIL_FROM, sender: process.env.RESEND_FROM_EMAIL, supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL, supabaseKey: process.env.SUPABASE_SECRET_KEY };
   process.env.CRON_SECRET = "cron-test-secret-value";
   process.env.RESEND_API_KEY = "re_test_key";
+  delete process.env.BREVO_API_KEY;
+  delete process.env.EMAIL_FROM;
   process.env.RESEND_FROM_EMAIL = "CiteMend <reports@example.test>";
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://supabase.test";
   process.env.SUPABASE_SECRET_KEY = "service-role-test-key";
@@ -48,7 +50,7 @@ test("verificationId limits a local cron run to the seeded due report", async ()
     assert.equal(requests.filter(item => item.url.hostname === "api.resend.com").length, 1);
   } finally {
     mock.restoreAll();
-    for (const [name, value] of Object.entries({ CRON_SECRET: previous.secret, RESEND_API_KEY: previous.resend, RESEND_FROM_EMAIL: previous.sender, NEXT_PUBLIC_SUPABASE_URL: previous.supabaseUrl, SUPABASE_SECRET_KEY: previous.supabaseKey })) {
+    for (const [name, value] of Object.entries({ CRON_SECRET: previous.secret, RESEND_API_KEY: previous.resend, BREVO_API_KEY: previous.brevo, EMAIL_FROM: previous.emailFrom, RESEND_FROM_EMAIL: previous.sender, NEXT_PUBLIC_SUPABASE_URL: previous.supabaseUrl, SUPABASE_SECRET_KEY: previous.supabaseKey })) {
       if (value === undefined) delete process.env[name];
       else process.env[name] = value;
     }
