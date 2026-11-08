@@ -17,13 +17,13 @@ export function planTier(plan: string | null | undefined, active: boolean): Tier
 export async function getAuditQuota(userId: string, requestedPromptCount: number, now = new Date()) {
   const db = createServerDatabase();
   const [subscriptionResult, auditResult] = await Promise.all([
-    db.from("subscriptions").select("plan,status,cancelled,ends_at,current_period_end").eq("user_id", userId).limit(100),
+    db.from("subscriptions").select("plan,plan_name,status,cancelled,ends_at,current_period_end,test_mode").eq("user_id", userId).limit(100),
     db.from("audits").select("id,sitemap_url_count", { count: "exact" }).eq("user_id", userId).gte("created_at", new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString()).limit(1000),
   ]);
   if (subscriptionResult.error || auditResult.error) throw new Error("Tier quota usage is temporarily unavailable.");
   const active = (subscriptionResult.data ?? []).filter(item => grantsProAccess(item, now.getTime()));
   const selected = active.find(item => item.plan === "agency") ?? active[0];
-  const tier = planTier(selected?.plan, !!selected);
+  const tier = planTier(selected?.plan_name ?? selected?.plan, !!selected);
   const limits = PLAN_TIERS[tier];
   const audits = auditResult.data ?? [];
   if ((auditResult.count ?? audits.length) + 1 > limits.monthlyAudits) return { allowed: false as const, reason: "monthly_audits" as const, tier, maxSitemapPages: 0 };

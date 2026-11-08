@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 const groups = [
-  { title: "Product", links: [["Platform", "/#platform"], ["Pricing", "/#pricing"], ["Workspace", "/dashboard"], ["Integrations", "/integrations"], ["Benchmarks", "/benchmarks"]] },
+  { title: "Product", links: [["Platform", "/#platform"], ["Pricing", "/pricing"], ["Workspace", "/dashboard"], ["Integrations", "/integrations"], ["Benchmarks", "/benchmarks"]] },
   { title: "Solutions", links: [["Agencies", "/solutions/agencies"], ["B2B SaaS", "/solutions/saas"], ["Ecommerce", "/solutions/ecommerce"], ["Enterprise", "/solutions/enterprise"]] },
   { title: "Resources & Help", links: [["Help Center", "/help"], ["Support", "/support"], ["System status", "/status"], ["Changelog", "/changelog"], ["About", "/about"]] },
   { title: "Legal & Trust", links: [["Terms", "/terms"], ["Privacy", "/privacy"], ["Refunds", "/refund-policy"], ["Acceptable use", "/acceptable-use"], ["Cookies & pixel", "/cookies"], ["DPA", "/dpa"], ["Security", "/security"], ["Subprocessors", "/subprocessors"]] },

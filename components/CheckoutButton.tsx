@@ -91,7 +91,7 @@ export default function CheckoutButton({ plan }: { plan?: "pro" | "agency" } = {
     setPending(true);
     setError("");
     try {
-      const response = await fetch(`/api/lemonsqueezy/checkout?plan=${plan}`, { method: "POST" });
+      const response = await fetch("/api/billing/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tier: plan === "pro" ? "starter" : "agency" }) });
       const result: unknown = await response.json();
       if (response.ok && result && typeof result === "object" && (result as { betaMode?: boolean }).betaMode) {
         setBetaMode(true);

@@ -57,8 +57,20 @@ test("readiness doctor differentiates missing required settings from optional fe
   assert.equal(result.checks.find((check) => check.id === "database")?.status, "MISSING");
 });
 
-test("readiness doctor checks all expected tables through migration 035", () => {
-  assert.equal(REQUIRED_READINESS_TABLES.length, 44);
+test("readiness doctor accepts canonical Lemon Squeezy variable names", async () => {
+  const env: Record<string, string> = { ...completeEnvironment };
+  for (const name of ["LEMON_SQUEEZY_API_KEY", "LEMON_SQUEEZY_STORE_ID", "LEMON_SQUEEZY_PRODUCT_ID", "LEMON_SQUEEZY_VARIANT_ID", "LEMON_SQUEEZY_WEBHOOK_SECRET"]) delete env[name];
+  Object.assign(env, {
+    LEMONSQUEEZY_API_KEY: "key", LEMONSQUEEZY_STORE_ID: "123", LEMONSQUEEZY_PRODUCT_ID: "456",
+    LEMONSQUEEZY_VARIANT_ID: "789", LEMONSQUEEZY_WEBHOOK_SECRET: "secret",
+  });
+  const result = await runReadinessDoctor({ env, inspectDatabase: async () => ({ connected: true, tables: allTables() }) });
+  assert.equal(result.checks.find(check => check.id === "lemon-squeezy")?.status, "PASS");
+});
+
+test("readiness doctor checks all expected tables through migration 036", () => {
+  assert.equal(REQUIRED_READINESS_TABLES.length, 45);
+  assert.ok(REQUIRED_READINESS_TABLES.includes("billing_webhook_events"));
   assert.ok(REQUIRED_READINESS_TABLES.includes("workspace_api_rate_windows"));
   assert.ok(REQUIRED_READINESS_TABLES.includes("workspace_operating_metrics"));
   assert.ok(REQUIRED_READINESS_TABLES.includes("case_studies"));

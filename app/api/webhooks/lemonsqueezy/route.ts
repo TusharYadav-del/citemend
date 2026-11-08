@@ -1,171 +1,111 @@
-import { isValidLemonSqueezySignature } from "@/lib/lemonsqueezy-webhook";
 import { createServerDatabase } from "@/lib/supabase-server";
-import { agencyVariantId } from "@/lib/lemonsqueezy";
 import { createHash } from "node:crypto";
-import { claimWebhookEvent, finishWebhookEvent } from "@/lib/webhook-idempotency";
-import { webhookEventIdentity } from "@/lib/integrations-workflow";
+import { isValidLemonSqueezySignature } from "@/lib/lemonsqueezy-webhook";
+import { applyPaymentEventState, deliveryHash, isTestDelivery, subscriptionRecord, type BillingPayload } from "@/lib/billing-webhook";
+import { founderNotificationEmail, sendEmail } from "@/lib/email-provider";
 
-const MAX_WEBHOOK_BYTES = 64 * 1024;
+const MAX_BODY = 64 * 1024;
+const headers = { "Cache-Control": "no-store" };
+const subscriptionEvents = new Set([
+  "subscription_created", "subscription_updated", "subscription_cancelled", "subscription_expired",
+  "subscription_resumed", "subscription_paused", "subscription_unpaused", "subscription_plan_changed",
+]);
+const paymentEvents = new Set(["subscription_payment_success", "subscription_payment_recovered", "subscription_payment_failed"]);
 
-type SubscriptionEvent = {
-  meta?: { event_name?: unknown; event_id?: unknown; custom_data?: { user_id?: unknown } };
-  data?: { type?: unknown; id?: unknown; attributes?: Record<string, unknown> };
-};
-
-async function readBoundedBody(request: Request): Promise<string | null> {
-  const reader = request.body?.getReader();
-  if (!reader) return null;
-  const chunks: Uint8Array[] = [];
-  let bytes = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      bytes += value.byteLength;
-      if (bytes > MAX_WEBHOOK_BYTES) {
-        await reader.cancel().catch(() => {});
-        return null;
-      }
-      chunks.push(value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks));
-  } catch {
-    return null;
-  }
+async function fetchSubscription(id: string): Promise<BillingPayload> {
+  const key = (process.env.LEMONSQUEEZY_API_KEY || process.env.LEMON_SQUEEZY_API_KEY)?.trim();
+  if (!key) throw new Error("Lemon Squeezy API key is missing.");
+  const response = await fetch(`https://api.lemonsqueezy.com/v1/subscriptions/${encodeURIComponent(id)}`, {
+    headers: { Accept: "application/vnd.api+json", Authorization: `Bearer ${key}` }, cache: "no-store", signal: AbortSignal.timeout(8_000),
+  });
+  if (!response.ok) throw new Error("Could not read the subscription from Lemon Squeezy.");
+  return await response.json() as BillingPayload;
 }
 
 export async function POST(request: Request) {
-  const secret = (process.env.LEMON_SQUEEZY_WEBHOOK_SECRET || process.env.LEMONSQUEEZY_WEBHOOK_SECRET)?.trim();
-  if (!secret) return Response.json({ error: "Webhook is not configured." }, { status: 503 });
-
-  const rawBody = await readBoundedBody(request);
+  // The signature covers the exact bytes Lemon Squeezy delivered.
+  const length = Number(request.headers.get("content-length") ?? 0);
+  if (Number.isFinite(length) && length > MAX_BODY) return Response.json({ error: "Webhook payload is too large." }, { status: 413, headers });
+  const raw = await request.text();
+  if (Buffer.byteLength(raw) > MAX_BODY) return Response.json({ error: "Webhook payload is too large." }, { status: 413, headers });
+  const secret = (process.env.LEMONSQUEEZY_WEBHOOK_SECRET || process.env.LEMON_SQUEEZY_WEBHOOK_SECRET)?.trim();
   const signature = request.headers.get("x-signature") ?? "";
-  if (!rawBody || !isValidLemonSqueezySignature(rawBody, signature, secret)) {
-    return Response.json({ error: "Invalid webhook signature or payload." }, { status: 401 });
+  if (!secret || !isValidLemonSqueezySignature(raw, signature, secret)) {
+    return Response.json({ error: "Unauthorized webhook." }, { status: 401, headers });
+  }
+  let payload: BillingPayload;
+  try { payload = JSON.parse(raw) as BillingPayload; }
+  catch { return Response.json({ error: "Invalid webhook JSON." }, { status: 400, headers }); }
+  if (!payload || typeof payload !== "object") return Response.json({ error: "Invalid webhook JSON." }, { status: 400, headers });
+  const eventName = payload.meta?.event_name;
+  const objectId = payload.data?.id;
+  if (typeof eventName !== "string" || typeof objectId !== "string" || !/^\d+$/.test(objectId)) {
+    return Response.json({ error: "Invalid webhook identity." }, { status: 400, headers });
+  }
+  if (process.env.NODE_ENV === "production" && process.env.LEMON_SQUEEZY_TEST_MODE !== "true" && isTestDelivery(payload)) {
+    return Response.json({ error: "Test billing events are disabled in production." }, { status: 403, headers });
+  }
+  if (!subscriptionEvents.has(eventName) && !paymentEvents.has(eventName) && eventName !== "order_created") {
+    return Response.json({ received: true, ignored: true }, { headers });
   }
 
-  let event: SubscriptionEvent;
-  try {
-    event = JSON.parse(rawBody) as SubscriptionEvent;
-  } catch {
-    return Response.json({ error: "Invalid webhook JSON." }, { status: 400 });
-  }
-
-  const eventName = event.meta?.event_name;
-  if (eventName !== "subscription_created" && eventName !== "subscription_cancelled" && eventName !== "subscription_updated") {
-    return Response.json({ received: true, ignored: true });
-  }
-
-  const subscription = event.data;
-  const attributes = subscription?.attributes;
-  const subscriptionId = subscription?.id;
-  const storeId = (process.env.LEMON_SQUEEZY_STORE_ID || process.env.LEMONSQUEEZY_STORE_ID)?.trim();
-  const productId = (process.env.LEMON_SQUEEZY_PRODUCT_ID || process.env.LEMONSQUEEZY_PRODUCT_ID)?.trim();
-  const variantId = String(attributes?.variant_id ?? "");
-  const agency = variantId === agencyVariantId();
-  if (!storeId || (!agency && !productId)) return Response.json({ error: "Webhook is not configured." }, { status: 503 });
-  if (
-    subscription?.type !== "subscriptions" ||
-    typeof subscriptionId !== "string" ||
-    !/^\d+$/.test(subscriptionId) ||
-    !attributes ||
-    String(attributes.store_id) !== storeId ||
-    !/^\d+$/.test(String(attributes.product_id ?? "")) ||
-    !/^\d+$/.test(variantId) ||
-    (!agency && String(attributes.product_id) !== productId)
-  ) {
-    return Response.json({ error: "Invalid subscription event." }, { status: 400 });
-  }
-  if (process.env.NODE_ENV === "production" && attributes.test_mode === true) {
-    return Response.json({ received: true, ignored: true });
-  }
-
-  const customUserId = event.meta?.custom_data?.user_id;
-  const suppliedUserId = typeof customUserId === "string" && customUserId.trim() ? customUserId.trim() : null;
-  const providerUpdatedAt = attributes.updated_at;
-  if (typeof providerUpdatedAt !== "string" || !Number.isFinite(Date.parse(providerUpdatedAt)) || typeof attributes.status !== "string" || !attributes.status.trim()) {
-    return Response.json({ error: "Invalid subscription event." }, { status: 400 });
-  }
-
-  let db: ReturnType<typeof createServerDatabase>;
-  try { db = createServerDatabase(); } catch {
-    return Response.json({ error: "Subscription storage is not configured." }, { status: 503 });
-  }
-
-  const numericString = (value: unknown) => value === null || value === undefined ? null : String(value);
-  const cancelled = eventName === "subscription_cancelled" || attributes.cancelled === true || attributes.status === "cancelled";
-  let eventId: string;
-  try { eventId = typeof event.meta?.event_id === "string" ? webhookEventIdentity("lemonsqueezy", event.meta.event_id) : `lemonsqueezy:${createHash("sha256").update(rawBody).digest("hex")}`; }
-  catch { return Response.json({ error: "Invalid webhook event ID." }, { status: 400 }); }
-  try {
-    const claim = await claimWebhookEvent(db, eventId, eventName);
-    if (!claim.claimed) return Response.json({ received: true, duplicate: true });
-  } catch { return Response.json({ error: "Webhook idempotency storage is unavailable." }, { status: 503 }); }
-  const done = async (status: "completed" | "failed" | "ignored", error?: string) => { await finishWebhookEvent(db, eventId, status, error); };
-
-  // Compare-and-swap avoids a delayed webhook overwriting newer billing state.
-  try {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const { data: existing, error: readError } = await db.from("subscriptions")
-        .select("user_id,provider_updated_at,cancelled")
-        .eq("id", subscriptionId)
-        .maybeSingle();
-      if (readError) { await done("failed", "Subscription lookup failed."); return Response.json({ error: "Subscription storage is unavailable." }, { status: 503 }); }
-      if (existing && suppliedUserId && suppliedUserId !== existing.user_id) {
-        { await done("failed", "Subscription owner did not match."); return Response.json({ error: "Subscription owner does not match." }, { status: 400 }); }
-      }
-      const userId = existing?.user_id ?? suppliedUserId;
-      if (!userId) { await done("failed", "Subscription owner is missing."); return Response.json({ error: "Subscription owner is missing." }, { status: 400 }); }
-
-      if (existing?.provider_updated_at) {
-        const previousTime = Date.parse(existing.provider_updated_at);
-        const incomingTime = Date.parse(providerUpdatedAt);
-        if (previousTime > incomingTime || (previousTime === incomingTime && existing.cancelled && !cancelled)) {
-          await done("ignored"); return Response.json({ received: true, ignored: true });
-        }
-      }
-
-      const row = {
-        id: subscriptionId,
-        user_id: userId,
-        store_id: storeId,
-        product_id: String(attributes.product_id),
-        variant_id: variantId,
-        plan: agency ? "agency" : "pro",
-        customer_id: numericString(attributes.customer_id),
-        order_id: numericString(attributes.order_id),
-        status: attributes.status,
-        renews_at: typeof attributes.renews_at === "string" ? attributes.renews_at : null,
-        ends_at: typeof attributes.ends_at === "string" ? attributes.ends_at : null,
-        cancelled,
-        provider_updated_at: providerUpdatedAt,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (!existing) {
-        const { error } = await db.from("subscriptions").insert(row);
-        if (!error) { await done("completed"); return Response.json({ received: true }); }
-        if (error.code === "23505") continue;
-        await done("failed", "Subscription insert failed.");
-        return Response.json({ error: "Subscription storage is unavailable." }, { status: 503 });
-      }
-
-      let update = db.from("subscriptions").update(row).eq("id", subscriptionId).eq("user_id", userId);
-      update = existing.provider_updated_at
-        ? update.eq("provider_updated_at", existing.provider_updated_at).lte("provider_updated_at", providerUpdatedAt)
-        : update.is("provider_updated_at", null);
-      const { data: updated, error } = await update.select("id").maybeSingle();
-      if (error) { await done("failed", "Subscription update failed."); return Response.json({ error: "Subscription storage is unavailable." }, { status: 503 }); }
-      if (updated) { await done("completed"); return Response.json({ received: true }); }
+  let snapshot = payload;
+  let subscriptionId: string | undefined;
+  if (paymentEvents.has(eventName)) {
+    const value = payload.data?.attributes?.subscription_id;
+    if (payload.data?.type !== "subscription-invoices" || !/^\d+$/.test(String(value ?? ""))) {
+      return Response.json({ error: "Invalid subscription invoice." }, { status: 400, headers });
     }
-  } catch {
-    await done("failed", "Subscription update threw an error.").catch(() => {});
-    return Response.json({ error: "Subscription storage is unavailable." }, { status: 503 });
+    subscriptionId = String(value);
   }
-  await done("failed", "Subscription compare-and-swap needs retry.").catch(() => {});
-  return Response.json({ error: "Subscription update needs retry." }, { status: 503 });
+  const eventHash = deliveryHash(raw, eventName, objectId, subscriptionId);
+  let db: ReturnType<typeof createServerDatabase>;
+  try {
+    db = createServerDatabase();
+    const prior = await db.from("billing_webhook_events").select("id").eq("event_hash", eventHash).maybeSingle();
+    if (prior.error) throw prior.error;
+    if (prior.data) return Response.json({ duplicate: true }, { headers });
+  } catch { return Response.json({ error: "Billing storage is unavailable; retry delivery." }, { status: 503, headers }); }
+  if (paymentEvents.has(eventName)) {
+    try {
+      const fresh = await fetchSubscription(subscriptionId!);
+      snapshot = { ...fresh, meta: { ...payload.meta, custom_data: payload.meta?.custom_data ?? fresh.meta?.custom_data } };
+    } catch { return Response.json({ error: "Subscription could not be verified with the provider." }, { status: 503, headers }); }
+    if (process.env.NODE_ENV === "production" && process.env.LEMON_SQUEEZY_TEST_MODE !== "true" && isTestDelivery(snapshot)) {
+      return Response.json({ error: "Test billing events are disabled in production." }, { status: 403, headers });
+    }
+  }
+
+  let record: ReturnType<typeof subscriptionRecord> | null = null;
+  try {
+    if (subscriptionEvents.has(eventName) || paymentEvents.has(eventName)) {
+      record = subscriptionRecord(snapshot, eventName);
+      if (subscriptionId && record.id !== subscriptionId) throw new Error("Invoice subscription mismatch.");
+      if (paymentEvents.has(eventName)) record = applyPaymentEventState(record, eventName, payload.data?.attributes ?? {});
+    } else {
+      const storeId = (process.env.LEMONSQUEEZY_STORE_ID || process.env.LEMON_SQUEEZY_STORE_ID)?.trim();
+      if (payload.data?.type !== "orders" || String(payload.data.attributes?.store_id) !== storeId || !storeId) throw new Error("Invalid order store.");
+    }
+  } catch { return Response.json({ error: "Webhook data does not match configured billing." }, { status: 400, headers }); }
+
+  try {
+    const { data, error } = await db.rpc("apply_billing_webhook_event", { p_hash: eventHash, p_event_name: eventName, p_payload: payload as Record<string, unknown>, p_record: record });
+    if (error) return Response.json({ error: "Billing state could not be saved; retry delivery." }, { status: 503, headers });
+    if (data === "duplicate") return Response.json({ duplicate: true }, { headers });
+    if (eventName === "subscription_payment_failed" && data === "processed" && record?.status === "past_due") {
+      const current = record;
+      const stored = current.email ? null : await db.from("subscriptions").select("email").eq("id", current.id).maybeSingle();
+      const userEmail = current.email ?? (stored && !stored.error ? stored.data?.email : null);
+      const recipients = [...new Set([founderNotificationEmail(), userEmail].filter((value): value is string => !!value))];
+      const results = await Promise.allSettled(recipients.map(to => sendEmail({
+        to, subject: "CiteMend subscription payment failed",
+        text: `A Lemon Squeezy payment failed for subscription ${current.id}. Update the payment method in the CiteMend billing page.`,
+        idempotencyKey: `billing-failed-${eventHash}-${createHash("sha256").update(to).digest("hex").slice(0, 12)}`,
+      })));
+      if (results.some(result => result.status === "rejected")) console.error("A billing payment-failure alert could not be delivered.");
+    }
+    return Response.json({ received: true, ...(data === "ignored" ? { ignored: true } : {}) }, { headers });
+  } catch {
+    return Response.json({ error: "Billing storage is unavailable; retry delivery." }, { status: 503, headers });
+  }
 }

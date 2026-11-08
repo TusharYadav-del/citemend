@@ -2,7 +2,7 @@ export const REQUIRED_READINESS_TABLES = [
   "audits", "broken_links", "subscriptions", "weekly_scan_runs", "weekly_scan_jobs", "weekly_scan_digests",
   "redirect_rules", "sitemap_pages", "audit_citation_gaps", "ai_404_events", "citation_hijack_opportunities",
   "cms_connections", "rescued_ai_visits", "workspace_integrations", "pixel_intercept_quotas", "action_audit_logs",
-  "ai_observation_evidence", "recovery_outcomes", "webhook_events_log", "workspace_api_keys",
+  "ai_observation_evidence", "recovery_outcomes", "webhook_events_log", "billing_webhook_events", "workspace_api_keys",
   "autonomous_agent_runs", "ecommerce_catalog_items", "organization_members", "workspace_governance_policies",
   "scheduled_reports", "citation_change_events", "workspace_api_rate_windows", "workspace_operating_metrics",
   "case_studies", "design_partner_applications", "agency_referrals", "forensic_teaser_rate_windows",
@@ -69,7 +69,14 @@ export async function runReadinessDoctor({ env = process.env, inspectDatabase, n
     databaseCheck = { id: "database", label: "Supabase schema and connectivity", status, summary: status === "PASS" ? "All required tables exist with RLS enabled." : "Database setup is incomplete.", details };
   }
 
-  const lemonSqueezyConfigured = ["LEMON_SQUEEZY_API_KEY", "LEMON_SQUEEZY_STORE_ID", "LEMON_SQUEEZY_PRODUCT_ID", "LEMON_SQUEEZY_VARIANT_ID", "LEMON_SQUEEZY_WEBHOOK_SECRET"].every((name) => configured(env[name]));
+  const billingEnv = { ...env,
+    LEMON_SQUEEZY_API_KEY: env.LEMONSQUEEZY_API_KEY || env.LEMON_SQUEEZY_API_KEY,
+    LEMON_SQUEEZY_STORE_ID: env.LEMONSQUEEZY_STORE_ID || env.LEMON_SQUEEZY_STORE_ID,
+    LEMON_SQUEEZY_PRODUCT_ID: env.LEMONSQUEEZY_PRODUCT_ID || env.LEMON_SQUEEZY_PRODUCT_ID,
+    LEMON_SQUEEZY_VARIANT_ID: env.LEMONSQUEEZY_STARTER_VARIANT_ID || env.LEMONSQUEEZY_VARIANT_ID || env.LEMON_SQUEEZY_VARIANT_ID,
+    LEMON_SQUEEZY_WEBHOOK_SECRET: env.LEMONSQUEEZY_WEBHOOK_SECRET || env.LEMON_SQUEEZY_WEBHOOK_SECRET,
+  };
+  const lemonSqueezyConfigured = ["LEMON_SQUEEZY_API_KEY", "LEMON_SQUEEZY_STORE_ID", "LEMON_SQUEEZY_PRODUCT_ID", "LEMON_SQUEEZY_VARIANT_ID", "LEMON_SQUEEZY_WEBHOOK_SECRET"].every((name) => configured(billingEnv[name as keyof typeof billingEnv]));
   const dodoCredentialsPresent = configured(env.DODO_PAYMENTS_API_KEY) || configured(env.DODO_PAYMENTS_WEBHOOK_SECRET);
   const checks: ReadinessCheck[] = [
     databaseCheck,
@@ -81,7 +88,7 @@ export async function runReadinessDoctor({ env = process.env, inspectDatabase, n
       details: configured(env.GEMINI_API_KEY) ? ["Secret value is not returned."] : ["Missing: GEMINI_API_KEY"],
     },
     requiredCheck("email-cron", "Email and cron", ["RESEND_API_KEY", "CRON_SECRET"], env),
-    requiredCheck("lemon-squeezy", "Lemon Squeezy billing", ["LEMON_SQUEEZY_API_KEY", "LEMON_SQUEEZY_STORE_ID", "LEMON_SQUEEZY_PRODUCT_ID", "LEMON_SQUEEZY_VARIANT_ID", "LEMON_SQUEEZY_WEBHOOK_SECRET"], env),
+    requiredCheck("lemon-squeezy", "Lemon Squeezy billing", ["LEMON_SQUEEZY_API_KEY", "LEMON_SQUEEZY_STORE_ID", "LEMON_SQUEEZY_PRODUCT_ID", "LEMON_SQUEEZY_VARIANT_ID", "LEMON_SQUEEZY_WEBHOOK_SECRET"], billingEnv),
     {
       id: "dodo-payments", label: "Dodo Payments", status: dodoCredentialsPresent ? "WARN" : lemonSqueezyConfigured ? "PASS" : "WARN",
       summary: dodoCredentialsPresent ? "Dodo credentials are present, but this application does not integrate Dodo Payments." : lemonSqueezyConfigured ? "Not required; Lemon Squeezy is configured as the active billing provider." : "Dodo Payments is not integrated; configure the supported Lemon Squeezy provider instead.",

@@ -1,4 +1,7 @@
-import { auth } from "@clerk/nextjs/server";
-import { createServerDatabase } from "@/lib/supabase-server";
-const json=(body:unknown,status=200)=>Response.json(body,{status,headers:{"Cache-Control":"private, no-store"}});
-export async function POST(){const {userId}=await auth();if(!userId)return json({error:"Sign in to manage billing."},401);const db=createServerDatabase();const {data:subscription,error}=await db.from("subscriptions").select("id,status,cancelled").eq("user_id",userId).neq("status","cancelled").order("updated_at",{ascending:false}).limit(1).maybeSingle();if(error)return json({error:"Billing status is temporarily unavailable."},503);if(!subscription)return json({error:"No active paid subscription was found."},404);const key=process.env.LEMON_SQUEEZY_API_KEY??process.env.LEMONSQUEEZY_API_KEY;if(!key)return json({error:"Subscription management is not configured."},503);try{const response=await fetch(`https://api.lemonsqueezy.com/v1/subscriptions/${encodeURIComponent(subscription.id)}`,{headers:{Accept:"application/vnd.api+json",Authorization:`Bearer ${key}`},cache:"no-store",signal:AbortSignal.timeout(8000)});if(!response.ok)return json({error:"The payment provider could not open subscription management."},502);const payload=await response.json() as {data?:{attributes?:{urls?:{customer_portal?:unknown}}}};const portal=payload.data?.attributes?.urls?.customer_portal;if(typeof portal!=="string")return json({error:"The provider did not return a customer portal URL."},502);const url=new URL(portal);if(url.protocol!=="https:"||!(url.hostname==="lemonsqueezy.com"||url.hostname.endsWith(".lemonsqueezy.com")))return json({error:"The provider returned an untrusted portal URL."},502);return json({url:url.href});}catch{return json({error:"Could not contact the payment provider."},502);}}
+import { POST as openBillingPortal } from "@/app/api/billing/portal/route";
+
+export async function POST(request: Request) {
+  return openBillingPortal(new Request(request.url, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "manage" }),
+  }));
+}

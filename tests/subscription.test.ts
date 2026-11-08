@@ -14,6 +14,12 @@ test("Pro access respects subscription status and cancellation grace period", ()
   assert.equal(grantsProAccess({ status: "expired", cancelled: true, ends_at: "2026-11-02T00:00:00Z" }, now), false);
 });
 
+test("production paid access excludes test subscriptions when test mode is disabled", () => {
+  process.env = { ...oldEnv, NODE_ENV: "production", LEMON_SQUEEZY_TEST_MODE: "false" };
+  assert.equal(grantsProAccess({ plan: "pro", status: "active", cancelled: false, ends_at: null, test_mode: true }, now), false);
+  assert.equal(grantsProAccess({ plan: "pro", status: "active", cancelled: false, ends_at: null, test_mode: false }, now), true);
+});
+
 const oldFetch = globalThis.fetch;
 const oldEnv = process.env;
 afterEach(() => { globalThis.fetch = oldFetch; process.env = oldEnv; });

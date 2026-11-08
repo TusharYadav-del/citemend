@@ -8,7 +8,7 @@ export function agencyVariantId(): string {
 export function isBillingEnabled(): boolean {
   return Boolean(process.env.LEMONSQUEEZY_CHECKOUT_URL?.trim())
     || process.env.LEMONSQUEEZY_LIVE_BILLING_ENABLED === "true"
-    || (process.env.NODE_ENV === "development" && process.env.LEMON_SQUEEZY_TEST_MODE === "true");
+    || process.env.LEMON_SQUEEZY_TEST_MODE === "true";
 }
 
 export function configuredCheckoutUrl(userId: string): string | null {

@@ -44,6 +44,12 @@ export type Database = {
         Update: { id?: string; event_id?: string; provider?: string; event_type?: string; delivery_status?: string; retry_count?: number; last_error?: string | null; received_at?: string; completed_at?: string | null };
         Relationships: [];
       };
+      billing_webhook_events: {
+        Row: { id: string; event_hash: string; event_name: string; payload: Record<string, unknown>; processed_at: string };
+        Insert: { id?: string; event_hash: string; event_name: string; payload: Record<string, unknown>; processed_at?: string };
+        Update: { id?: string; event_hash?: string; event_name?: string; payload?: Record<string, unknown>; processed_at?: string };
+        Relationships: [];
+      };
       workspace_api_keys: {
         Row: { id: string; user_id: string; workspace_domain: string; key_hash: string; key_prefix: string; permissions_json: string[]; rate_limit_per_minute: number; last_used_at: string | null; created_at: string; revoked_at: string | null };
         Insert: { id?: string; user_id: string; workspace_domain: string; key_hash: string; key_prefix: string; permissions_json?: string[]; rate_limit_per_minute?: number; last_used_at?: string | null; created_at?: string; revoked_at?: string | null };
@@ -183,9 +189,9 @@ export type Database = {
         Relationships: [];
       };
       subscriptions: {
-        Row: { id: string; user_id: string; store_id: string; product_id: string; variant_id: string; customer_id: string | null; order_id: string | null; status: string; plan: string | null; current_period_end: string | null; email: string | null; domain: string | null; renews_at: string | null; ends_at: string | null; cancelled: boolean; provider_updated_at: string | null; created_at: string; updated_at: string };
-        Insert: { id: string; user_id: string; store_id: string; product_id: string; variant_id: string; customer_id?: string | null; order_id?: string | null; status: string; plan?: string | null; current_period_end?: string | null; email?: string | null; domain?: string | null; renews_at?: string | null; ends_at?: string | null; cancelled?: boolean; provider_updated_at?: string | null; created_at?: string; updated_at?: string };
-        Update: { id?: string; user_id?: string; store_id?: string; product_id?: string; variant_id?: string; customer_id?: string | null; order_id?: string | null; status?: string; plan?: string | null; current_period_end?: string | null; email?: string | null; domain?: string | null; renews_at?: string | null; ends_at?: string | null; cancelled?: boolean; provider_updated_at?: string | null; created_at?: string; updated_at?: string };
+        Row: { id: string; user_id: string; store_id: string; product_id: string; variant_id: string; customer_id: string | null; order_id: string | null; lemonsqueezy_customer_id: string | null; lemonsqueezy_subscription_id: string | null; lemonsqueezy_order_id: string | null; status: string; plan: string | null; plan_name: string | null; test_mode: boolean | null; current_period_end: string | null; email: string | null; domain: string | null; renews_at: string | null; ends_at: string | null; trial_ends_at: string | null; customer_portal_url: string | null; update_payment_method_url: string | null; cancelled: boolean; provider_updated_at: string | null; created_at: string; updated_at: string };
+        Insert: { id: string; user_id: string; store_id: string; product_id: string; variant_id: string; customer_id?: string | null; order_id?: string | null; lemonsqueezy_customer_id?: string | null; lemonsqueezy_subscription_id?: string | null; lemonsqueezy_order_id?: string | null; status: string; plan?: string | null; plan_name?: string | null; test_mode?: boolean | null; current_period_end?: string | null; email?: string | null; domain?: string | null; renews_at?: string | null; ends_at?: string | null; trial_ends_at?: string | null; customer_portal_url?: string | null; update_payment_method_url?: string | null; cancelled?: boolean; provider_updated_at?: string | null; created_at?: string; updated_at?: string };
+        Update: { id?: string; user_id?: string; store_id?: string; product_id?: string; variant_id?: string; customer_id?: string | null; order_id?: string | null; lemonsqueezy_customer_id?: string | null; lemonsqueezy_subscription_id?: string | null; lemonsqueezy_order_id?: string | null; status?: string; plan?: string | null; plan_name?: string | null; test_mode?: boolean | null; current_period_end?: string | null; email?: string | null; domain?: string | null; renews_at?: string | null; ends_at?: string | null; trial_ends_at?: string | null; customer_portal_url?: string | null; update_payment_method_url?: string | null; cancelled?: boolean; provider_updated_at?: string | null; created_at?: string; updated_at?: string };
         Relationships: [];
       };
       background_jobs: {
@@ -218,6 +224,7 @@ export type Database = {
     };
     Views: { [key in never]: never };
     Functions: {
+      apply_billing_webhook_event: { Args: { p_hash: string; p_event_name: string; p_payload: Record<string, unknown>; p_record?: Record<string, unknown> | null }; Returns: string };
       claim_pixel_intercept_quota: { Args: { target_domain: string }; Returns: boolean };
       reserve_workspace_agent_scan: { Args: { p_user_id: string; p_workspace_domain: string }; Returns: boolean };
       consume_workspace_api_rate_limit: { Args: { p_key_id: string; p_limit: number }; Returns: boolean };

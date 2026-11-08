@@ -995,3 +995,14 @@ Code and tests are complete. The user confirmed migration 035 has been applied t
 - [x] Verify lint and production build.
 
 The user confirmed the real signing secret is configured in `.env.local` and Vercel Environment Variables. Lint passed with zero errors and two pre-existing warnings in `app/layout.tsx`; the optimized production build passed using an isolated output directory.
+
+## Day 367: Production Billing and Subscription Hardening (COMPLETED IN CODE)
+
+- [x] Add forward-only migration `036_billing_hardening.sql` with canonical Lemon Squeezy subscription fields, owner-only subscription reads, service-role-only writes, a unique billing delivery hash, and atomic webhook claim/state application. Preserve existing beta and legacy Pro/Agency rows.
+- [x] Add authenticated `POST /api/billing/checkout` with Clerk primary email, server-mapped Starter/Growth/Agency variants, checkout custom ownership data, test mode, and a configured redirect origin. Route the legacy checkout URL through the same checks.
+- [x] Verify webhook HMAC before processing; reject production test deliveries when test mode is disabled; handle subscription, invoice payment, and order events with replay and owner protection. Keep cancelled access only through `ends_at`, downgrade expired subscriptions through existing quota checks, and attempt founder/user failed-payment alerts.
+- [x] Add authenticated billing status and portal APIs, refresh expired signed provider URLs, and show current plan, status, audit quota usage, test-mode warning, invoice portal, and payment-method controls in Dashboard Billing.
+- [x] Add a `/pricing` page with configured paid-tier checkout buttons and expose `/pricing`, `/terms`, `/privacy`, and `/refund-policy` in the footer.
+- [x] Verify `npx tsc --noEmit`, `npm run lint` (zero errors; two pre-existing `app/layout.tsx` warnings), `npm test` (292 passed), and optimized `npm run build` with an isolated build directory.
+
+Repository implementation and local automated QA are complete. The user reported applying migration 036 to hosted Supabase; its hosted state was not independently queried. The real Starter/Growth/Agency variant IDs must be configured for each tier offered; the existing default variant supplies the Starter fallback. No live purchase or hosted webhook delivery was performed during this code task, so production payment activation remains an external smoke test.
