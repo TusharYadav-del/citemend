@@ -987,3 +987,11 @@ Code and tests are complete. The user confirmed migration 035 has been applied t
 - [x] Trace the free beta button to `/api/beta-request`; return delivery results and show provider IDs/errors in toasts and the request dialog. Auto-accepted invitations send an acceptance email and a separate founder copy. No manual accept/approve-beta endpoint or UI exists; design-partner applications use a separate `/api/design-partners/apply` flow.
 - [x] Add `GET /api/health/test-email` for localhost development only. It attempts both providers and returns env-presence checks and provider diagnostics without exposing keys.
 - [x] Add mocked sender, fallback, delivery failure, beta request deduplication/activation, and browser-diagnostic coverage. Verify `npx tsc --noEmit`, `npm run lint` (zero errors; two existing `app/layout.tsx` warnings), `npm test` (284 passed), and optimized production build using `CITEMEND_BUILD_DIR=.next-beta-email-final-build`.
+
+## Day 366: Lemon Squeezy Webhook Secret (COMPLETED)
+
+- [x] Add `LEMONSQUEEZY_WEBHOOK_SECRET` to the ignored `.env.local` beside the other Lemon Squeezy settings.
+- [x] Preserve the existing webhook handler, which accepts either `LEMONSQUEEZY_WEBHOOK_SECRET` or the older `LEMON_SQUEEZY_WEBHOOK_SECRET` spelling.
+- [x] Verify lint and production build.
+
+The user confirmed the real signing secret is configured in `.env.local` and Vercel Environment Variables. Lint passed with zero errors and two pre-existing warnings in `app/layout.tsx`; the optimized production build passed using an isolated output directory.
