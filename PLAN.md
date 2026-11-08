@@ -980,3 +980,10 @@ Code and tests are complete. The user confirmed migration 035 has been applied t
 - [x] Include the submitted account email and normalized domain; deduplicate notifications by notifying only on the initial pending request, not repeat submissions.
 - [x] Use the shared Brevo/Resend sender and preserve the successful beta request if email notification is unavailable or fails.
 - [x] Verify TypeScript, lint, and optimized production build. Lint has zero errors and the two existing warnings in `app/layout.tsx`.
+
+## Beta Email Delivery Diagnostics (COMPLETED IN CODE)
+
+- [x] Prefer Resend with `CiteMend <onboarding@resend.dev>` for founder destinations, then fall back to Brevo; preserve provider failures, including Brevo HTTP status and response body.
+- [x] Trace the free beta button to `/api/beta-request`; return delivery results and show provider IDs/errors in toasts and the request dialog. Auto-accepted invitations send an acceptance email and a separate founder copy. No manual accept/approve-beta endpoint or UI exists; design-partner applications use a separate `/api/design-partners/apply` flow.
+- [x] Add `GET /api/health/test-email` for localhost development only. It attempts both providers and returns env-presence checks and provider diagnostics without exposing keys.
+- [x] Add mocked sender, fallback, delivery failure, beta request deduplication/activation, and browser-diagnostic coverage. Verify `npx tsc --noEmit`, `npm run lint` (zero errors; two existing `app/layout.tsx` warnings), `npm test` (284 passed), and optimized production build using `CITEMEND_BUILD_DIR=.next-beta-email-final-build`.

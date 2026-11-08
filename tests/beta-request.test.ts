@@ -46,12 +46,14 @@ test("invited email receives exactly 30 days; repeat requests cannot extend it",
   assert.equal(betaInvitationAllowed("vip@example.com"), true);
   const first = await requestDesignPartnerBeta("user_123", "VIP@example.com", "example.com", start);
   assert.equal(first.unlocked, true);
+  assert.equal(first.betaAccepted, true);
   assert.equal(first.currentPeriodEnd, "2026-12-02T00:00:00.000Z");
   assert.equal(rows[0].status, "active");
   assert.equal(rows[0].plan, "pro_beta");
   assert.equal(grantsProAccess(rows[0] as Parameters<typeof grantsProAccess>[0], start.getTime()), true);
   const again = await requestDesignPartnerBeta("user_123", "VIP@example.com", "example.com", new Date("2026-11-10T00:00:00Z"));
   assert.equal(again.currentPeriodEnd, first.currentPeriodEnd);
+  assert.equal(again.betaAccepted, undefined);
   assert.equal(methods.filter((method) => method === "POST").length, 1);
 });
 
@@ -80,7 +82,10 @@ test("non-invited user remains pending and cannot gain quota", async () => {
   const { rows } = setup("");
   const result = await requestDesignPartnerBeta("user_123", "founder@example.com", "example.com");
   assert.equal(result.unlocked, false);
+  assert.equal(result.requestCreated, true);
   assert.equal(rows[0].status, "pending_beta");
+  const repeated = await requestDesignPartnerBeta("user_123", "founder@example.com", "example.com");
+  assert.equal(repeated.requestCreated, false);
   assert.equal(grantsProAccess(rows[0] as Parameters<typeof grantsProAccess>[0]), false);
   assert.equal(await hasProSubscription("user_123"), false);
 });

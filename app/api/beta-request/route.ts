@@ -1,6 +1,6 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { requestDesignPartnerBeta } from "@/lib/beta-request";
-import { notifyFounderOfBetaRequest } from "@/lib/founder-notification";
+import { founderEmailRecipient, sendFounderAlertEmail, type FounderEmailDelivery } from "@/lib/founder-alerts";
 import { isBillingEnabled } from "@/lib/lemonsqueezy";
 
 export async function POST(request: Request) {
@@ -32,15 +32,32 @@ export async function POST(request: Request) {
     const email = user.emailAddresses.find((entry) => entry.id === user.primaryEmailAddressId)?.emailAddress;
     if (!email) return Response.json({ error: "Add a primary email to your account before requesting the beta." }, { status: 422 });
     const result = await requestDesignPartnerBeta(userId, email, domain);
-    if (result.requestCreated) {
-      try {
-        const notification = await notifyFounderOfBetaRequest({ userId, email, domain: result.domain ?? domain });
-        if (notification === "not_configured") console.warn("Founder beta-request email is not configured.");
-      } catch {
-        console.error("Founder beta-request email could not be sent.");
-      }
+    let emailDelivery: FounderEmailDelivery;
+    let founderEmailDelivery: FounderEmailDelivery | undefined;
+    const acceptedDomain = result.domain ?? domain;
+    if (result.betaAccepted) {
+      emailDelivery = await sendFounderAlertEmail({
+        to: email,
+        subject: "Your CiteMend Pro Beta is accepted",
+        text: `Your free CiteMend Pro Beta request for ${acceptedDomain} was accepted. Pro access is active for 30 days, through ${result.currentPeriodEnd ?? "the date shown in your account"}. No payment was taken.`,
+        idempotencyKey: `beta-acceptance-${userId}`,
+      });
+      founderEmailDelivery = await sendFounderAlertEmail({
+        to: founderEmailRecipient(),
+        subject: `[CiteMend] Beta user accepted for ${acceptedDomain}`,
+        text: `A beta request was accepted and Pro access was activated.\n\nDomain: ${acceptedDomain}\nAccount email: ${email}\nClerk user ID: ${userId}\nAccess ends: ${result.currentPeriodEnd ?? "unknown"}`,
+        idempotencyKey: `founder-beta-accepted-${userId}`,
+      });
+    } else if (result.requestCreated) {
+      emailDelivery = await sendFounderAlertEmail({
+        subject: `[CiteMend] New free beta request for ${acceptedDomain}`,
+        text: `A new free beta request is waiting for founder review.\n\nDomain: ${acceptedDomain}\nRequester email: ${email}\nClerk user ID: ${userId}\n\nThe request is saved in the subscriptions table with status pending_beta.`,
+        idempotencyKey: `founder-beta-request-${userId}`,
+      });
+    } else {
+      emailDelivery = { sent: false, provider: "none", error: "No new email was sent because this beta request was already processed." };
     }
-    return Response.json({ unlocked: result.unlocked, message: result.message, currentPeriodEnd: result.currentPeriodEnd });
+    return Response.json({ unlocked: result.unlocked, message: result.message, currentPeriodEnd: result.currentPeriodEnd, emailDelivery, ...(founderEmailDelivery ? { founderEmailDelivery } : {}) });
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("Enter a")) return Response.json({ error: error.message }, { status: 400 });
     return Response.json({ error: "Beta activation is temporarily unavailable. Please try again later." }, { status: 503 });

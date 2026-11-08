@@ -27,7 +27,7 @@ test("Resend personal sender domains use its verified onboarding sender and pres
 }, async () => {
   let captured: { from: string; replyTo?: string } | undefined;
   const result = await sendEmail({ to: "prospect@example.test", subject: "Evidence", text: "Verified finding" }, {
-    sendResend: async (_apiKey, _message, from, replyTo) => { captured = { from, replyTo }; return "resend_test_id"; },
+    sendResend: async (message, from) => { captured = { from, replyTo: message.replyTo }; return "resend_test_id"; },
   });
 
   assert.deepEqual(captured, { from: "CiteMend <onboarding@resend.dev>", replyTo: "founder@gmail.com" });

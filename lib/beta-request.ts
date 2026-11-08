@@ -4,7 +4,7 @@ import { createServerDatabase } from "./supabase-server";
 import { expireBetaSubscriptions, grantsProAccess } from "./subscription";
 
 type DatabaseClient = ReturnType<typeof createServerDatabase>;
-export type BetaRequestResult = { unlocked: boolean; message: string; currentPeriodEnd: string | null; requestCreated?: boolean; domain?: string };
+export type BetaRequestResult = { unlocked: boolean; message: string; currentPeriodEnd: string | null; requestCreated?: boolean; betaAccepted?: boolean; domain?: string };
 export const BETA_ACTIVE_MESSAGE = "🎉 VIP Beta Activated! Full Pro access is now unlocked for 30 days.";
 export const BETA_PENDING_MESSAGE = "✅ Beta request received for your account! Your domain is queued for founder approval.";
 
@@ -81,7 +81,7 @@ export async function requestDesignPartnerBeta(
   }).eq("id", betaId).eq("user_id", userId).eq("status", "pending_beta")
     .select("id,status,plan,current_period_end,cancelled,ends_at").maybeSingle();
   if (activated.error) throw new Error("Beta activation is temporarily unavailable.");
-  if (activated.data) return { unlocked: true, message: BETA_ACTIVE_MESSAGE, currentPeriodEnd: activated.data.current_period_end };
+  if (activated.data) return { unlocked: true, message: BETA_ACTIVE_MESSAGE, currentPeriodEnd: activated.data.current_period_end, betaAccepted: true, domain };
 
   const raced = await read();
   const grant = (raced.data ?? []).find((row) => row.id === betaId);

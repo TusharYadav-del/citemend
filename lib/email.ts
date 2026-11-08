@@ -2,6 +2,9 @@ import "server-only";
 import { buildRedirectExport } from "./redirect-export";
 import { sendEmail } from "./email-provider";
 
+export { sendFounderAlertEmail } from "./founder-alerts";
+export type { FounderEmailDelivery } from "./founder-alerts";
+
 export type DigestLink = { domain: string; cited_url: string; suggested_redirect: string | null; audit_id: string };
 
 function escapeHtml(value: string): string {

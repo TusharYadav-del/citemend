@@ -5,6 +5,20 @@ import { useRouter } from "next/navigation";
 import { useUser, SignInButton } from "@clerk/nextjs";
 import { toast } from "sonner";
 
+type EmailDeliveryStatus = { sent: boolean; provider: "resend" | "brevo" | "none"; messageId?: string; error?: string };
+function isEmailDeliveryStatus(value: unknown): value is EmailDeliveryStatus {
+  if (!value || typeof value !== "object") return false;
+  const delivery = value as Partial<EmailDeliveryStatus>;
+  return typeof delivery.sent === "boolean" && (delivery.provider === "resend" || delivery.provider === "brevo" || delivery.provider === "none")
+    && (delivery.messageId === undefined || typeof delivery.messageId === "string")
+    && (delivery.error === undefined || typeof delivery.error === "string");
+}
+function emailDeliveryMessage(delivery: EmailDeliveryStatus) {
+  return delivery.sent
+    ? `Email sent via ${delivery.provider} (ID: ${delivery.messageId ?? "unknown"})`
+    : `Email failed: ${delivery.error ?? "No provider accepted the email."}`;
+}
+
 export default function CheckoutButton({ plan }: { plan?: "pro" | "agency" } = {}) {
   const { isSignedIn, isLoaded } = useUser();
   const [betaMode, setBetaMode] = useState<boolean | null>(null);
@@ -15,7 +29,7 @@ export default function CheckoutButton({ plan }: { plan?: "pro" | "agency" } = {
   const [error, setError] = useState("");
   const [betaOpen, setBetaOpen] = useState(false);
   const [domain, setDomain] = useState("");
-  const [betaResult, setBetaResult] = useState<{ unlocked: boolean; message: string } | null>(null);
+  const [betaResult, setBetaResult] = useState<{ unlocked: boolean; message: string; emailMessages: string[] } | null>(null);
 
   useEffect(() => {
     fetch("/api/lemonsqueezy/checkout", { cache: "no-store" })
@@ -48,15 +62,23 @@ export default function CheckoutButton({ plan }: { plan?: "pro" | "agency" } = {
       });
       const result: unknown = await response.json();
       if (!result || typeof result !== "object") throw new Error("Beta activation is temporarily unavailable.");
-      const payload = result as { unlocked?: unknown; message?: unknown; error?: unknown };
+      const payload = result as { unlocked?: unknown; message?: unknown; error?: unknown; emailDelivery?: unknown; founderEmailDelivery?: unknown };
       if (!response.ok) throw new Error(typeof payload.error === "string" ? payload.error : "Beta activation is temporarily unavailable.");
       if (typeof payload.unlocked !== "boolean" || typeof payload.message !== "string") throw new Error("Beta activation returned an unexpected response.");
-      setBetaResult({ unlocked: payload.unlocked, message: payload.message });
+      if (!isEmailDeliveryStatus(payload.emailDelivery) || (payload.founderEmailDelivery !== undefined && !isEmailDeliveryStatus(payload.founderEmailDelivery))) throw new Error("Beta activation returned no email delivery result.");
+      const deliveries = [payload.emailDelivery, ...(payload.founderEmailDelivery ? [payload.founderEmailDelivery] : [])] as EmailDeliveryStatus[];
+      const emailMessages = deliveries.map(emailDeliveryMessage);
+      setBetaResult({ unlocked: payload.unlocked, message: payload.message, emailMessages });
       setSubscription({ state: payload.unlocked ? "active_beta" : "pending_beta", currentPeriodEnd: typeof (result as { currentPeriodEnd?: unknown }).currentPeriodEnd === "string" ? (result as { currentPeriodEnd: string }).currentPeriodEnd : null, daysRemaining: payload.unlocked ? 30 : null });
       if (payload.unlocked) {
         toast.success(payload.message);
         router.refresh();
       } else toast.info(payload.message);
+      for (const delivery of deliveries) {
+        const status = emailDeliveryMessage(delivery);
+        if (delivery.sent) toast.success(status);
+        else toast.error(status);
+      }
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Beta activation is temporarily unavailable.";
       setError(message);
@@ -117,7 +139,7 @@ export default function CheckoutButton({ plan }: { plan?: "pro" | "agency" } = {
       {!betaMode && error && <p role="alert" className="mt-2 max-w-xs text-xs leading-5 text-red-800">{error}</p>}
       {betaMode && betaOpen && <dialog ref={dialogRef} onClose={() => setBetaOpen(false)} aria-labelledby="beta-title" className="m-auto w-[min(92vw,30rem)] rounded-2xl border border-[#dfe5dc] bg-white p-6 text-[#182c25] shadow-2xl backdrop:bg-black/50 sm:p-8">
         <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-widest text-[#53704e]">Citemend design-partner beta</p><h2 id="beta-title" className="mt-2 text-2xl font-semibold">30 days of Pro, free</h2></div><button type="button" onClick={() => dialogRef.current?.close()} aria-label="Close beta request" className="rounded-md px-2 py-1 text-xl leading-none text-[#68736b] hover:bg-[#f1f4eb]">&times;</button></div>
-        {betaResult?.unlocked ? <div role="status" className="mt-6 rounded-xl bg-[#eef7e8] p-4"><p className="font-semibold">{betaResult.message}</p><p className="mt-3 text-sm leading-6 text-[#4c6351]">Your Pro access is active now. Weekly scan delivery begins when production scheduling is switched on; no payment was taken.</p></div> : betaResult ? <p role="status" className="mt-6 rounded-xl bg-[#eef7e8] p-4 text-sm leading-6">{betaResult.message} Pro access is not active yet.</p> : <form onSubmit={requestBeta} className="mt-5"><p className="text-sm leading-6 text-[#68736b]">Enter the domain you want monitored. We&apos;ll use your signed-in account email for the request. No payment details are needed.</p><label htmlFor="beta-domain" className="mt-5 block text-sm font-medium">Your domain</label><input id="beta-domain" type="text" value={domain} onChange={(event) => setDomain(event.target.value)} placeholder="yourbrand.com" required maxLength={300} disabled={pending} className="mt-2 h-11 w-full rounded-lg border border-[#d2dacc] px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#759d68]" /><button type="submit" disabled={pending} className="mt-5 w-full rounded-lg bg-[#214d39] px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">{pending ? "Saving your request..." : "Request free Pro beta"}</button>{error && <p role="alert" className="mt-3 text-sm text-red-800">{error}</p>}</form>}
+        {betaResult?.unlocked ? <div role="status" className="mt-6 rounded-xl bg-[#eef7e8] p-4"><p className="font-semibold">{betaResult.message}</p><p className="mt-3 text-sm leading-6 text-[#4c6351]">Your Pro access is active now. Weekly scan delivery begins when production scheduling is switched on; no payment was taken.</p><div className="mt-3 space-y-1 text-xs text-[#4c6351]">{betaResult.emailMessages.map((message, index) => <p key={`${index}-${message}`}>{message}</p>)}</div></div> : betaResult ? <div role="status" className="mt-6 rounded-xl bg-[#eef7e8] p-4 text-sm leading-6">{betaResult.message} Pro access is not active yet.<div className="mt-2 space-y-1 text-xs text-[#4c6351]">{betaResult.emailMessages.map((message, index) => <p key={`${index}-${message}`}>{message}</p>)}</div></div> : <form onSubmit={requestBeta} className="mt-5"><p className="text-sm leading-6 text-[#68736b]">Enter the domain you want monitored. We&apos;ll use your signed-in account email for the request. No payment details are needed.</p><label htmlFor="beta-domain" className="mt-5 block text-sm font-medium">Your domain</label><input id="beta-domain" type="text" value={domain} onChange={(event) => setDomain(event.target.value)} placeholder="yourbrand.com" required maxLength={300} disabled={pending} className="mt-2 h-11 w-full rounded-lg border border-[#d2dacc] px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#759d68]" /><button type="submit" disabled={pending} className="mt-5 w-full rounded-lg bg-[#214d39] px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">{pending ? "Saving your request..." : "Request free Pro beta"}</button>{error && <p role="alert" className="mt-3 text-sm text-red-800">{error}</p>}</form>}
       </dialog>}
     </div>
   );
