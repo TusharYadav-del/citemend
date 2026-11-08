@@ -4,7 +4,7 @@ import { createServerDatabase } from "./supabase-server";
 import { expireBetaSubscriptions, grantsProAccess } from "./subscription";
 
 type DatabaseClient = ReturnType<typeof createServerDatabase>;
-export type BetaRequestResult = { unlocked: boolean; message: string; currentPeriodEnd: string | null };
+export type BetaRequestResult = { unlocked: boolean; message: string; currentPeriodEnd: string | null; requestCreated?: boolean; domain?: string };
 export const BETA_ACTIVE_MESSAGE = "🎉 VIP Beta Activated! Full Pro access is now unlocked for 30 days.";
 export const BETA_PENDING_MESSAGE = "✅ Beta request received for your account! Your domain is queued for founder approval.";
 
@@ -34,6 +34,7 @@ export async function requestDesignPartnerBeta(
 
   const betaId = `beta:${userId}`;
   let beta = (current.data ?? []).find((row) => row.plan === "pro_beta");
+  let requestCreated = false;
   if (beta && beta.id !== betaId) throw new Error("A beta record already exists for this account.");
   if (beta?.status === "active") {
     if (!grantsProAccess(beta, now.getTime())) {
@@ -60,7 +61,7 @@ export async function requestDesignPartnerBeta(
       if (raced.error) throw new Error("Beta subscriptions are temporarily unavailable.");
       beta = (raced.data ?? []).find((row) => row.id === betaId);
     } else if (inserted.error || !inserted.data) throw new Error("Beta subscriptions are temporarily unavailable.");
-    else beta = inserted.data;
+    else { beta = inserted.data; requestCreated = true; }
     if (!beta) throw new Error("Beta subscriptions are temporarily unavailable.");
   }
 
@@ -70,7 +71,7 @@ export async function requestDesignPartnerBeta(
         .eq("id", betaId).eq("user_id", userId).eq("status", "pending_beta");
       if (error) throw new Error("Beta subscriptions are temporarily unavailable.");
     }
-    return { unlocked: false, message: BETA_PENDING_MESSAGE, currentPeriodEnd: null };
+    return { unlocked: false, message: BETA_PENDING_MESSAGE, currentPeriodEnd: null, requestCreated, domain };
   }
 
   const periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();

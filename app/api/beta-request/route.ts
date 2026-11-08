@@ -1,5 +1,6 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { requestDesignPartnerBeta } from "@/lib/beta-request";
+import { notifyFounderOfBetaRequest } from "@/lib/founder-notification";
 import { isBillingEnabled } from "@/lib/lemonsqueezy";
 
 export async function POST(request: Request) {
@@ -31,7 +32,15 @@ export async function POST(request: Request) {
     const email = user.emailAddresses.find((entry) => entry.id === user.primaryEmailAddressId)?.emailAddress;
     if (!email) return Response.json({ error: "Add a primary email to your account before requesting the beta." }, { status: 422 });
     const result = await requestDesignPartnerBeta(userId, email, domain);
-    return Response.json(result);
+    if (result.requestCreated) {
+      try {
+        const notification = await notifyFounderOfBetaRequest({ userId, email, domain: result.domain ?? domain });
+        if (notification === "not_configured") console.warn("Founder beta-request email is not configured.");
+      } catch {
+        console.error("Founder beta-request email could not be sent.");
+      }
+    }
+    return Response.json({ unlocked: result.unlocked, message: result.message, currentPeriodEnd: result.currentPeriodEnd });
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("Enter a")) return Response.json({ error: error.message }, { status: 400 });
     return Response.json({ error: "Beta activation is temporarily unavailable. Please try again later." }, { status: 503 });

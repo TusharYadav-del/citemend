@@ -973,3 +973,10 @@ Code and tests are complete. The user confirmed migration 035 has been applied t
 - [x] Verify `npx tsc --noEmit`, `npm run lint` (zero errors; two existing warnings in `app/layout.tsx`), `npm test` (279 passed), and optimized production build using `CITEMEND_BUILD_DIR=.next-email-transport-build`.
 
 `lib/founder-alerts.ts` is not present in this repository; all existing email sending call sites use the shared transport. Outreach sending remains disabled pending the live sales phase.
+
+## Founder Notifications for Free Beta Requests (COMPLETED IN CODE)
+
+- [x] Send a founder notification to `FOUNDER_NOTIFICATION_EMAIL` when a new, non-invited user creates a pending free beta request.
+- [x] Include the submitted account email and normalized domain; deduplicate notifications by notifying only on the initial pending request, not repeat submissions.
+- [x] Use the shared Brevo/Resend sender and preserve the successful beta request if email notification is unavailable or fails.
+- [x] Verify TypeScript, lint, and optimized production build. Lint has zero errors and the two existing warnings in `app/layout.tsx`.
