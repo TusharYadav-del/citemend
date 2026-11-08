@@ -15,16 +15,16 @@ function numericId(value: string | undefined, name: string): string {
 
 export function variantForTier(tier: BillingTier): string {
   const effective = [
-    process.env.LEMONSQUEEZY_STARTER_VARIANT_ID || process.env.LEMONSQUEEZY_VARIANT_ID || process.env.LEMON_SQUEEZY_VARIANT_ID,
+    process.env.LEMONSQUEEZY_STARTER_VARIANT_ID,
     process.env.LEMONSQUEEZY_GROWTH_VARIANT_ID,
-    process.env.LEMONSQUEEZY_AGENCY_VARIANT_ID || process.env.LEMON_SQUEEZY_AGENCY_VARIANT_ID,
+    process.env.LEMONSQUEEZY_AGENCY_VARIANT_ID,
   ].map(value => value?.trim()).filter((value): value is string => !!value);
   if (new Set(effective).size !== effective.length) throw new BillingConfigError("Each billing tier needs a distinct Lemon Squeezy variant ID.");
   const setting: [string | undefined, string] = tier === "starter"
-    ? [process.env.LEMONSQUEEZY_STARTER_VARIANT_ID || process.env.LEMONSQUEEZY_VARIANT_ID || process.env.LEMON_SQUEEZY_VARIANT_ID, "LEMONSQUEEZY_STARTER_VARIANT_ID or LEMONSQUEEZY_VARIANT_ID"]
+    ? [process.env.LEMONSQUEEZY_STARTER_VARIANT_ID, "LEMONSQUEEZY_STARTER_VARIANT_ID"]
     : tier === "growth"
       ? [process.env.LEMONSQUEEZY_GROWTH_VARIANT_ID, "LEMONSQUEEZY_GROWTH_VARIANT_ID"]
-      : [process.env.LEMONSQUEEZY_AGENCY_VARIANT_ID || process.env.LEMON_SQUEEZY_AGENCY_VARIANT_ID, "LEMONSQUEEZY_AGENCY_VARIANT_ID"];
+    : [process.env.LEMONSQUEEZY_AGENCY_VARIANT_ID, "LEMONSQUEEZY_AGENCY_VARIANT_ID"];
   return numericId(setting[0], setting[1]);
 }
 

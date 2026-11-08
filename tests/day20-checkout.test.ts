@@ -7,7 +7,7 @@ const oldEnv = process.env;
 afterEach(() => { globalThis.fetch = oldFetch; process.env = oldEnv; });
 
 test("development test checkout requests test mode and retains the signed-in owner", async () => {
-  process.env = { ...oldEnv, NODE_ENV: "development", LEMON_SQUEEZY_API_KEY: "test-key", LEMON_SQUEEZY_STORE_ID: "123", LEMON_SQUEEZY_PRODUCT_ID: "456", LEMON_SQUEEZY_VARIANT_ID: "789" };
+  process.env = { ...oldEnv, NODE_ENV: "development", LEMON_SQUEEZY_API_KEY: "test-key", LEMON_SQUEEZY_STORE_ID: "123", LEMON_SQUEEZY_PRODUCT_ID: "456", LEMONSQUEEZY_STARTER_VARIANT_ID: "789" };
   globalThis.fetch = async (_url, options) => {
     const body = JSON.parse(String(options?.body));
     assert.equal(body.data.attributes.test_mode, true);
@@ -18,7 +18,7 @@ test("development test checkout requests test mode and retains the signed-in own
 });
 
 test("test checkout fails closed if Lemon Squeezy does not confirm test mode", async () => {
-  process.env = { ...oldEnv, NODE_ENV: "development", LEMON_SQUEEZY_API_KEY: "test-key", LEMON_SQUEEZY_STORE_ID: "123", LEMON_SQUEEZY_PRODUCT_ID: "456", LEMON_SQUEEZY_VARIANT_ID: "789" };
+  process.env = { ...oldEnv, NODE_ENV: "development", LEMON_SQUEEZY_API_KEY: "test-key", LEMON_SQUEEZY_STORE_ID: "123", LEMON_SQUEEZY_PRODUCT_ID: "456", LEMONSQUEEZY_STARTER_VARIANT_ID: "789" };
   globalThis.fetch = async () => Response.json({ data: { attributes: { test_mode: false, url: "https://example.lemonsqueezy.com/checkout/custom/live" } } });
   await assert.rejects(createLemonSqueezyCheckout("user_123", true), /did not create a test-mode checkout/);
   process.env = { ...process.env, NODE_ENV: "production" };
@@ -26,7 +26,7 @@ test("test checkout fails closed if Lemon Squeezy does not confirm test mode", a
 });
 
 test("agency checkout selects the configured Agency variant and keeps the account owner", async () => {
-  process.env = { ...oldEnv, NODE_ENV: "development", LEMON_SQUEEZY_API_KEY: "test-key", LEMON_SQUEEZY_STORE_ID: "123", LEMON_SQUEEZY_PRODUCT_ID: "456", LEMON_SQUEEZY_VARIANT_ID: "789", LEMON_SQUEEZY_AGENCY_VARIANT_ID: "2336501" };
+  process.env = { ...oldEnv, NODE_ENV: "development", LEMON_SQUEEZY_API_KEY: "test-key", LEMON_SQUEEZY_STORE_ID: "123", LEMON_SQUEEZY_PRODUCT_ID: "456", LEMONSQUEEZY_STARTER_VARIANT_ID: "789", LEMON_SQUEEZY_AGENCY_VARIANT_ID: "2336501" };
   globalThis.fetch = async (_url, options) => {
     const body = JSON.parse(String(options?.body));
     assert.equal(body.data.relationships.variant.data.id, "2336501");

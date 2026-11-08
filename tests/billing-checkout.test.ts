@@ -8,13 +8,14 @@ afterEach(() => { process.env = oldEnv; globalThis.fetch = oldFetch; });
 
 function configure() {
   process.env = { ...oldEnv, LEMONSQUEEZY_API_KEY: "test-api-key", LEMONSQUEEZY_STORE_ID: "123",
-    LEMONSQUEEZY_VARIANT_ID: "789", LEMONSQUEEZY_GROWTH_VARIANT_ID: "790", LEMONSQUEEZY_AGENCY_VARIANT_ID: "791",
+    LEMONSQUEEZY_STARTER_VARIANT_ID: "2322742",
+    LEMONSQUEEZY_GROWTH_VARIANT_ID: "790", LEMONSQUEEZY_AGENCY_VARIANT_ID: "2336501",
     NEXT_PUBLIC_APP_URL: "https://siteman.vercel.app", LEMON_SQUEEZY_TEST_MODE: "true" };
 }
 
 test("checkout payload binds Clerk owner, email, plan tier, store, variant, redirect and test mode", async () => {
   configure();
-  for (const [tier, variant] of [["starter", "789"], ["growth", "790"], ["agency", "791"]] as const) {
+  for (const [tier, variant] of [["starter", "2322742"], ["growth", "790"], ["agency", "2336501"]] as const) {
     const payload = buildBillingCheckout(tier, "user_123", "owner@example.com");
     assert.equal(payload.data.relationships.store.data.id, "123");
     assert.equal(payload.data.relationships.variant.data.id, variant);
@@ -23,17 +24,28 @@ test("checkout payload binds Clerk owner, email, plan tier, store, variant, redi
     assert.equal(payload.data.attributes.product_options.redirect_url, "https://siteman.vercel.app/dashboard?billing=success");
     assert.equal(payload.data.attributes.test_mode, true);
   }
+  const requestedVariants: string[] = [];
   globalThis.fetch = async (url, init) => {
     assert.equal(String(url), "https://api.lemonsqueezy.com/v1/checkouts");
     const body = JSON.parse(String(init?.body));
     assert.equal(body.data.attributes.checkout_data.custom.user_id, "user_123");
+    requestedVariants.push(body.data.relationships.variant.data.id);
     return Response.json({ data: { attributes: { test_mode: true, url: "https://store.lemonsqueezy.com/checkout/custom/abc" } } });
   };
   assert.match(await createBillingCheckout("starter", "user_123", "owner@example.com"), /checkout\/custom/);
+  assert.match(await createBillingCheckout("agency", "user_123", "owner@example.com"), /checkout\/custom/);
+  assert.deepEqual(requestedVariants, ["2322742", "2336501"]);
 });
 
 test("checkout rejects unconfigured variants, invalid origins and untrusted provider URLs", async () => {
   configure();
+  delete process.env.LEMONSQUEEZY_STARTER_VARIANT_ID;
+  assert.throws(() => buildBillingCheckout("starter", "user_123", "owner@example.com"), /LEMONSQUEEZY_STARTER_VARIANT_ID/);
+  process.env.LEMONSQUEEZY_STARTER_VARIANT_ID = "2322742";
+  delete process.env.LEMONSQUEEZY_AGENCY_VARIANT_ID;
+  process.env.LEMON_SQUEEZY_AGENCY_VARIANT_ID = "2336501";
+  assert.throws(() => buildBillingCheckout("agency", "user_123", "owner@example.com"), /LEMONSQUEEZY_AGENCY_VARIANT_ID/);
+  process.env.LEMONSQUEEZY_AGENCY_VARIANT_ID = "2336501";
   delete process.env.LEMONSQUEEZY_GROWTH_VARIANT_ID;
   assert.throws(() => buildBillingCheckout("growth", "user_123", "owner@example.com"), BillingConfigError);
   process.env.NEXT_PUBLIC_APP_URL = "https://attacker.example.com/path";

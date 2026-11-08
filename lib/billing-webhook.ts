@@ -21,7 +21,7 @@ export function isTestDelivery(payload: BillingPayload): boolean {
 
 export function configuredBillingTier(variantId: string): BillingTier | null {
   const variants: [BillingTier, string | undefined][] = [
-    ["starter", process.env.LEMONSQUEEZY_STARTER_VARIANT_ID || process.env.LEMONSQUEEZY_VARIANT_ID || process.env.LEMON_SQUEEZY_VARIANT_ID],
+    ["starter", process.env.LEMONSQUEEZY_STARTER_VARIANT_ID],
     ["growth", process.env.LEMONSQUEEZY_GROWTH_VARIANT_ID],
     ["agency", process.env.LEMONSQUEEZY_AGENCY_VARIANT_ID || process.env.LEMON_SQUEEZY_AGENCY_VARIANT_ID],
   ];

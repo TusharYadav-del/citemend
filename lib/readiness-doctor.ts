@@ -73,10 +73,11 @@ export async function runReadinessDoctor({ env = process.env, inspectDatabase, n
     LEMON_SQUEEZY_API_KEY: env.LEMONSQUEEZY_API_KEY || env.LEMON_SQUEEZY_API_KEY,
     LEMON_SQUEEZY_STORE_ID: env.LEMONSQUEEZY_STORE_ID || env.LEMON_SQUEEZY_STORE_ID,
     LEMON_SQUEEZY_PRODUCT_ID: env.LEMONSQUEEZY_PRODUCT_ID || env.LEMON_SQUEEZY_PRODUCT_ID,
-    LEMON_SQUEEZY_VARIANT_ID: env.LEMONSQUEEZY_STARTER_VARIANT_ID || env.LEMONSQUEEZY_VARIANT_ID || env.LEMON_SQUEEZY_VARIANT_ID,
+    LEMONSQUEEZY_STARTER_VARIANT_ID: env.LEMONSQUEEZY_STARTER_VARIANT_ID,
+    LEMONSQUEEZY_AGENCY_VARIANT_ID: env.LEMONSQUEEZY_AGENCY_VARIANT_ID,
     LEMON_SQUEEZY_WEBHOOK_SECRET: env.LEMONSQUEEZY_WEBHOOK_SECRET || env.LEMON_SQUEEZY_WEBHOOK_SECRET,
   };
-  const lemonSqueezyConfigured = ["LEMON_SQUEEZY_API_KEY", "LEMON_SQUEEZY_STORE_ID", "LEMON_SQUEEZY_PRODUCT_ID", "LEMON_SQUEEZY_VARIANT_ID", "LEMON_SQUEEZY_WEBHOOK_SECRET"].every((name) => configured(billingEnv[name as keyof typeof billingEnv]));
+  const lemonSqueezyConfigured = ["LEMON_SQUEEZY_API_KEY", "LEMON_SQUEEZY_STORE_ID", "LEMON_SQUEEZY_PRODUCT_ID", "LEMONSQUEEZY_STARTER_VARIANT_ID", "LEMONSQUEEZY_AGENCY_VARIANT_ID", "LEMON_SQUEEZY_WEBHOOK_SECRET"].every((name) => configured(billingEnv[name as keyof typeof billingEnv]));
   const dodoCredentialsPresent = configured(env.DODO_PAYMENTS_API_KEY) || configured(env.DODO_PAYMENTS_WEBHOOK_SECRET);
   const checks: ReadinessCheck[] = [
     databaseCheck,
@@ -88,7 +89,7 @@ export async function runReadinessDoctor({ env = process.env, inspectDatabase, n
       details: configured(env.GEMINI_API_KEY) ? ["Secret value is not returned."] : ["Missing: GEMINI_API_KEY"],
     },
     requiredCheck("email-cron", "Email and cron", ["RESEND_API_KEY", "CRON_SECRET"], env),
-    requiredCheck("lemon-squeezy", "Lemon Squeezy billing", ["LEMON_SQUEEZY_API_KEY", "LEMON_SQUEEZY_STORE_ID", "LEMON_SQUEEZY_PRODUCT_ID", "LEMON_SQUEEZY_VARIANT_ID", "LEMON_SQUEEZY_WEBHOOK_SECRET"], billingEnv),
+    requiredCheck("lemon-squeezy", "Lemon Squeezy billing", ["LEMON_SQUEEZY_API_KEY", "LEMON_SQUEEZY_STORE_ID", "LEMON_SQUEEZY_PRODUCT_ID", "LEMONSQUEEZY_STARTER_VARIANT_ID", "LEMONSQUEEZY_AGENCY_VARIANT_ID", "LEMON_SQUEEZY_WEBHOOK_SECRET"], billingEnv),
     {
       id: "dodo-payments", label: "Dodo Payments", status: dodoCredentialsPresent ? "WARN" : lemonSqueezyConfigured ? "PASS" : "WARN",
       summary: dodoCredentialsPresent ? "Dodo credentials are present, but this application does not integrate Dodo Payments." : lemonSqueezyConfigured ? "Not required; Lemon Squeezy is configured as the active billing provider." : "Dodo Payments is not integrated; configure the supported Lemon Squeezy provider instead.",

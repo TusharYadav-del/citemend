@@ -51,7 +51,7 @@ export function BillingPanel({ available }: { available: Record<BillingTier, boo
         <button type="button" onClick={() => void openPortal("manage")} disabled={!!busy} className="rounded-lg border border-emerald-300/30 px-3 py-2 text-xs font-semibold text-emerald-200 disabled:opacity-60">{busy === "manage" ? "Opening…" : "Manage Subscription / Download Invoices"}</button>
         <button type="button" onClick={() => void openPortal("payment")} disabled={!!busy} className="rounded-lg border border-white/20 px-3 py-2 text-xs font-semibold disabled:opacity-60">{busy === "payment" ? "Opening…" : "Update Payment Method"}</button>
       </div>}
-      {!billing.active && <div className="mt-4 flex flex-wrap gap-3">{(["starter", "growth", "agency"] as const).filter(tier => available[tier]).map(tier => <BillingCheckoutButton key={tier} tier={tier} label={`Choose ${tier[0].toUpperCase() + tier.slice(1)}`} />)}</div>}
+      {!billing.active && <div className="mt-4 flex flex-wrap gap-3">{(["starter", "agency"] as const).filter(tier => available[tier]).map(tier => <BillingCheckoutButton key={tier} tier={tier} label={`Choose ${tier[0].toUpperCase() + tier.slice(1)}`} />)}</div>}
     </>}
     {error && <p role="alert" className="mt-3 text-xs text-amber-200">{error}</p>}
   </section>;

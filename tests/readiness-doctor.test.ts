@@ -13,7 +13,8 @@ const completeEnvironment: Record<string, string> = {
   LEMON_SQUEEZY_API_KEY: "ls-real-looking-key",
   LEMON_SQUEEZY_STORE_ID: "store-1",
   LEMON_SQUEEZY_PRODUCT_ID: "product-1",
-  LEMON_SQUEEZY_VARIANT_ID: "variant-1",
+  LEMONSQUEEZY_STARTER_VARIANT_ID: "variant-1",
+  LEMONSQUEEZY_AGENCY_VARIANT_ID: "variant-2",
   LEMON_SQUEEZY_WEBHOOK_SECRET: "webhook-secret",
 };
 
@@ -59,10 +60,10 @@ test("readiness doctor differentiates missing required settings from optional fe
 
 test("readiness doctor accepts canonical Lemon Squeezy variable names", async () => {
   const env: Record<string, string> = { ...completeEnvironment };
-  for (const name of ["LEMON_SQUEEZY_API_KEY", "LEMON_SQUEEZY_STORE_ID", "LEMON_SQUEEZY_PRODUCT_ID", "LEMON_SQUEEZY_VARIANT_ID", "LEMON_SQUEEZY_WEBHOOK_SECRET"]) delete env[name];
+  for (const name of ["LEMON_SQUEEZY_API_KEY", "LEMON_SQUEEZY_STORE_ID", "LEMON_SQUEEZY_PRODUCT_ID", "LEMON_SQUEEZY_WEBHOOK_SECRET"]) delete env[name];
   Object.assign(env, {
     LEMONSQUEEZY_API_KEY: "key", LEMONSQUEEZY_STORE_ID: "123", LEMONSQUEEZY_PRODUCT_ID: "456",
-    LEMONSQUEEZY_VARIANT_ID: "789", LEMONSQUEEZY_WEBHOOK_SECRET: "secret",
+    LEMONSQUEEZY_WEBHOOK_SECRET: "secret",
   });
   const result = await runReadinessDoctor({ env, inspectDatabase: async () => ({ connected: true, tables: allTables() }) });
   assert.equal(result.checks.find(check => check.id === "lemon-squeezy")?.status, "PASS");

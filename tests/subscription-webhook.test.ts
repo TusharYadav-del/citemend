@@ -14,7 +14,7 @@ afterEach(() => { globalThis.fetch = oldFetch; process.env = oldEnv; });
 
 function configure(nodeEnv: "development" | "production" | "test" = "development") {
   process.env = { ...oldEnv, NODE_ENV: nodeEnv, NEXT_PUBLIC_SUPABASE_URL: "https://db.example.com", SUPABASE_SECRET_KEY: "server-key",
-    LEMONSQUEEZY_WEBHOOK_SECRET: "webhook-secret", LEMONSQUEEZY_STORE_ID: "123", LEMONSQUEEZY_VARIANT_ID: "789",
+    LEMONSQUEEZY_WEBHOOK_SECRET: "webhook-secret", LEMONSQUEEZY_STORE_ID: "123", LEMONSQUEEZY_STARTER_VARIANT_ID: "789",
     LEMONSQUEEZY_AGENCY_VARIANT_ID: "2336501", LEMON_SQUEEZY_TEST_MODE: "false", RESEND_API_KEY: "", BREVO_API_KEY: "" };
 }
 
