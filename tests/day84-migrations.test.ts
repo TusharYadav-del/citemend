@@ -19,17 +19,21 @@ test("daily Vercel jobs and the every-minute Supabase worker use protected cron 
   assert.deepEqual(vercel.crons, [
     { path: "/api/cron/data-retention", schedule: "0 2 * * *" },
     { path: "/api/cron/scheduled-reports", schedule: "0 4 * * *" },
+    { path: "/api/cron/outreach/daily", schedule: "0 9 * * *" },
   ]);
+  const outreachSetup = await readFile(new URL("../supabase/setup/outreach_cron.sql", import.meta.url), "utf8");
+  assert.match(outreachSetup, /citemend-outreach-daily/);
+  assert.match(outreachSetup, /\/api\/cron\/outreach\/daily/);
 });
 
-test("migrations 001 through 034 apply in order and expose the columns used by the application", async () => {
+test("migrations 001 through 035 apply in order and expose the columns used by the application", async () => {
   const db = new PGlite({ extensions: { vector } });
   try {
     await db.exec("create role anon; create role authenticated; create role service_role bypassrls;");
     await db.exec("create schema auth; create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$; grant usage on schema auth to authenticated, service_role; grant execute on function auth.jwt() to authenticated, service_role;");
     const directory = new URL("../supabase/migrations/", import.meta.url);
     const files = (await readdir(directory)).filter(name => /^\d{3}_.+\.sql$/.test(name)).sort();
-    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 34 }, (_, index) => String(index + 1).padStart(3, "0")));
+    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 35 }, (_, index) => String(index + 1).padStart(3, "0")));
     for (const file of files) await db.exec(await readFile(new URL(file, directory), "utf8"));
     const expected: Record<string, string[]> = {
       audits: ["id", "user_id", "domain", "buyer_prompt", "status", "created_at", "completed_at", "competitor_domains", "ground_truth_pricing", "indexnow_key", "share_of_model_score", "engine_matrix_json", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text", "llms_txt_content", "webhook_url", "sitemap_url_count"],
@@ -67,6 +71,15 @@ test("migrations 001 through 034 apply in order and expose the columns used by t
       background_jobs: ["id", "user_id", "workspace_domain", "job_type", "job_key", "status", "progress_percent", "current_step_label", "payload_json", "result_json", "attempt_count", "max_attempts", "continuation_pending", "next_retry_at", "lease_token", "lease_expires_at", "error_message", "created_at", "updated_at", "completed_at"],
       founder_weekly_scorecards: ["founder_user_id", "week_start", "scorecard_json", "updated_at"],
       support_tickets: ["id", "workspace_domain", "user_id", "user_email", "category", "priority", "subject", "message", "diagnostic_context_json", "status", "created_at"],
+      outreach_prospects: ["id", "domain", "company_name", "qualification_score", "status", "research_json"],
+      outreach_evidence: ["id", "prospect_id", "evidence_type", "observed_state", "http_status"],
+      outreach_contacts: ["id", "prospect_id", "email", "email_status", "source_url"],
+      outreach_campaigns: ["id", "name", "status", "daily_target"],
+      outreach_emails: ["id", "prospect_id", "recipient", "factuality_report", "status"],
+      outreach_events: ["id", "email_id", "prospect_id", "event_type", "provider_event_id"],
+      outreach_suppressions: ["id", "email", "reason", "source"],
+      outreach_daily_runs: ["id", "run_date", "status", "sends_reserved", "telemetry"],
+      outreach_settings: ["id", "outreach_enabled", "outreach_enabled_override", "kill_switch", "daily_target", "daily_send_limit", "min_qualification_score"],
     };
     const result = await db.query<{ table_name: string; column_name: string; is_nullable: string }>("select table_name, column_name, is_nullable from information_schema.columns where table_schema = 'public'");
     for (const [table, columns] of Object.entries(expected)) {
@@ -75,7 +88,15 @@ test("migrations 001 through 034 apply in order and expose the columns used by t
     }
     const rlsTables = await db.query<{ table_name: string; rls_enabled: boolean }>("select c.relname as table_name,c.relrowsecurity as rls_enabled from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p')");
     for (const table of Object.keys(expected)) assert.equal(rlsTables.rows.find((row) => row.table_name === table)?.rls_enabled, true, `${table} must have RLS enabled`);
-    assert.deepEqual((await db.query<{ table_name: string }>("select table_name from public.citemend_readiness_schema_status() order by table_name")).rows.length, 35);
+    const outreachDefaults = (await db.query<{ outreach_enabled:boolean; outreach_enabled_override:boolean|null; daily_target:number; daily_send_limit:number; min_qualification_score:number }>("select outreach_enabled,outreach_enabled_override,daily_target,daily_send_limit,min_qualification_score from public.outreach_settings where id=1")).rows[0];
+    assert.deepEqual(outreachDefaults,{outreach_enabled:false,outreach_enabled_override:null,daily_target:20,daily_send_limit:15,min_qualification_score:75});
+    assert.deepEqual((await db.query<{ table_name: string }>("select table_name from public.citemend_readiness_schema_status() order by table_name")).rows.length, 44);
+    const firstOutreachRun = (await db.query<{ claimed: boolean; run_id: string }>("select * from public.outreach_begin_daily_run('2026-11-08')")).rows[0];
+    assert.equal(firstOutreachRun.claimed, true);
+    const duplicateOutreachRun = (await db.query<{ claimed: boolean; run_id: string }>("select * from public.outreach_begin_daily_run('2026-11-08')")).rows[0];
+    assert.equal(duplicateOutreachRun.claimed, false);
+    assert.equal((await db.query<{ allowed: boolean }>("select public.outreach_reserve_daily_send('2026-11-08',1) allowed")).rows[0].allowed, true);
+    assert.equal((await db.query<{ allowed: boolean }>("select public.outreach_reserve_daily_send('2026-11-08',1) allowed")).rows[0].allowed, false);
     const firstJob = (await db.query<{ id: string }>("select id from public.enqueue_background_job('queue_user','queue.example','ecommerce_sync','catalog-run-1','{\"source\":\"json\"}'::jsonb)")).rows[0].id;
     const duplicateJob = (await db.query<{ id: string }>("select id from public.enqueue_background_job('queue_user','queue.example','ecommerce_sync','catalog-run-1','{\"source\":\"json\"}'::jsonb)")).rows[0].id;
     assert.equal(duplicateJob, firstJob, "idempotent enqueue returns the same job row");

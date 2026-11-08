@@ -952,3 +952,15 @@ Migration 034 is covered by local ordered PGlite migration tests; apply it to ho
 - [x] Verify `npx tsc --noEmit`, `npm run lint` (0 errors; two existing warnings in `app/layout.tsx`), `npm test` (269 passed), and an optimized Turbopack production build using an isolated build directory.
 
 The repository's existing `.next` Turbopack persistence directory failed to open (`invalid digit found in string`), so final production builds were completed successfully using `CITEMEND_BUILD_DIR` to isolate build output. The webpack fallback is incompatible with the existing `node:crypto` import in the billing dependency graph. The optional Playwright suite could not reach its local dev server in this restricted environment (`ERR_NETWORK_ACCESS_DENIED` for `localhost:3108`); no browser-visual pass is claimed.
+
+## Autonomous Outreach & Programmatic Inbound Engine (COMPLETED IN CODE)
+
+- [x] Audit the existing Next.js 16 app, Supabase/Clerk/Resend setup, Tavily/Groq research, DNS-pinned SSRF verifier, existing cron jobs, and current migration numbering.
+- [x] Add the nine RLS-protected outreach tables, safe disabled defaults, idempotent daily run lock, and atomic send quota reservation. Migration `020_recovery_approval_lifecycle.sql` already exists, so add the forward migration as `035_autonomous_outreach_engine.sql` without rewriting deployed history.
+- [x] Implement the Tavily prospect discovery, public contact extraction and MX checks, SSRF-safe citation research, 100-point qualification, factuality-gated copy, suppression and one-click unsubscribe, Resend/webhook delivery, and signed delivery/reply event handlers.
+- [x] Add the protected daily cron, Vercel schedule, Supabase Vault/pg_cron setup script, founder-only AI Outreach dashboard and kill switch.
+- [x] Publish dynamic public `/report/[domain]` diagnostics and a runtime sitemap containing researched reports.
+- [x] Add mocked-provider unit/integration coverage for deduplication, email checks, scoring, factuality, suppression tokens, quota locks, signatures, cron authorization, and migration/RLS ordering.
+- [x] Verify `npx tsc --noEmit`, `npm run lint` (zero errors; two pre-existing warnings in `app/layout.tsx`), all 277 `npm test` cases, and optimized production build using `CITEMEND_BUILD_DIR=.next-outreach-complete-build`.
+
+Code and tests are complete. The user confirmed migration 035 has been applied to hosted Supabase; configure the Supabase Vault secrets and run `supabase/setup/outreach_cron.sql` when scheduling is wanted. Per user request, autonomous sending remains disabled until the live sales phase; do not enable the dashboard toggle or set `OUTREACH_ENABLED=true` yet. Configure Tavily, a dedicated outreach sender, and either the outbound webhook or Resend credentials before activation. `OUTREACH_REPLY_WEBHOOK_SECRET` protects optional reply workflow events.

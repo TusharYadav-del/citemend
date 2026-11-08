@@ -1,4 +1,5 @@
-﻿export type Database = {
+type OutreachTable<Row extends Record<string, unknown>> = { Row: Row; Insert: Partial<Row>; Update: Partial<Row>; Relationships: [] };
+export type Database = {
   public: {
     Tables: {
       case_studies: {
@@ -205,6 +206,15 @@
         Update: { id?: string; workspace_domain?: string | null; user_id?: string; user_email?: string; category?: string; priority?: string; subject?: string; message?: string; diagnostic_context_json?: Record<string, unknown>; status?: string; created_at?: string };
         Relationships: [];
       };
+      outreach_prospects: OutreachTable<{ id:string; domain:string; company_name:string|null; category:string|null; country:string|null; website_url:string|null; qualification_score:number; status:string; company_fit:number; decision_maker_score:number; ai_presence_score:number; broken_citation_score:number; technical_seo_score:number; verified_contact_score:number; personalization_score:number; research_json:Record<string,unknown>; report_public:boolean; discovered_at:string; researched_at:string|null; created_at:string; updated_at:string }>;
+      outreach_evidence: OutreachTable<{ id:string; prospect_id:string; evidence_type:string; source_url:string|null; title:string|null; excerpt:string|null; observed_state:string|null; http_status:number|null; final_url:string|null; verification_json:Record<string,unknown>; verified_at:string|null; created_at:string }>;
+      outreach_contacts: OutreachTable<{ id:string; prospect_id:string; full_name:string|null; title:string|null; email:string; email_status:string; verification_json:Record<string,unknown>; source_url:string; is_public:boolean; created_at:string }>;
+      outreach_campaigns: OutreachTable<{ id:string; name:string; status:string; daily_target:number; created_at:string; updated_at:string }>;
+      outreach_emails: OutreachTable<{ id:string; prospect_id:string; contact_id:string|null; campaign_id:string|null; provider:string|null; provider_message_id:string|null; recipient:string; subject:string; body_text:string; body_html:string; factuality_report:Record<string,unknown>; status:string; sent_at:string|null; created_at:string }>;
+      outreach_events: OutreachTable<{ id:string; email_id:string|null; prospect_id:string|null; event_type:string; provider_event_id:string|null; payload:Record<string,unknown>; occurred_at:string }>;
+      outreach_suppressions: OutreachTable<{ id:string; email:string; domain:string|null; reason:string; source:string; token_hash:string|null; created_at:string }>;
+      outreach_daily_runs: OutreachTable<{ id:string; run_date:string; status:string; started_at:string; finished_at:string|null; discovered:number; researched:number; qualified:number; emails_sent:number; sends_reserved:number; errors:number; telemetry:Record<string,unknown> }>;
+      outreach_settings: OutreachTable<{ id:number; outreach_enabled:boolean; outreach_enabled_override:boolean|null; kill_switch:boolean; daily_target:number; daily_send_limit:number; min_qualification_score:number; updated_at:string }>;
     };
     Views: { [key in never]: never };
     Functions: {
@@ -221,6 +231,8 @@
       report_background_job_progress: { Args: { p_job_id: string; p_lease_token: string; p_progress_percent: number; p_step_label: string; p_lease_seconds?: number }; Returns: boolean };
       complete_background_job: { Args: { p_job_id: string; p_lease_token: string; p_result_json: Record<string, unknown> }; Returns: boolean };
       retry_background_job: { Args: { p_job_id: string; p_lease_token: string; p_safe_error: string }; Returns: string };
+      outreach_begin_daily_run: { Args: { p_run_date:string }; Returns: { claimed:boolean; run_id:string }[] };
+      outreach_reserve_daily_send: { Args: { p_run_date:string; p_limit:number }; Returns: boolean };
       match_sitemap_url: {
         Args: { query_embedding: string; target_domain: string; match_threshold: number; match_count: number; query_model?: string };
         Returns: { url: string; similarity: number }[];

@@ -206,6 +206,7 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
     { label: "Workspaces", href: `${dashboardHref}#workspaces` },
     ...(access.role === "owner" ? [{ label: "Billing", href: `${dashboardHref}#billing` }] : []),
     ...(isFounder ? [{ label: "Founder OS", href: "/dashboard/founder-os" }] : []),
+    ...(isFounder ? [{ label: "AI Outreach", href: "/dashboard/ai-outreach" }] : []),
   ];
   const recoveryRows = audits.flatMap(audit => audit.broken_links.map(link => ({ ...link, auditId: audit.id, domain: audit.domain, auditCreatedAt: audit.created_at })));
   return (

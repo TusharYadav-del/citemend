@@ -7,6 +7,8 @@ export const REQUIRED_READINESS_TABLES = [
   "scheduled_reports", "citation_change_events", "workspace_api_rate_windows", "workspace_operating_metrics",
   "case_studies", "design_partner_applications", "agency_referrals", "forensic_teaser_rate_windows",
   "background_jobs", "founder_weekly_scorecards", "support_tickets",
+  "outreach_prospects", "outreach_evidence", "outreach_contacts", "outreach_campaigns", "outreach_emails",
+  "outreach_events", "outreach_suppressions", "outreach_daily_runs", "outreach_settings",
 ] as const;
 
 export type ReadinessStatus = "PASS" | "WARN" | "MISSING";
