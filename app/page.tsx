@@ -11,6 +11,8 @@ import { SiteFooter } from "@/components/site-footer";
 export const metadata: Metadata = {
   title: "CiteMend | Repair Broken AI Citations",
   description: "Inspect broken AI citations, review relevant replacements, and verify approved redirects across content libraries and website migrations.",
+  openGraph: { type: "website", title: "CiteMend | Repair Broken AI Citations", description: "Inspect broken AI citations, review relevant replacements, and verify approved redirects." },
+  twitter: { card: "summary_large_image", title: "CiteMend | Repair Broken AI Citations", description: "Inspect broken AI citations and review verified recovery options." },
 };
 
 const features = [

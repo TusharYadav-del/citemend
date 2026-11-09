@@ -1,17 +1,32 @@
 import "server-only";
 import { buildRedirectExport, type ExportableRedirect, type RedirectExportFormat } from "@/lib/redirect-export";
 import { hasProSubscription } from "@/lib/subscription";
+import { createServerDatabase } from "@/lib/supabase-server";
 
 type ExportDependencies = {
   isConfigured?: () => boolean;
   getUserId?: () => Promise<string | null>;
   hasPro?: typeof hasProSubscription;
+  verifyOwnedLinks?: (userId: string, domain: string, links: ExportableRedirect[]) => Promise<ExportableRedirect[]>;
 };
 
 export function createRedirectExportHandler(dependencies: ExportDependencies = {}) {
   const isConfigured = dependencies.isConfigured ?? (() => Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY));
   const getUserId = dependencies.getUserId ?? (async () => (await (await import("@clerk/nextjs/server")).auth()).userId);
   const hasPro = dependencies.hasPro ?? hasProSubscription;
+  const verifyOwnedLinks = dependencies.verifyOwnedLinks ?? (async (userId: string, domain: string, requested: ExportableRedirect[]) => {
+    const sourceUrls = [...new Set(requested.map(link => link.cited_url))];
+    const { data, error } = await createServerDatabase().from("broken_links")
+      .select("cited_url,http_status,suggested_redirect,approval_status,audits!inner(user_id,domain)")
+      .in("cited_url", sourceUrls).eq("audits.user_id", userId).eq("audits.domain", domain);
+    if (error) throw error;
+    const owned = new Map((data ?? []).map(link => [link.cited_url, link]));
+    return requested.flatMap(link => {
+      const saved = owned.get(link.cited_url);
+      if (!saved || saved.http_status !== link.http_status || saved.suggested_redirect !== link.suggested_redirect || saved.approval_status !== link.approval_status) return [];
+      return [{ cited_url: saved.cited_url, http_status: saved.http_status, suggested_redirect: saved.suggested_redirect, approval_status: saved.approval_status }];
+    });
+  });
   return async function POST(request: Request) {
     if (!isConfigured()) {
       return Response.json({ error: "Sign-in is not configured." }, { status: 503 });
@@ -51,10 +66,16 @@ export function createRedirectExportHandler(dependencies: ExportDependencies = {
       return Response.json({ error: "Invalid export data." }, { status: 400 });
     }
     const links = data.links as unknown[];
-    if (!links.every((link) => link && typeof link === "object" && typeof (link as ExportableRedirect).cited_url === "string" && typeof (link as ExportableRedirect).http_status === "number" && (typeof (link as ExportableRedirect).suggested_redirect === "string" || (link as ExportableRedirect).suggested_redirect === null))) {
+    if (!links.every((link) => link && typeof link === "object" && typeof (link as ExportableRedirect).cited_url === "string" && typeof (link as ExportableRedirect).http_status === "number" && (typeof (link as ExportableRedirect).suggested_redirect === "string" || (link as ExportableRedirect).suggested_redirect === null) && typeof (link as ExportableRedirect).approval_status === "string")) {
       return Response.json({ error: "Invalid export data." }, { status: 400 });
     }
-    const validLinks = links as ExportableRedirect[];
+    const requested = links as ExportableRedirect[];
+    const approvalCandidates = requested.filter(link => link.http_status === 404 && !!link.suggested_redirect && ["approved", "deployed"].includes(link.approval_status));
+    if (!approvalCandidates.length) return Response.json({ error: "No human-approved redirect is available to export." }, { status: 422 });
+    let validLinks: ExportableRedirect[];
+    try {
+      validLinks = await verifyOwnedLinks(userId, data.domain, approvalCandidates);
+    } catch { return Response.json({ error: "Could not verify saved redirect approvals." }, { status: 503 }); }
     const htaccess = buildRedirectExport(data.domain, validLinks, "htaccess");
     if (!htaccess.includes("\nRedirect 301 ")) return Response.json({ error: "No verified redirect is available to export." }, { status: 422 });
     const content = data.single

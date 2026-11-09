@@ -10,7 +10,7 @@ export async function getPublicAudit(id: string) {
   const db = createServerDatabase();
   const { data, error } = await db
     .from("audits")
-    .select("id,domain,status,created_at,share_of_model_score,engine_matrix_json,agency_brand_name,agency_logo_url,agency_primary_color,agency_cta_text,agency_cta_url,broken_links(id,cited_url,http_status,suggested_redirect)")
+    .select("id,domain,status,created_at,share_of_model_score,engine_matrix_json,agency_brand_name,agency_logo_url,agency_primary_color,agency_cta_text,agency_cta_url,broken_links(id,cited_url,http_status,suggested_redirect,approval_status)")
     .eq("id", id)
     .in("status", ["completed", "partial", "mock_completed"])
     .maybeSingle();

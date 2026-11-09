@@ -5,7 +5,7 @@ import { createRedirectExportHandler } from "../lib/redirect-export-handler";
 import type { runAudit } from "../lib/audit-pipeline";
 
 const auditBody = { domain: "example.com", buyerPrompt: "Find documentation" };
-const exportBody = { domain: "example.com", format: "htaccess", links: [{ cited_url: "https://example.com/old", http_status: 404, suggested_redirect: "https://example.com/new" }] };
+const exportBody = { domain: "example.com", format: "htaccess", links: [{ cited_url: "https://example.com/old", http_status: 404, suggested_redirect: "https://example.com/new", approval_status: "approved" }] };
 const request = (url: string, body: unknown) => new Request(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 const authenticated = { isConfigured: () => true, getUserId: async () => "user_123" };
 const fakeReport = { persistence: { status: "saved" } } as Awaited<ReturnType<typeof runAudit>>;
@@ -56,8 +56,10 @@ test("redirect export requires an authenticated Pro subscription even for direct
   assert.equal((await free(request("http://localhost/api/redirect-export", exportBody))).status, 403);
   const unavailable = createRedirectExportHandler({ ...authenticated, hasPro: async () => { throw new Error("offline"); } });
   assert.equal((await unavailable(request("http://localhost/api/redirect-export", exportBody))).status, 503);
-  const pro = createRedirectExportHandler({ ...authenticated, hasPro: async () => true });
+  const pro = createRedirectExportHandler({ ...authenticated, hasPro: async () => true, verifyOwnedLinks: async (_userId, _domain, links) => links });
   const response = await pro(request("http://localhost/api/redirect-export", exportBody));
   assert.equal(response.status, 200);
   assert.match((await response.json()).content, /Redirect 301/);
+  const forged = createRedirectExportHandler({ ...authenticated, hasPro: async () => true, verifyOwnedLinks: async () => [] });
+  assert.equal((await forged(request("http://localhost/api/redirect-export", exportBody))).status, 422);
 });

@@ -47,12 +47,19 @@ test("scores prospects against the complete 100 point rubric and enforces hard g
   assert.equal(risky.score, 90); assert.equal(risky.eligible, false);
 });
 
-test("email factuality requires sourced, quote-linked verified observations", () => {
-  const email = generateEvidenceBackedEmail({ companyName: "Acme", contactName: "Jane Doe", domain: "acme.example", email: "jane@acme.example", appOrigin: "https://citemend.example", tokenSecret: "test-secret", evidence: [{ claim: "HTTP verification found 404 for the cited URL.", sourceUrl: "https://acme.example/article", quote: "https://acme.example/old", kind: "404" }] });
+test("outreach uses one verified example and waits for founder review", () => {
+  const example = { deadUrl: "https://acme.example/old-product", status: 404 as const, detectedAt: "2026-11-09T10:00:00.000Z", referrerUrl: "https://publisher.example/best-tools", referrerContext: "Acme is listed in the category guide.", replacementUrl: "https://acme.example/products/current", replacementReason: "Same product family and use case; destination returned HTTP 200." };
+  const email = generateEvidenceBackedEmail({ companyName: "Acme", contactName: "Jane Doe", domain: "acme.example", email: "jane@acme.example", appOrigin: "https://citemend.example", tokenSecret: "test-secret", evidence: [example] });
   assert.ok(email); assert.equal(validateFactualityReport(email.factualityReport), true);
   assert.match(email.text, /\/report\/acme\.example/);
   assert.match(email.text, /\/api\/outreach\/unsubscribe\?token=/);
-  assert.equal(validateFactualityReport({ ...email!.factualityReport, claims: [{ claim: "Unsupported", sourceUrl: "javascript:alert(1)", quote: "", kind: "404" }] }), false);
+  assert.match(email.text, /Observed HTTP status: 404/);
+  assert.match(email.text, /Detection date: 2026-11-09/);
+  assert.match(email.text, /Suggested live replacement: https:\/\/acme\.example\/products\/current/);
+  assert.match(email.text, /Would you like me to share the full self-serve report/);
+  assert.equal(email.factualityReport.approvalStatus, "pending_founder_review");
+  assert.equal(generateEvidenceBackedEmail({ companyName: "Acme", domain: "acme.example", email: "jane@acme.example", appOrigin: "https://citemend.example", tokenSecret: "test-secret", evidence: [{ ...example, replacementUrl: null, replacementReason: null }] }), null);
+  assert.equal(generateEvidenceBackedEmail({ companyName: "Acme", domain: "acme.example", email: "jane@acme.example", appOrigin: "https://citemend.example", tokenSecret: "test-secret", evidence: [example, example] }), null);
 });
 
 test("unsubscribe token round trips, rejects tampering, and webhook signature rejects replay or altered body", () => {

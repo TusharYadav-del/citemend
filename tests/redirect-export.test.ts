@@ -3,13 +3,14 @@ import { test } from "node:test";
 import { buildRedirectExport } from "../lib/redirect-export";
 
 const links = [
-  { cited_url: "https://example.com/old-page?source=ai", http_status: 404, suggested_redirect: "https://example.com/new-page" },
-  { cited_url: "https://example.com/unfixed", http_status: 404, suggested_redirect: null },
-  { cited_url: "https://example.com/working", http_status: 200, suggested_redirect: "https://example.com/should-not-include" },
-  { cited_url: "https://example.com/external", http_status: 404, suggested_redirect: "https://attacker.example/landing" },
+  { cited_url: "https://example.com/old-page?source=ai", http_status: 404, suggested_redirect: "https://example.com/new-page", approval_status: "approved" },
+  { cited_url: "https://example.com/unfixed", http_status: 404, suggested_redirect: null, approval_status: "pending_review" },
+  { cited_url: "https://example.com/working", http_status: 200, suggested_redirect: "https://example.com/should-not-include", approval_status: "approved" },
+  { cited_url: "https://example.com/external", http_status: 404, suggested_redirect: "https://attacker.example/landing", approval_status: "approved" },
+  { cited_url: "https://example.com/not-approved", http_status: 404, suggested_redirect: "https://example.com/candidate", approval_status: "pending_review" },
 ];
 
-test("exports only confirmed 404s with verified same-domain destinations in htaccess format", () => {
+test("exports only explicitly approved confirmed 404s with same-domain destinations in htaccess format", () => {
   assert.equal(buildRedirectExport("example.com", links, "htaccess"), [
     "# 301 redirects for example.com",
     'Redirect 301 "/old-page" "https://example.com/new-page"',
@@ -30,7 +31,7 @@ test("creates Shopify import CSV with path redirects and escaped cells", () => {
 });
 
 test("returns an empty format-specific export when no safe redirects exist", () => {
-  const unsafe = [{ ...links[0], suggested_redirect: "https://attacker.example/landing" }];
+  const unsafe = [{ ...links[0], suggested_redirect: "https://attacker.example/landing" }, { ...links[0], approval_status: "pending_review" }];
   assert.equal(buildRedirectExport("example.com", unsafe, "vercel"), '{\n  "redirects": []\n}');
   assert.equal(buildRedirectExport("example.com", unsafe, "shopify"), '"Redirect from","Redirect to"');
   assert.equal(buildRedirectExport("example.com", unsafe, "htaccess"), "# 301 redirects for example.com");

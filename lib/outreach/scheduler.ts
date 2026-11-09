@@ -7,7 +7,6 @@ import { scoreProspect } from "./qualification";
 import { isSuppressed } from "./suppression";
 import { checkOutreachCompliance } from "./compliance";
 import { generateEvidenceBackedEmail, validateFactualityReport } from "./email-generation";
-import { sendOutreachEmail } from "./sending";
 
 const db = () => createServerDatabase();
 const dateKey = () => new Date().toISOString().slice(0, 10);
@@ -19,7 +18,8 @@ export async function runDailyOutreach() {
   if (claimError) throw new Error("Could not acquire the daily outreach run lock.");
   const run = Array.isArray(claim) ? claim[0] : claim;
   if (!run?.claimed) return { status: "duplicate", runId: run?.run_id ?? null };
-  let discovered = 0, researched = 0, qualified = 0, emailsSent = 0, errors = 0;
+  let discovered = 0, researched = 0, qualified = 0, errors = 0;
+  const emailsSent = 0;
   try {
     const { data: settings, error: settingsError } = await database.from("outreach_settings").select("*").eq("id", 1).single();
     if (settingsError) throw new Error("Outreach settings are unavailable.");
@@ -51,26 +51,14 @@ export async function runDailyOutreach() {
         const email = contactCheck.normalized;
         if (await isSuppressed(database, email)) { await database.from("outreach_prospects").update({ status: "suppressed" }).eq("id", saved.id); continue; }
         const appOrigin = (process.env.NEXT_PUBLIC_APP_URL || "https://citemend.com").replace(/\/$/, "");
-        const evidence = research.citationEvidence.filter(item => item.state === "404" || item.state === "410").flatMap(item => [
-          { claim: `The generated ${research.answerProvider ?? "research"} answer for ${prospect.companyName} included this URL.`, sourceUrl: `${appOrigin}/report/${encodeURIComponent(prospect.domain)}`, quote: item.url, kind: item.state },
-          { claim: `HTTP verification found ${item.state} for the cited URL.`, sourceUrl: item.url, quote: item.url, kind: item.state },
-        ]);
+        const firstVerifiedDead = research.citationEvidence.find(item => item.state === "404" || item.state === "410");
+        const evidence = firstVerifiedDead ? [{ deadUrl: firstVerifiedDead.url, status: firstVerifiedDead.state === "404" ? 404 as const : 410 as const, detectedAt: new Date().toISOString(), referrerUrl: firstVerifiedDead.sourceUrl, referrerContext: firstVerifiedDead.excerpt, replacementUrl: null, replacementReason: null }] : [];
         const message = generateEvidenceBackedEmail({ companyName: prospect.companyName, contactName: prospect.contact?.name, domain: prospect.domain, evidence, email, appOrigin });
         if (!message || !validateFactualityReport(message.factualityReport)) continue;
         const compliance = checkOutreachCompliance({ publicContact: true, contactSourceUrl: prospect.contact?.sourceUrl ?? null, emailStatus: contactCheck.status, score: qualification.score, minimumScore: settings.min_qualification_score, suppressed: false, reportExists: true, factualityPassed: message.factualityReport.passed, unsubscribeToken: message.text.match(/unsubscribe here: (\S+)/)?.[1] ?? "", country: prospect.country });
         if (!compliance.eligible || !settingEnabled(settings) || campaign.data?.status !== "active") continue;
-        const reserved = await database.rpc("outreach_reserve_daily_send", { p_run_date: runDate, p_limit: settings.daily_send_limit });
-        if (reserved.error || reserved.data !== true) break;
-        const { data: savedEmail, error: emailSaveError } = await database.from("outreach_emails").insert({ prospect_id: saved.id, contact_id: contactId, campaign_id: campaign.data?.id ?? null, recipient: email, subject: message.subject, body_text: message.text, body_html: message.html, factuality_report: message.factualityReport, status: "queued" }).select("id").single();
-        if (emailSaveError || !savedEmail) throw emailSaveError ?? new Error("Email draft persistence failed.");
-        try {
-          const sender = process.env.OUTREACH_FROM_EMAIL?.trim() || process.env.EMAIL_FROM?.trim() || process.env.RESEND_FROM_EMAIL?.trim();
-          if (!sender) throw new Error("Configure OUTREACH_FROM_EMAIL before sending.");
-          const delivery = await sendOutreachEmail({ idempotencyKey: savedEmail.id, to: email, from: sender, message });
-          await database.from("outreach_emails").update({ provider: delivery.provider, provider_message_id: delivery.messageId, status: "sent", sent_at: new Date().toISOString() }).eq("id", savedEmail.id);
-          await database.from("outreach_events").insert({ email_id: savedEmail.id, prospect_id: saved.id, event_type: "sent", payload: { provider: delivery.provider } });
-          await database.from("outreach_prospects").update({ status: "sent" }).eq("id", saved.id); emailsSent++;
-        } catch (error) { await database.from("outreach_emails").update({ status: "failed" }).eq("id", savedEmail.id); throw error; }
+        const { error: emailSaveError } = await database.from("outreach_emails").insert({ prospect_id: saved.id, contact_id: contactId, campaign_id: campaign.data?.id ?? null, recipient: email, subject: message.subject, body_text: message.text, body_html: message.html, factuality_report: message.factualityReport, status: "pending_review" });
+        if (emailSaveError) throw emailSaveError;
       } catch { errors++; }
     }
     await database.from("outreach_daily_runs").update({ status: "completed", finished_at: new Date().toISOString(), discovered, researched, qualified, emails_sent: emailsSent, errors, telemetry: { target: settings.daily_target, sendLimit: settings.daily_send_limit, outreachEnabled: settingEnabled(settings) } }).eq("id", run.run_id);

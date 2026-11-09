@@ -17,7 +17,10 @@ async function getReport(value: string) {
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { domain } = await params; const report = await getReport(domain);
   if (!report) return { title: "Citation report unavailable | CiteMend", robots: { index: false, follow: false } };
-  return { title: `${report.prospect.company_name} citation report | CiteMend`, description: `Verified cited URL destination checks for ${report.prospect.company_name}.`, alternates: { canonical: `/report/${encodeURIComponent(report.prospect.domain)}` } };
+  const title = `${report.prospect.company_name} citation report | CiteMend`;
+  const description = `Verified cited URL destination checks for ${report.prospect.company_name}.`;
+  const url = `/report/${encodeURIComponent(report.prospect.domain)}`;
+  return { title, description, alternates: { canonical: url }, openGraph: { type: "article", title, description, url }, twitter: { card: "summary", title, description } };
 }
 export default async function PublicCitationReport({ params }: Params) {
   const { domain } = await params; const report = await getReport(domain); if (!report) notFound();

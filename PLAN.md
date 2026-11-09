@@ -1006,3 +1006,17 @@ The user confirmed the real signing secret is configured in `.env.local` and Ver
 - [x] Verify `npx tsc --noEmit`, `npm run lint` (zero errors; two pre-existing `app/layout.tsx` warnings), `npm test` (292 passed), and optimized `npm run build` with an isolated build directory.
 
 Repository implementation and local automated QA are complete. The user reported applying migration 036 to hosted Supabase; its hosted state was not independently queried. No live purchase or hosted webhook delivery was performed during this code task, so production payment activation remains an external smoke test. The two currently advertised paid tiers are Starter ($49/month) and Agency ($249/month); the user supplied distinct variant IDs and confirmed they are configured in `.env.local` and Vercel. Vercel configuration was not independently queried.
+
+## Day 368: Public SEO, Safe Redirect QA, Retention Metrics & Compliant Outreach (COMPLETED)
+
+- [x] Add explicit robots permissions for Googlebot, OAI-SearchBot, PerplexityBot, and ClaudeBot; include the public homepage, pricing/legal pages, dynamic public reports, and completed shareable audit reports in the sitemap.
+- [x] Add server-rendered OpenGraph/Twitter metadata and SoftwareApplication JSON-LD; generate per-report metadata for public audit and citation reports without Clerk gating.
+- [x] Classify dead URLs as high-intent recoverable, leave-as-404/410, or redirect-risk-detected; surface the classification in Recovery Center and count logged redirect safety rejections in the dashboard value summary.
+- [x] Require a server-side owner and approval-state recheck before exporting redirects; only approved/deployed same-domain mappings are emitted. Weekly digest rules follow the same approval check.
+- [x] Add the four-metric Monthly Recovery & QA Value Summary to the dashboard and scheduled email reports, with recovered visits measured, orders/leads disclosed as uninstrumented, and engineering time labeled as an estimate.
+- [x] Add the $49 first-month 30-day paid recovery pilot entry point alongside recurring Starter and Agency monitoring prices.
+- [x] Restrict outreach templates to one exact verified dead-URL example with status, detection date, referrer, same-domain replacement/reason, permission-based report CTA, and one-click opt-out; daily outreach saves review-only drafts and does not send automatically.
+- [x] Add regression tests for recovery classification and the one-example outreach format; pass TypeScript and all 293 unit tests.
+- [x] Verify lint (0 errors; two existing font-config warnings) and optimized production build. The standard build directory has a pre-existing corrupt Turbopack persistence store, so the final successful build used `CITEMEND_BUILD_DIR=.next-day368-build-verified`.
+
+Previous days remain unchanged. Paid pilot checkout currently uses the configured Starter subscription variant: $49 for the first month and $49/month thereafter unless cancelled. Order and lead attribution is not connected; estimated hours saved is labeled as a planning estimate. Semantic and commercial equivalence is only counted when both are explicitly recorded in evidence.

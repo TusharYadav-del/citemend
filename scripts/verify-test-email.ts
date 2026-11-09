@@ -9,7 +9,7 @@ async function main() {
   const from = process.env.RESEND_FROM_EMAIL?.trim();
   if (!key || !from) throw new Error("Configure the Resend API key and sender first.");
   const resend = new Resend(key);
-  const message = renderWeeklyDigest([{ domain: "example.com", cited_url: "https://example.com/old", suggested_redirect: "https://example.com/new", audit_id: "00000000-0000-4000-8000-000000000020" }]);
+  const message = renderWeeklyDigest([{ domain: "example.com", cited_url: "https://example.com/old", suggested_redirect: "https://example.com/new", approval_status: "pending_review", audit_id: "00000000-0000-4000-8000-000000000020" }]);
   const { data, error } = await resend.emails.send({
     from, to: "delivered@resend.dev", subject: `[TEST] ${message.subject}`,
     html: message.html, text: message.text,

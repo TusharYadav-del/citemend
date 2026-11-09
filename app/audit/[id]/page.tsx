@@ -12,11 +12,17 @@ import { ENGINE_PROFILES, compareCategoryCitationRanks, describeEngineStatus, ha
 import PrintReportButton from "@/components/print-report-button";
 import { AgencyReportBrand, AgencyReportCTA } from "@/components/agency-report-brand";
 
-export const metadata: Metadata = {
-  title: "Citation audit report | Citemend AI",
-  description: "A shareable report of saved broken AI citations and suggested redirects.",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  try {
+    const audit = await getPublicAudit(id);
+    if (!audit) return { title: "Citation report unavailable | CiteMend", robots: { index: false, follow: false } };
+    const title = `${audit.domain} citation recovery report | CiteMend`;
+    const description = `Saved audit with ${audit.broken_links.length} verified HTTP 404 citation${audit.broken_links.length === 1 ? "" : "s"} and reviewed recovery context.`;
+    const url = `/audit/${audit.id}`;
+    return { title, description, alternates: { canonical: url }, openGraph: { type: "article", title, description, url }, twitter: { card: "summary", title, description } };
+  } catch { return { title: "Citation report | CiteMend", description: "A public snapshot of verified citation recovery evidence." }; }
+}
 
 async function AuditReport({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ whitelabel?: string | string[]; print?: string | string[] }> }) {
   await connection();

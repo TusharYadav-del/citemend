@@ -77,6 +77,18 @@ function MetricCards({ audits, rescued, deployments, citations, activeWorkspaces
   return <><section aria-label="Live telemetry" className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map((card) => <MetricCard key={card.label} label={card.label} value={typeof card.value === "number" ? card.value.toLocaleString() : card.value} detail={card.detail} icon={card.icon} />)}</section><section aria-label="Verified AI Search Recoveries per Active Workspace" className="mb-6 rounded-2xl border border-white/10 bg-white/[0.03] p-5"><h2 className="text-sm font-semibold text-white">Verified AI Search Recoveries per Active Workspace</h2><p className="mt-1 text-xs text-slate-400">Evidence milestones shown separately; an HTTP deployment does not imply an AI citation.</p><div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><MetricCard label="Recoveries / Active Workspace" value={northStar} detail={`${activeWorkspaces} owned domain${activeWorkspaces === 1 ? "" : "s"}; technical deployments divided by workspaces`} /><MetricCard label="Technical Deployments Verified" value={deployments === null ? "—" : deployments.toLocaleString()} detail="Production redirect and destination checks passed" /><MetricCard label="Subsequent AI Citations Observed" value={citations === null ? "—" : citations.toLocaleString()} detail="A later saved observation cited the canonical URL" /><MetricCard label="Rescued Pixel Visits (30D)" value={rescued === null ? "—" : rescued.toLocaleString()} detail="Live rescue telemetry; $15/click pipeline is an estimate" /></div></section></>;
 }
 
+function MonthlyRecoveryValueSummary({ highIntent, recoveredVisits, prevented, hoursSaved }: { highIntent: number; recoveredVisits: number | null; prevented: number; hoursSaved: number }) {
+  return <section aria-label="Monthly Recovery and QA Value Summary" className="mb-6 rounded-2xl border border-emerald-300/20 bg-emerald-300/[.04] p-5">
+    <div><h2 className="text-base font-semibold text-white">Monthly Recovery &amp; QA Value Summary</h2><p className="mt-1 text-xs text-slate-400">Last 30 days · measured events are separated from estimates.</p></div>
+    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <MetricCard label="New Verified High-Intent Dead URLs Caught" value={highIntent.toLocaleString()} detail="Only findings with recorded semantic + commercial match evidence qualify." />
+      <MetricCard label="Estimated Visits / Orders / Leads Recovered" value={recoveredVisits === null ? "Unavailable" : recoveredVisits.toLocaleString()} detail="Verified recovered visits; order and lead attribution is not connected." />
+      <MetricCard label="Soft-404s, Loops & Bad Redirects Prevented" value={prevented.toLocaleString()} detail="Logged redirect conflict and safety rejections; not inferred from all 404s." />
+      <MetricCard label="Engineering / SEO Hours Saved" value={`~${hoursSaved.toLocaleString()}h`} detail="Estimate at 30 minutes per verified high-intent finding; replace with team time tracking when available." />
+    </div>
+  </section>;
+}
+
 function HistoryUnavailable() {
   return <div className="m-6"><AlertBanner tone="danger" title="We couldn't load this workspace"><p>Your saved audits are temporarily unavailable. Try again in a moment.</p><RetryButton /></AlertBanner></div>;
 }
@@ -232,6 +244,12 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
       <OnboardingChecklist progress={onboarding} />
       <AuditTemplates />
       <MetricCards audits={audits} rescued={access.organizationId?null:rescued} deployments={deploymentCount} citations={citationCount} activeWorkspaces={new Set(audits.map(audit => audit.domain)).size} />
+      <MonthlyRecoveryValueSummary
+        highIntent={recoveryRows.filter(link => link.http_status === 404 && link.suggested_redirect && (link.match_confidence ?? 0) >= 85 && /semantic.*commercial|commercial.*semantic/i.test(link.match_evidence_reason ?? "") && Date.now() - Date.parse(link.auditCreatedAt) <= 30 * 86400000).length}
+        recoveredVisits={rescued}
+        prevented={actionLogs.filter(log => log.action_type === "redirect_conflict_rejection" && Date.now() - Date.parse(log.created_at) <= 30 * 86400000).length}
+        hoursSaved={Math.round(recoveryRows.filter(link => link.http_status === 404 && link.suggested_redirect && (link.match_confidence ?? 0) >= 85 && /semantic.*commercial|commercial.*semantic/i.test(link.match_evidence_reason ?? "") && Date.now() - Date.parse(link.auditCreatedAt) <= 30 * 86400000).length * 0.5 * 10) / 10}
+      />
       <Suspense fallback={<OperatingMetricsSkeleton />}><WorkspaceOperatingMetrics domain={selectedDomain || allDomains[0] || ""} ownerUserIds={ownerIds} actorUserIds={[...new Set([...ownerIds, userId])]} organizationId={access.organizationId} /></Suspense>
       {latestReport && <section aria-label="Quick tools" className="mb-6 rounded-xl border border-white/10 bg-white/[0.03] p-4"><h2 className="text-sm font-semibold text-white">Quick Tools</h2><a href={`/audit/${latestReport.id}?print=1`} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg border border-emerald-400/30 px-3 py-2 text-xs font-semibold text-emerald-300">Export Report / Save as PDF</a><p className="mt-2 text-xs text-slate-500">Opens the latest report for {latestReport.domain}.</p></section>}
       {access.organizationId===null&&<AuditAnalysisTools auditId={latestReport?.id} />}

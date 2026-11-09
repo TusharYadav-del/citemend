@@ -389,8 +389,8 @@ test("failed queue initialization releases its lease for a later retry", async (
 
 test("weekly digest renders escaped 404 details and only verified same-domain 301 rules", () => {
   const message = renderWeeklyDigest([
-    { domain: "example.com", cited_url: "https://example.com/old?x=<script>", suggested_redirect: "https://example.com/new", audit_id: "audit-1" },
-    { domain: "example.com", cited_url: "https://example.com/missing", suggested_redirect: "https://attacker.test/steal", audit_id: "audit-1" },
+    { domain: "example.com", cited_url: "https://example.com/old?x=<script>", suggested_redirect: "https://example.com/new", approval_status: "approved", audit_id: "audit-1" },
+    { domain: "example.com", cited_url: "https://example.com/missing", suggested_redirect: "https://attacker.test/steal", approval_status: "pending_review", audit_id: "audit-1" },
   ], "https://citemend.vercel.app");
   assert.match(message.html, /&lt;script&gt;/);
   assert.doesNotMatch(message.html, /<script>/);
@@ -408,7 +408,7 @@ test("a completed weekly scan sends one account digest and records its provider 
   store.prepareDigests = async () => { prepared++; };
   store.digestCandidates = async () => sent ? [] : [digest];
   store.claimDigest = async (candidate) => ({ ...candidate, status: "sending", lease_token: "lease" });
-  store.digestLinks = async () => [{ domain: "example.com", cited_url: "https://example.com/old", suggested_redirect: "https://example.com/new", audit_id: "audit-1" }];
+  store.digestLinks = async () => [{ domain: "example.com", cited_url: "https://example.com/old", suggested_redirect: "https://example.com/new", approval_status: "pending_review", audit_id: "audit-1" }];
   store.finishDigest = async (_digest, status, messageId) => { states.push(`${status}:${messageId}`); if (status === "sent") sent++; };
   const handler = createWeeklyScanHandler({ secret: () => "secret", store: () => store, now: () => now, hasPro: async () => true, sendDigest: async (userId, digestId, links) => {
     assert.equal(userId, "pro-user"); assert.equal(digestId, digest.id); assert.equal(links.length, 1); return "resend-id";
@@ -431,7 +431,7 @@ test("weekly digest skips unchanged links and retries provider failures", async 
   const handler = createWeeklyScanHandler({ secret: () => "secret", store: () => store, hasPro: async () => true, sendDigest: async () => { sends++; throw new Error("down"); } });
   assert.equal((await handler(request("secret", "drain"))).status, 200);
   assert.deepEqual(states, ["skipped"]);
-  store.digestLinks = async () => [{ domain: "example.com", cited_url: "https://example.com/new", suggested_redirect: null, audit_id: "audit-1" }];
+  store.digestLinks = async () => [{ domain: "example.com", cited_url: "https://example.com/new", suggested_redirect: null, approval_status: "pending_review", audit_id: "audit-1" }];
   assert.equal((await handler(request("secret", "drain"))).status, 200);
   assert.deepEqual(states, ["skipped", "pending"]);
   assert.equal(sends, 1);
@@ -450,9 +450,9 @@ test("digest comparison includes only newly confirmed 404s since the preceding a
     }
     if (url.pathname.endsWith("/broken_links")) return Response.json([
       { cited_url: "https://example.com/known", http_status: 404, suggested_redirect: null },
-      { cited_url: "https://example.com/new", http_status: 404, suggested_redirect: "https://example.com/fix" },
+      { cited_url: "https://example.com/new", http_status: 404, suggested_redirect: "https://example.com/fix", approval_status: "pending_review" },
     ]);
     throw new Error("Unexpected database request");
   };
-  assert.deepEqual(await new WeeklyScanStore().digestLinks(digest), [{ domain: "example.com", audit_id: "audit-new", cited_url: "https://example.com/new", suggested_redirect: "https://example.com/fix" }]);
+  assert.deepEqual(await new WeeklyScanStore().digestLinks(digest), [{ domain: "example.com", audit_id: "audit-new", cited_url: "https://example.com/new", suggested_redirect: "https://example.com/fix", approval_status: "pending_review" }]);
 });

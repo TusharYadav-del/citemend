@@ -16,7 +16,7 @@ export default function CopyRedirects({
   links,
 }: {
   domain: string;
-  links: { cited_url: string; http_status: number; suggested_redirect: string | null }[];
+  links: { cited_url: string; http_status: number; suggested_redirect: string | null; approval_status: string }[];
 }) {
   const [format, setFormat] = useState<RedirectExportFormat>("htaccess");
   const [message, setMessage] = useState("");
@@ -63,7 +63,7 @@ export default function CopyRedirects({
         </button>
       </div>
       <p role="status" aria-live="polite" className="mt-3 min-h-5 text-xs text-emerald-300">{message}</p>
-      <p className="text-xs leading-5 text-slate-400">One-click export is included with Pro. Exports include only saved HTTP 404 links with verified replacement URLs on this domain.</p>
+      <p className="text-xs leading-5 text-slate-400">One-click export is included with Pro. Only human-approved or deployed HTTP 404 mappings with same-domain destinations can be exported.</p>
       {upgrade && <UpgradeModal signedIn={upgrade === "signed-in"} onClose={() => setUpgrade(null)} />}
     </div>
   );

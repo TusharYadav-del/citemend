@@ -29,10 +29,17 @@ async function send(request: Request) {
       continue;
     }
     const audit = await db.from("audits").select("id,status,created_at").eq("user_id", item.user_id).eq("domain", item.workspace_domain).order("created_at", { ascending: false }).limit(1).maybeSingle();
-    const links = audit.data ? await db.from("broken_links").select("id,http_status,cited_url,suggested_redirect").eq("audit_id", audit.data.id).limit(100) : { data: [], error: null };
+    const links = audit.data ? await db.from("broken_links").select("id,http_status,cited_url,suggested_redirect,match_confidence,match_evidence_reason").eq("audit_id", audit.data.id).limit(100) : { data: [], error: null };
     const observations = audit.data ? await db.from("ai_observation_evidence").select("id").eq("audit_id", audit.data.id).limit(500) : { data: [], error: null };
+    const since30d = new Date(Date.now() - 30 * 86400000).toISOString();
+    const rescued = await db.from("rescued_ai_visits").select("id", { count: "exact", head: true }).eq("domain", item.workspace_domain).gte("created_at", since30d);
+    const broken = (links.data ?? []).filter(link => link.http_status === 404 || link.http_status === 410);
+    const highIntent = broken.filter(link => !!link.suggested_redirect && (link.match_confidence ?? 0) >= 85 && /semantic.*commercial|commercial.*semantic/i.test(link.match_evidence_reason ?? "")).length;
+    const safetyRejections = await db.from("action_audit_logs").select("id", { count: "exact", head: true }).eq("workspace_domain", item.workspace_domain).eq("action_type", "redirect_conflict_rejection").gte("created_at", since30d);
+    const recoveredVisits = rescued.error ? "unavailable" : String(rescued.count ?? 0);
+    const prevented = safetyRejections.error ? "unavailable" : String(safetyRejections.count ?? 0);
     const subject = `CiteMend ${item.report_type.replaceAll("_", " ")} · ${item.workspace_domain}`;
-    const text = `Workspace: ${item.workspace_domain}\nLatest audit: ${audit.data?.status ?? "No saved audit"}\nConfirmed broken citations in latest audit: ${links.data?.filter(link => link.http_status === 404).length ?? 0}\nRecorded AI observations: ${observations.data?.length ?? 0}\n\nView the dashboard for full evidence and recovery controls.`;
+    const text = `Monthly Recovery & QA Value Summary · ${item.workspace_domain}\nNew verified high-intent dead URLs caught: ${highIntent} (requires recorded semantic and commercial match evidence)\nEstimated visits / orders / leads recovered: ${recoveredVisits} verified recovered visits in the last 30 days; order and lead attribution is not connected\nSoft-404s, loops & bad redirects prevented: ${prevented} logged redirect safety rejections in the last 30 days\nEngineering / SEO hours saved: ~${(highIntent * 0.5).toFixed(1)} estimated hours (30-minute planning assumption, not time-tracked)\n\nLatest audit: ${audit.data?.status ?? "No saved audit"}\nConfirmed broken citations in latest audit: ${broken.filter(link => link.http_status === 404).length}\nRecorded AI observations: ${observations.data?.length ?? 0}\n\nView the dashboard for full evidence and recovery controls.`;
     try {
       const recurrence = item.recurrence_interval ?? "one_time";
       const nextScheduleAt = nextScheduledReportAt(item.schedule_at, recurrence);

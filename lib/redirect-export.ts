@@ -2,6 +2,7 @@ export type ExportableRedirect = {
   cited_url: string;
   http_status: number;
   suggested_redirect: string | null;
+  approval_status: string;
 };
 
 export type RedirectExportFormat = "htaccess" | "vercel" | "shopify";
@@ -27,7 +28,7 @@ export function buildRedirectExport(
   format: RedirectExportFormat,
 ): string {
   const redirects = links.flatMap((link) => {
-    if (link.http_status !== 404 || !link.suggested_redirect) return [];
+    if (link.http_status !== 404 || !link.suggested_redirect || !["approved", "deployed"].includes(link.approval_status)) return [];
     const source = safeUrl(link.cited_url, domain);
     const destination = safeUrl(link.suggested_redirect, domain);
     return source && destination ? [{ source, destination }] : [];

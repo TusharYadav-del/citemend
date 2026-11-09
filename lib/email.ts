@@ -5,7 +5,7 @@ import { sendEmail } from "./email-provider";
 export { sendFounderAlertEmail } from "./founder-alerts";
 export type { FounderEmailDelivery } from "./founder-alerts";
 
-export type DigestLink = { domain: string; cited_url: string; suggested_redirect: string | null; audit_id: string };
+export type DigestLink = { domain: string; cited_url: string; suggested_redirect: string | null; approval_status: string; audit_id: string };
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!);
@@ -15,7 +15,7 @@ export function renderWeeklyDigest(links: DigestLink[], appOrigin?: string): { s
   const origin = appOrigin && /^https:\/\/[^/]+$/i.test(appOrigin) ? appOrigin : undefined;
   const rows = links.map((link) => {
     const rule = link.suggested_redirect
-      ? buildRedirectExport(link.domain, [{ cited_url: link.cited_url, http_status: 404, suggested_redirect: link.suggested_redirect }], "htaccess").split("\n").slice(1).join("\n")
+      ? buildRedirectExport(link.domain, [{ cited_url: link.cited_url, http_status: 404, suggested_redirect: link.suggested_redirect, approval_status: link.approval_status }], "htaccess").split("\n").slice(1).join("\n")
       : "No verified replacement is available yet.";
     const reportUrl = origin ? `${origin}/audit/${encodeURIComponent(link.audit_id)}` : null;
     return { ...link, rule: rule || "No verified replacement is available yet.", reportUrl };

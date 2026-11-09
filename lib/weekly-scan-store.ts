@@ -245,11 +245,11 @@ export class WeeklyScanStore {
           .order("created_at", { ascending: false }).limit(1).maybeSingle();
         if (prior.error) throw new Error("Could not compare prior audit findings.");
         const previous = new Set((prior.data?.broken_links ?? []).map((link) => link.cited_url));
-        const current = await this.db.from("broken_links").select("cited_url,http_status,suggested_redirect")
+        const current = await this.db.from("broken_links").select("cited_url,http_status,suggested_redirect,approval_status")
           .eq("audit_id", job.audit_id).eq("http_status", 404);
         if (current.error) throw new Error("Could not read weekly 404 findings.");
         for (const link of current.data ?? []) {
-          if (!previous.has(link.cited_url)) links.push({ domain: job.domain, audit_id: job.audit_id, cited_url: link.cited_url, suggested_redirect: link.suggested_redirect });
+          if (!previous.has(link.cited_url)) links.push({ domain: job.domain, audit_id: job.audit_id, cited_url: link.cited_url, suggested_redirect: link.suggested_redirect, approval_status: link.approval_status });
         }
       }
       if (!jobs || jobs.length < PAGE_SIZE) break;
