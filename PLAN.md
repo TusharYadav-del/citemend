@@ -1077,4 +1077,14 @@ No new migration was required. Dodo billing and webhook checks use mocked signed
 - [x] Verify `npx tsc --noEmit`, `npm run lint` (zero errors; two pre-existing warnings in `app/layout.tsx`), `npm test` (310 passed), and optimized production build with `CITEMEND_BUILD_DIR=.next-s1-6-verified`.
 - [x] Require `DODO_PAYMENTS_ENABLED=true` in addition to Dodo keys/product IDs before checkout, portal, or webhook processing; the example defaults to `false` so billing remains off during the deferred live setup.
 
-Migration 040 still needs to be applied to hosted Supabase before signal aggregation and QA checks activate. Until then, the cron returns a successful skipped result and the pixel keeps its existing telemetry fallback. No Dodo API call, live payment, webhook registration, or external prospect email was performed. Next segment: S1.7 Agency Multi-Workspace Switcher & White-Label Monthly ROI Report Export.
+The user confirmed Migration 040 was successfully applied to hosted Supabase; recovery signal aggregation and the daily QA cron are ready to run. No Dodo API call, live payment, webhook registration, or external prospect email was performed.
+
+## CiteMend Year 1 Stage-1 Step 7: Agency Workspace Switching & Monthly ROI Report (COMPLETED IN CODE)
+
+- [x] Extend the existing domain selector with client-workspace language and add a monthly recovery report link for the selected domain.
+- [x] Add an authenticated, tenant-checked report page with client and calendar-month switching, domain-scoped recovery findings and redirected event counts, and the four monthly value metrics.
+- [x] Apply each saved agency profile to report branding, add print styling and browser Save as PDF flow, and disclose that order attribution is unavailable and hours saved are estimated.
+- [x] Add unit coverage for month boundaries, invalid/future month input, metric calculations, and null telemetry.
+- [x] Verify `npx tsc --noEmit`, lint with zero errors (two existing `app/layout.tsx` warnings), all 312 tests, and the optimized production build with `CITEMEND_BUILD_DIR=.next-s1-7-verified`.
+
+No new database migration is needed; S1.7 uses the existing workspace ownership, recovery findings, redirected telemetry, and agency branding tables. Next segment: S1.8 Self-Serve Diagnostic Preview & Manual 1-Verified-Example Outreach Workbench.

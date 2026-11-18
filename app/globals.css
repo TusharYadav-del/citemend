@@ -128,6 +128,13 @@ body { min-height: 100vh; overflow-x: hidden; background: var(--background); col
   .audit-report th, .audit-report td { padding: 6px; border: 1px solid #d2dad5; text-align: left; overflow-wrap: anywhere; vertical-align: top; }
   .audit-report a, .audit-report p, .audit-report h1, .audit-report h2 { overflow-wrap: anywhere; }
   .audit-report .report-cta { position: static !important; border: 1px solid #d2dad5; }
+  body:has(.roi-report), body:has(.roi-report) main, .roi-report, .roi-report * { color: #17211c !important; background: transparent !important; box-shadow: none !important; text-shadow: none !important; }
+  .roi-report { display: block !important; min-height: 0 !important; max-width: none !important; padding: 0 !important; }
+  .roi-report-content { width: 100% !important; max-width: none !important; }
+  .roi-report .print-hide, .roi-report button { display: none !important; }
+  .roi-report article, .roi-report section, .roi-report header, .roi-report footer { border-color: #d2dad5 !important; break-inside: avoid; }
+  .roi-report .report-cta { position: static !important; border: 1px solid #d2dad5; }
+  .roi-report h1, .roi-report h2 { color: #17211c !important; }
 }
 
 @media (prefers-reduced-motion: reduce) { .cm-audit-progress [data-slot="progress-indicator"]::after { animation: none; } }

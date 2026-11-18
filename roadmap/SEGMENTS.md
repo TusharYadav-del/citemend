@@ -10,8 +10,8 @@ Status Legend: `[DONE]` | `[NEXT]` | `[PENDING]` | `[LOCKED]`
 - **[S1.4] [DONE]** Dodo Payments Billing Migration (`dodopayments` SDK, $149 Pilot + $99 Growth + $249 Agency checkout, idempotent Standard Webhooks, customer portal, active Lemon Squeezy code removed; legacy records retained).
 - **[S1.5] [DONE]** Pre-Launch End-to-End QA Stress Test & Production Hardening (recovery scan-to-approval-to-deployment verification smoke test, Dodo webhook signature/idempotency integration test, controlled auth-unavailable responses, and isolated Turbopack build verification).
 - **[S1.6] [DONE]** Continuous High-Signal 404 & Referrer Event Ingestion API + Automated Redirect QA Cron (quota-limited, normalized event intake and daily DNS-pinned checks for deployed redirects, broken targets, chains, and loops; user-agent strings are never proof of AI traffic).
-- **[S1.7] [NEXT]** Agency Multi-Workspace Switcher & White-Label Monthly ROI Report Export (HTML/PDF-ready 4-metric monthly recovery report per client domain).
-- **[S1.8] [PENDING]** Self-Serve Diagnostic Preview & Manual "1-Verified-Example" Outreach Workbench (draft-first founder approval UI, domain deliverability checklist, suppression/opt-out ledger, gated behind `OUTBOUND_EMAILS_ENABLED`).
+- **[S1.7] [DONE]** Agency Multi-Workspace Switcher & White-Label Monthly ROI Report Export (client-domain selection and HTML/print-ready four-metric calendar-month report).
+- **[S1.8] [NEXT]** Self-Serve Diagnostic Preview & Manual "1-Verified-Example" Outreach Workbench (draft-first founder approval UI, domain deliverability checklist, suppression/opt-out ledger, gated behind `OUTBOUND_EMAILS_ENABLED`).
 
 ---
 ### VALIDATION GATE: Year 1 -> Year 2
