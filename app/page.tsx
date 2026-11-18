@@ -9,11 +9,21 @@ import { MarketingRecoveryPreview } from "@/components/marketing-recovery-previe
 import { SiteFooter } from "@/components/site-footer";
 
 export const metadata: Metadata = {
-  title: "CiteMend | Repair Broken AI Citations",
-  description: "Inspect broken AI citations, review relevant replacements, and verify approved redirects across content libraries and website migrations.",
-  openGraph: { type: "website", title: "CiteMend | Repair Broken AI Citations", description: "Inspect broken AI citations, review relevant replacements, and verify approved redirects." },
-  twitter: { card: "summary_large_image", title: "CiteMend | Repair Broken AI Citations", description: "Inspect broken AI citations and review verified recovery options." },
+  title: "CiteMend | Commerce Reliability & Revenue Infrastructure",
+  description: "Make every digital commerce interaction across Search, AI Assistants, and Autonomous Agents accurate, accessible, and measurable.",
+  alternates: { canonical: "/" },
+  openGraph: { type: "website", url: "/", title: "CiteMend | Commerce Reliability & Revenue Infrastructure", description: "Make every digital commerce interaction across Search, AI Assistants, and Autonomous Agents accurate, accessible, and measurable." },
+  twitter: { card: "summary_large_image", title: "CiteMend | Commerce Reliability & Revenue Infrastructure", description: "Make digital commerce interactions accurate, accessible, and measurable." },
 };
+
+const pillars = [
+  { number: "01", name: "CiteMend Recovery", stage: "LIVE CORE", icon: FileSearch, description: "Find high-intent broken URLs, map verified destinations with soft-404 guardrails, deploy approved redirects, and recover traffic." },
+  { number: "02", name: "CiteMend Intelligence", stage: "EARLY ACCESS", icon: ShieldCheck, description: "Detect outdated prices, inventory mismatches, and policy discrepancies." },
+  { number: "03", name: "CiteMend AI Analytics", stage: "INCLUDED IN RECOVERY", icon: Activity, description: "Measure AI assistant referrals, recovered sessions, and revenue attribution." },
+  { number: "04", name: "CiteMend Catalog", stage: "ROADMAP", icon: ShoppingBag, description: "Maintain accurate product feeds, structured data, SKUs, and availability." },
+  { number: "05", name: "CiteMend Agent Reliability", stage: "ROADMAP", icon: Bot, description: "Monitor agent-commerce checkouts (OpenAI ACP / Google UCP) and transaction consistency." },
+  { number: "06", name: "CiteMend Enterprise", stage: "ROADMAP", icon: Globe2, description: "Global APIs, multi-store agency management, and enterprise governance." },
+];
 
 const features = [
   { icon: Radar, title: "AI citation monitoring", text: "Audit buyer questions against search grounded results, then inspect the URLs and evidence behind each finding." },
@@ -58,9 +68,9 @@ export default function Home() {
       <div aria-hidden="true" className="cm-glow pointer-events-none absolute -top-32 right-[-15%] -z-10 size-[48rem]" />
       <div className="cm-container grid min-w-0 items-start gap-8 overflow-x-hidden py-9 sm:py-11 lg:grid-cols-[1.02fr_.98fr] lg:gap-8 lg:py-12">
         <div className="cm-reveal">
-          <p className="cm-kicker flex flex-wrap items-center gap-2 break-words"><span className="relative flex size-2 shrink-0"><span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-300 opacity-50" /><span className="relative size-2 rounded-full bg-emerald-300" /></span> Citation recovery for SEO agencies and B2B SaaS teams</p>
-          <h1 className="mt-5 max-w-[48rem] break-words text-[clamp(2.45rem,9.4vw,5.35rem)] font-semibold leading-[.98] tracking-[-.065em]">Find broken AI citations. Repair the destination. Verify the result.</h1>
-          <p className="mt-5 max-w-xl break-words text-[15px] leading-7 text-slate-400 sm:text-[16px]">CiteMend helps teams inspect cited URLs, review relevant replacements, and verify approved redirects — with an evidence trail for every action.</p>
+          <p className="cm-kicker flex flex-wrap items-center gap-2 break-words"><span className="relative flex size-2 shrink-0"><span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-300 opacity-50" /><span className="relative size-2 rounded-full bg-emerald-300" /></span> Commerce Reliability &amp; Revenue Infrastructure</p>
+          <h1 className="mt-5 max-w-[48rem] break-words text-[clamp(2.45rem,9.4vw,5.35rem)] font-semibold leading-[.98] tracking-[-.065em]">Make every digital commerce interaction accurate, accessible, and measurable.</h1>
+          <p className="mt-5 max-w-xl break-words text-[15px] leading-7 text-slate-400 sm:text-[16px]">CiteMend — Commerce Reliability &amp; Revenue Infrastructure: Make every digital commerce interaction across Search, AI Assistants, and Autonomous Agents accurate, accessible, and measurable.</p>
           <p className="mt-3 max-w-xl text-xs leading-5 text-slate-500">Built for SEO agencies and B2B SaaS teams managing content libraries and website migrations.</p>
           <div className="mt-6 max-w-xl"><LandingPreview /></div>
           <div className="mt-5 flex flex-wrap gap-3"><a href="#audit" className="cm-button-primary cm-focus-ring">Start a free audit <ArrowRight className="size-4" /></a><a href="#how-it-works" className="cm-button-secondary cm-focus-ring">Explore the platform <ChevronRight className="size-4" /></a></div>
@@ -72,6 +82,11 @@ export default function Home() {
         </div>
       </div>
       <div className="cm-container pb-10 sm:pb-14"><div className="cm-panel grid gap-px overflow-hidden !rounded-2xl bg-white/[.06] md:grid-cols-3"><div className="bg-[#0d1119] px-5 py-4 sm:px-6"><p className="cm-kicker !text-[9px]">Find</p><p className="mt-1.5 text-xs font-medium text-slate-200">What answers cite your domain?</p></div><div className="bg-[#0d1119] px-5 py-4 sm:px-6"><p className="cm-kicker !text-[9px] !text-[#39d9ff]">Verify</p><p className="mt-1.5 text-xs font-medium text-slate-200">Which destinations are truly broken?</p></div><div className="bg-[#0d1119] px-5 py-4 sm:px-6"><p className="cm-kicker !text-[9px]">Recover</p><p className="mt-1.5 text-xs font-medium text-slate-200">Where should a lost visitor land?</p></div></div></div>
+    </section>
+
+    <section id="architecture" className="cm-container py-[var(--space-section)]" aria-labelledby="architecture-heading">
+      <div className="mb-10 max-w-3xl"><p className="cm-kicker">The 6-Pillar CiteMend Architecture</p><h2 id="architecture-heading" className="mt-4 text-3xl font-semibold tracking-[-.055em] sm:text-5xl">Commerce reliability, from discovery to transaction.</h2><p className="mt-4 text-sm leading-7 text-slate-400">Recovery is live. Each pillar shows its current availability so teams can plan around what is ready today.</p></div>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{pillars.map(({ number, name, stage, icon: Icon, description }) => <article key={number} className="cm-panel flex h-full flex-col !rounded-2xl p-6"><div className="flex items-start justify-between gap-3"><span className="grid size-11 place-items-center rounded-xl border border-emerald-300/15 bg-emerald-300/[.07] text-emerald-300"><Icon className="size-5" /></span><span className="cm-mono text-xs text-slate-500">{number}</span></div><p className="mt-6 text-[10px] font-bold uppercase tracking-[.16em] text-emerald-300">{stage}</p><h3 className="mt-2 text-lg font-semibold tracking-tight text-white">{name}</h3><p className="mt-3 text-sm leading-6 text-slate-400">{description}</p></article>)}</div>
     </section>
 
     <section id="platform" className="cm-container py-[var(--space-section)]">

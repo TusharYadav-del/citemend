@@ -6,7 +6,7 @@ import { verifyContactEmail } from "./email-verification";
 import { scoreProspect } from "./qualification";
 import { isSuppressed } from "./suppression";
 import { checkOutreachCompliance } from "./compliance";
-import { generateEvidenceBackedEmail, validateFactualityReport } from "./email-generation";
+import { generateEvidenceBackedEmail, oneVerifiedExample, validateFactualityReport } from "./email-generation";
 
 const db = () => createServerDatabase();
 const dateKey = () => new Date().toISOString().slice(0, 10);
@@ -51,13 +51,12 @@ export async function runDailyOutreach() {
         const email = contactCheck.normalized;
         if (await isSuppressed(database, email)) { await database.from("outreach_prospects").update({ status: "suppressed" }).eq("id", saved.id); continue; }
         const appOrigin = (process.env.NEXT_PUBLIC_APP_URL || "https://citemend.com").replace(/\/$/, "");
-        const firstVerifiedDead = research.citationEvidence.find(item => item.state === "404" || item.state === "410");
-        const evidence = firstVerifiedDead ? [{ deadUrl: firstVerifiedDead.url, status: firstVerifiedDead.state === "404" ? 404 as const : 410 as const, detectedAt: new Date().toISOString(), referrerUrl: firstVerifiedDead.sourceUrl, referrerContext: firstVerifiedDead.excerpt, replacementUrl: null, replacementReason: null }] : [];
+        const evidence = oneVerifiedExample(research.citationEvidence, prospect.domain, new Date().toISOString());
         const message = generateEvidenceBackedEmail({ companyName: prospect.companyName, contactName: prospect.contact?.name, domain: prospect.domain, evidence, email, appOrigin });
         if (!message || !validateFactualityReport(message.factualityReport)) continue;
         const compliance = checkOutreachCompliance({ publicContact: true, contactSourceUrl: prospect.contact?.sourceUrl ?? null, emailStatus: contactCheck.status, score: qualification.score, minimumScore: settings.min_qualification_score, suppressed: false, reportExists: true, factualityPassed: message.factualityReport.passed, unsubscribeToken: message.text.match(/unsubscribe here: (\S+)/)?.[1] ?? "", country: prospect.country });
-        if (!compliance.eligible || !settingEnabled(settings) || campaign.data?.status !== "active") continue;
-        const { error: emailSaveError } = await database.from("outreach_emails").insert({ prospect_id: saved.id, contact_id: contactId, campaign_id: campaign.data?.id ?? null, recipient: email, subject: message.subject, body_text: message.text, body_html: message.html, factuality_report: message.factualityReport, status: "pending_review" });
+        if (!compliance.eligible) continue;
+        const { error: emailSaveError } = await database.from("outreach_emails").insert({ prospect_id: saved.id, contact_id: contactId, campaign_id: campaign.data?.id ?? null, recipient: email, subject: message.subject, body_text: message.text, body_html: message.html, factuality_report: message.factualityReport, status: process.env.OUTBOUND_EMAILS_ENABLED === "true" ? "draft" : "draft_locked" });
         if (emailSaveError) throw emailSaveError;
       } catch { errors++; }
     }

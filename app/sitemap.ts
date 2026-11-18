@@ -3,10 +3,10 @@ import { connection } from "next/server";
 import { createServerDatabase } from "@/lib/supabase-server";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   await connection();
-  const origin = (process.env.NEXT_PUBLIC_APP_URL || "https://citemend.vercel.app").replace(/\/$/, "");
+  const origin = new URL(process.env.NEXT_PUBLIC_APP_URL || "https://citemend.vercel.app").origin;
   const now = new Date();
   const fixed: MetadataRoute.Sitemap = [
-    { url: origin, lastModified: now, changeFrequency: "weekly", priority: 1 },
+    { url: `${origin}/`, lastModified: now, changeFrequency: "weekly", priority: 1 },
     ...["pricing", "terms", "privacy", "refund-policy"].map(path => ({ url: `${origin}/${path}`, lastModified: now, changeFrequency: "monthly" as const, priority: 0.7 })),
   ];
   try {

@@ -7,7 +7,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: ["*", "Googlebot", "OAI-SearchBot", "PerplexityBot", "ClaudeBot"].map(userAgent => ({
       userAgent,
       allow: publicPaths,
-      disallow: ["/dashboard", "/api/", "/sign-in", "/sign-up"],
+      disallow: ["/dashboard", "/api", "/sign-in", "/sign-up"],
     })),
     sitemap: `${origin}/sitemap.xml`,
   };

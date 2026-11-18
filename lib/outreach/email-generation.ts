@@ -1,5 +1,6 @@
 import "server-only";
 import { createUnsubscribeToken } from "./suppression";
+import type { CitationEvidence } from "./types";
 
 export type EmailEvidence = {
   deadUrl: string;
@@ -21,6 +22,15 @@ function isHttps(value: string) { try { return new URL(value).protocol === "http
 function sameDomain(url: string, domain: string) {
   try { const host = new URL(url).hostname.toLowerCase().replace(/^www\./, ""); return host === domain.toLowerCase().replace(/^www\./, ""); }
   catch { return false; }
+}
+
+export function oneVerifiedExample(citations: CitationEvidence[], domain: string, detectedAt: string): EmailEvidence[] {
+  const dead = citations.find(item => (item.state === "404" || item.state === "410") && isHttps(item.url) && sameDomain(item.url, domain) && isHttps(item.sourceUrl) && item.excerpt.trim());
+  if (!dead) return [];
+  const deadTokens = new Set(new URL(dead.url).pathname.toLowerCase().split(/[^a-z0-9]+/).filter(token => token.length > 2));
+  const replacement = citations.find(item => item.state === "200" && item.httpStatus === 200 && isHttps(item.url) && sameDomain(item.url, domain) && item.url !== dead.url && new URL(item.url).pathname !== "/" && new URL(item.url).pathname.toLowerCase().split(/[^a-z0-9]+/).some(token => token.length > 2 && deadTokens.has(token)));
+  if (!replacement) return [];
+  return [{ deadUrl: dead.url, status: dead.state === "404" ? 404 : 410, detectedAt, referrerUrl: dead.sourceUrl, referrerContext: dead.excerpt, replacementUrl: replacement.url, replacementReason: "A same-domain URL with an overlapping path returned HTTP 200; content relevance requires founder review." }];
 }
 
 export function generateEvidenceBackedEmail(input: { companyName: string; contactName?: string | null; domain: string; evidence: EmailEvidence[]; email: string; appOrigin: string; tokenSecret?: string }): GeneratedOutreachEmail | null {

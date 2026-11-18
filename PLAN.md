@@ -1020,3 +1020,13 @@ Repository implementation and local automated QA are complete. The user reported
 - [x] Verify lint (0 errors; two existing font-config warnings) and optimized production build. The standard build directory has a pre-existing corrupt Turbopack persistence store, so the final successful build used `CITEMEND_BUILD_DIR=.next-day368-build-verified`.
 
 Previous days remain unchanged. Paid pilot checkout currently uses the configured Starter subscription variant: $49 for the first month and $49/month thereafter unless cancelled. Order and lead attribution is not connected; estimated hours saved is labeled as a planning estimate. Semantic and commercial equivalence is only counted when both are explicitly recorded in evidence.
+
+## CiteMend v2.0 Step 1: Outbound Lock, Public SEO & Six-Pillar Architecture (COMPLETED IN CODE)
+
+- [x] Add a server-side `OUTBOUND_EMAILS_ENABLED === "true"` guard before outreach webhook, Brevo, or Resend delivery; preserve separate founder notification delivery. When locked, compliant one-example outreach is saved for founder preview as `draft_locked` with forward migration 037.
+- [x] Keep the public marketing routes crawlable for general, Google, OpenAI, Perplexity, and Claude bots; exclude private dashboard, API, and sign-in routes. Include clean public URLs in the sitemap and update canonical metadata, OpenGraph, and SoftwareApplication JSON-LD.
+- [x] Update the public homepage with Commerce Reliability & Revenue Infrastructure positioning and all six pillars with current availability labels.
+- [x] Verify `npx tsc --noEmit`, `npm run lint` (zero errors; two existing font wrapper warnings), `npm test` (296 passed), and the optimized production build. The standard `.next` cache is corrupt, so the successful build used `CITEMEND_BUILD_DIR=.next-v2-step1-build`.
+- [x] The user confirmed migration 037 applied successfully to hosted Supabase.
+
+Set `NEXT_PUBLIC_APP_URL` to the public HTTPS origin in production so generated canonicals and the sitemap use that host. Outbound prospect delivery stays locked until the server environment variable is explicitly set to `true` after launch. Hosted crawlability was not independently checked.

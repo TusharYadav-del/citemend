@@ -6,7 +6,7 @@ import { deduplicateProspects } from "../lib/outreach/discovery";
 import { verifyContactEmail } from "../lib/outreach/email-verification";
 import { researchCompany } from "../lib/outreach/company-research";
 import { scoreProspect } from "../lib/outreach/qualification";
-import { generateEvidenceBackedEmail, validateFactualityReport } from "../lib/outreach/email-generation";
+import { generateEvidenceBackedEmail, oneVerifiedExample, validateFactualityReport } from "../lib/outreach/email-generation";
 import { createUnsubscribeToken, verifyUnsubscribeToken } from "../lib/outreach/suppression";
 import { verifyResendSignature } from "../lib/outreach/resend-signature";
 afterEach(() => mock.restoreAll());
@@ -60,6 +60,20 @@ test("outreach uses one verified example and waits for founder review", () => {
   assert.equal(email.factualityReport.approvalStatus, "pending_founder_review");
   assert.equal(generateEvidenceBackedEmail({ companyName: "Acme", domain: "acme.example", email: "jane@acme.example", appOrigin: "https://citemend.example", tokenSecret: "test-secret", evidence: [{ ...example, replacementUrl: null, replacementReason: null }] }), null);
   assert.equal(generateEvidenceBackedEmail({ companyName: "Acme", domain: "acme.example", email: "jane@acme.example", appOrigin: "https://citemend.example", tokenSecret: "test-secret", evidence: [example, example] }), null);
+});
+
+test("daily draft selects a verified same-domain replacement only when URL paths overlap", () => {
+  const sourceUrl = "https://publisher.example/guide";
+  const excerpt = "A public citation to a retired product.";
+  const citations = [
+    { url: "https://acme.example/products/legacy-widget", state: "404" as const, httpStatus: 404, sourceUrl, excerpt },
+    { url: "https://acme.example/products/new-widget", state: "200" as const, httpStatus: 200, sourceUrl, excerpt },
+  ];
+  const example = oneVerifiedExample(citations, "acme.example", "2026-11-18T00:00:00.000Z");
+  assert.equal(example.length, 1);
+  assert.equal(example[0].replacementUrl, citations[1].url);
+  assert.equal(oneVerifiedExample([citations[0], { ...citations[1], state: "unknown", httpStatus: null }], "acme.example", "2026-11-18T00:00:00.000Z").length, 0);
+  assert.equal(oneVerifiedExample([citations[0], { ...citations[1], url: "https://other.example/products/new-widget" }], "acme.example", "2026-11-18T00:00:00.000Z").length, 0);
 });
 
 test("unsubscribe token round trips, rejects tampering, and webhook signature rejects replay or altered body", () => {

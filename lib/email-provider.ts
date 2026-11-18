@@ -159,6 +159,9 @@ function isFounderRecipient(recipients: string[]): boolean {
 }
 
 export async function sendEmail(message: OutgoingEmail, options: EmailTransportOptions = {}): Promise<EmailDelivery> {
+  if (message.idempotencyKey?.startsWith("outreach-") && process.env.OUTBOUND_EMAILS_ENABLED !== "true") {
+    throw new Error("Prospect email delivery is locked. Save and review the draft instead.");
+  }
   const recipients = recipientList(message.to);
   const configuredFromEnv = message.from?.trim() || process.env.EMAIL_FROM?.trim() || process.env.RESEND_FROM_EMAIL?.trim();
   const resendKey = process.env.RESEND_API_KEY?.trim();
