@@ -1098,4 +1098,4 @@ No new database migration is needed; S1.7 uses the existing workspace ownership,
 - [x] Preserve normal founder notification email delivery and verify locked prospect attempts never call Resend, Brevo, or the outbound webhook.
 - [x] Verify `npx tsc --noEmit`, lint with zero errors (two existing `app/layout.tsx` warnings), all 316 tests, and optimized production build with `CITEMEND_BUILD_DIR=.next-s1-8-verified`.
 
-Apply `supabase/migrations/041_outreach_founder_workbench.sql` to hosted Supabase before using persistent checklist and founder review controls. No prospect email was sent. Year 1 implementation is complete; Year 2 remains locked until its customer validation gate is met.
+The user confirmed `supabase/migrations/041_outreach_founder_workbench.sql` applied successfully to hosted Supabase. Persistent checklist and founder review controls are ready. No prospect email was sent. Year 1 implementation is complete; Year 2 remains locked until its customer validation gate is met.
