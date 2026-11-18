@@ -86,7 +86,7 @@ test("anonymous audit creation is rejected before any saved report is produced",
 test("anonymous 301 export and Pro checkout are rejected", async ({ request }) => {
   const redirect = await request.post("/api/redirect-export", { data: { domain: "example.com", links: [], format: "htaccess" } });
   expect(redirect.status()).toBe(401);
-  const checkout = await request.post("/api/lemonsqueezy/checkout");
+  const checkout = await request.post("/api/billing/checkout");
   expect(checkout.status()).toBe(401);
 });
 

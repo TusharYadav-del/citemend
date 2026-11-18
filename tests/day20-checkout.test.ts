@@ -1,38 +1,18 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { createLemonSqueezyCheckout } from "../lib/lemonsqueezy";
+import { createBillingCheckout } from "../lib/billing-checkout";
 
-const oldFetch = globalThis.fetch;
 const oldEnv = process.env;
-afterEach(() => { globalThis.fetch = oldFetch; process.env = oldEnv; });
+afterEach(() => { process.env = oldEnv; });
 
-test("development test checkout requests test mode and retains the signed-in owner", async () => {
-  process.env = { ...oldEnv, NODE_ENV: "development", LEMON_SQUEEZY_API_KEY: "test-key", LEMON_SQUEEZY_STORE_ID: "123", LEMON_SQUEEZY_PRODUCT_ID: "456", LEMONSQUEEZY_STARTER_VARIANT_ID: "789" };
-  globalThis.fetch = async (_url, options) => {
+test("Dodo pilot checkout is configured as a one-time product for the authenticated owner", async () => {
+  process.env = { ...oldEnv, NODE_ENV: "development", DODO_PAYMENTS_API_KEY: "test-key", DODO_PAYMENTS_ENVIRONMENT: "test_mode", DODO_PRODUCT_PILOT_ID: "pdt_pilot", NEXT_PUBLIC_APP_URL: "https://citemend.vercel.app" };
+  const url = await createBillingCheckout("pilot", "user_123", "owner@example.com", async (_input, options) => {
     const body = JSON.parse(String(options?.body));
-    assert.equal(body.data.attributes.test_mode, true);
-    assert.equal(body.data.attributes.checkout_data.custom.user_id, "user_123");
-    return Response.json({ data: { attributes: { test_mode: true, url: "https://example.lemonsqueezy.com/checkout/custom/test" } } });
-  };
-  assert.match(await createLemonSqueezyCheckout("user_123", true), /lemonsqueezy\.com/);
-});
-
-test("test checkout fails closed if Lemon Squeezy does not confirm test mode", async () => {
-  process.env = { ...oldEnv, NODE_ENV: "development", LEMON_SQUEEZY_API_KEY: "test-key", LEMON_SQUEEZY_STORE_ID: "123", LEMON_SQUEEZY_PRODUCT_ID: "456", LEMONSQUEEZY_STARTER_VARIANT_ID: "789" };
-  globalThis.fetch = async () => Response.json({ data: { attributes: { test_mode: false, url: "https://example.lemonsqueezy.com/checkout/custom/live" } } });
-  await assert.rejects(createLemonSqueezyCheckout("user_123", true), /did not create a test-mode checkout/);
-  process.env = { ...process.env, NODE_ENV: "production" };
-  await assert.rejects(createLemonSqueezyCheckout("user_123", true), /development-only/);
-});
-
-test("agency checkout selects the configured Agency variant and keeps the account owner", async () => {
-  process.env = { ...oldEnv, NODE_ENV: "development", LEMON_SQUEEZY_API_KEY: "test-key", LEMON_SQUEEZY_STORE_ID: "123", LEMON_SQUEEZY_PRODUCT_ID: "456", LEMONSQUEEZY_STARTER_VARIANT_ID: "789", LEMON_SQUEEZY_AGENCY_VARIANT_ID: "2336501" };
-  globalThis.fetch = async (_url, options) => {
-    const body = JSON.parse(String(options?.body));
-    assert.equal(body.data.relationships.variant.data.id, "2336501");
-    assert.deepEqual(body.data.attributes.product_options.enabled_variants, [2336501]);
-    assert.equal(body.data.attributes.checkout_data.custom.user_id, "agency_owner");
-    return Response.json({ data: { attributes: { url: "https://example.lemonsqueezy.com/checkout/custom/agency" } } });
-  };
-  assert.match(await createLemonSqueezyCheckout("agency_owner", false, "agency"), /agency/);
+    assert.deepEqual(body.product_cart, [{ product_id: "pdt_pilot", quantity: 1 }]);
+    assert.equal(body.metadata.user_id, "user_123");
+    assert.equal(body.metadata.plan_tier, "pilot");
+    return Response.json({ checkout_url: "https://checkout.dodopayments.com/session/test" });
+  });
+  assert.match(url, /dodopayments\.com/);
 });

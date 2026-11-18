@@ -82,6 +82,9 @@ export function contractPriceRange(tier: CommercialTier, currency: ContractCurre
 
 export function activePlanMonthlyPriceUsd(plan: string | null | undefined): number | null {
   switch (plan?.toLowerCase()) {
+    case "pilot": return 149;
+    case "growth": return 99;
+    case "starter": return 49;
     case "pro": case "professional": return 39;
     case "agency": return 249;
     case "pro_beta": return 0;

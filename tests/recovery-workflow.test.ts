@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createRecoveryApproveHandler, createRecoveryRollbackHandler } from "../lib/recovery-workflow";
+import { runAudit } from "../lib/audit-pipeline";
+import { deployShopifyUrlRedirect } from "../lib/shopify/redirects";
+import { verifyDeployedRedirect } from "../lib/recovery/verify";
 import type { createServerDatabase } from "../lib/supabase-server";
 
 const linkId = "d98a5c0a-01a9-4d17-a9b1-2df80515548c";
@@ -168,4 +171,37 @@ test("approval rejects an existing active redirect conflict", async () => {
   const handler = createRecoveryApproveHandler({ getUserId: async () => "owner", database: () => db, verify: checkedUrl, trace: safeTrace });
   assert.equal((await handler(request({ linkId, action: "approve" }))).status, 409);
   assert.match(String((logs[0].new_state_json as { reason: string }).reason), /active redirect/);
+});
+
+test("recovery smoke path carries a verified scan through human approval to deployed redirect verification", async () => {
+  const source = "https://acme.com/products/blue-shirt";
+  const target = "https://acme.com/products/blue-shirt-v2";
+  const scan = await runAudit({ domain: "acme.com", buyerPrompt: "blue shirt" }, {
+    probe: async () => ({ text: `The product is cited at ${source}`, citedUrls: [source], providerUsed: "test", searchGrounding: { status: "available", sources: [] }, warnings: [] }),
+    sitemap: async () => [target],
+    check: async url => url === source ? 404 : 200,
+    semantic: async () => new Map([[source, [{ url: target, similarity: 0.94 }]]]),
+    synthesize: null,
+    save: async report => { assert.equal(report.findings[0]?.recoveryGuardrail?.classification, "recoverable_equivalent"); return { id: auditId, createdAt: "2026-11-18T00:00:00.000Z" }; },
+    saveGap: async () => {},
+    resolve: async url => url,
+  }, "owner");
+  assert.equal(scan.persistence.status, "saved");
+  const { db, updates } = setup({ ...baseLink, cited_url: source, suggested_redirect: target, match_confidence: 94 });
+  const approve = createRecoveryApproveHandler({ getUserId: async () => "owner", database: () => db, verify: async url => url.endsWith("/products/blue-shirt") ? { state: "404", httpStatus: 404 } : { state: "200", httpStatus: 200 }, trace: safeTrace });
+  const approval = await approve(request({ linkId, action: "approve" }));
+  assert.equal(approval.status, 200);
+  assert.equal(updates.find(update => update.table === "broken_links" && update.value.approval_status === "approved")?.value.approval_status, "approved");
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json({ data: { urlRedirectCreate: { urlRedirect: { id: "gid://shopify/UrlRedirect/1", path: "/products/blue-shirt", target: "/products/blue-shirt-v2" }, userErrors: [] } } });
+  try {
+    const deployed = await deployShopifyUrlRedirect("shop.myshopify.com", "test-token", "/products/blue-shirt", "/products/blue-shirt-v2");
+    assert.equal(deployed.path, "/products/blue-shirt");
+  } finally { globalThis.fetch = originalFetch; }
+  const verified = await verifyDeployedRedirect(source, target, "acme.com", async input => String(input) === source
+    ? new Response(null, { status: 301, headers: { Location: target } })
+    : new Response(null, { status: 200 }) as never);
+  assert.equal(verified.ok, true);
+  assert.equal(verified.destinationStatus, 200);
 });

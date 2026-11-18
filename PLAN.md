@@ -1048,3 +1048,33 @@ Live Vercel checks on 2026-11-18 returned HTTP 200 for `/`, `/pricing`, `/terms`
 - [x] Add unit tests for Shopify GraphQL duplicate-path handling and errors, Cloudflare CSV/JSON formatting, and direct redirect verification.
 - [x] Verify `npx tsc --noEmit`, lint (zero errors; two existing `app/layout.tsx` warnings), 305 passing unit tests, and optimized production build with `CITEMEND_BUILD_DIR=.next-step3-verified`.
 - [x] No new database migration was required; Step 3 uses the Migration 038 columns and the existing encrypted Shopify workspace integration.
+## CiteMend Year 1 Stage-1 Step 4: Dodo Payments Billing Migration (IMPLEMENTED IN CODE)
+
+- [x] Replace active Lemon Squeezy checkout, portal, and webhook code with the Dodo Payments SDK; publish the $149 one-time Pilot, $99/month Growth, and $249/month Agency offers.
+- [x] Verify Standard Webhooks signatures, deduplicate by signed delivery ID, map configured product IDs to owner-bound entitlements, and atomically update subscription state through the provider-neutral Migration 039 RPC.
+- [x] Add customer portal sessions, Dodo environment/product readiness checks, subscription lifecycle and test-mode handling, and preserve existing subscription data/legacy columns without dropping records.
+- [x] Add unit/integration coverage for checkout identity and product mapping, safe customer portal URLs, Standard Webhooks verification, duplicate event IDs, pilot entitlement duration, provider ownership, and ordered Migration 039 execution.
+- [x] Verify `npx tsc --noEmit`, lint (zero errors; two existing `app/layout.tsx` warnings), 302 passing tests, and optimized production build with `CITEMEND_BUILD_DIR=.next-s1-4-verified`.
+
+The user confirmed that Migration 039 was successfully applied to hosted Supabase. Before enabling live billing, configure matching Dodo API/webhook credentials and Pilot/Growth/Agency product IDs in Vercel, verify the product prices and billing cadences in Dodo, register `/api/webhooks/dodo`, and complete a Dodo test-mode checkout. No external billing request or purchase was made during this segment.
+
+## CiteMend Year 1 Stage-1 Step 5: Pre-Launch QA & Production Hardening (COMPLETED IN CODE)
+
+- [x] Add an end-to-end recovery smoke test that carries a verified 404 scan through the semantic/commercial guardrail, explicit human approval, mocked Shopify GraphQL deployment, and direct 301-to-200 verification.
+- [x] Expand redirect verifier coverage for non-redirecting sources, redirecting destinations, and network failures; preserve existing two-provider/duplicate Dodo webhook integration coverage.
+- [x] Harden Shopify deploy, Cloudflare export, and live verify routes so Clerk authentication outages return controlled private 503 errors rather than uncaught exceptions.
+- [x] Keep generated Next.js build types out of the tracked TypeScript config and use the existing ignored isolated-build directory pattern for Turbopack cache health.
+- [x] Verify `npx tsc --noEmit`, `npm run lint` (zero errors; two pre-existing warnings in `app/layout.tsx`), `npm test` (304 passed), and optimized production build with `CITEMEND_BUILD_DIR=.next-s1-5-verified`.
+
+No new migration was required. Dodo billing and webhook checks use mocked signed events; live Dodo/Vercel credentials, product setup, webhook registration, and test-mode checkout remain deferred as requested. Next segment: S1.6 Continuous High-Signal 404 & Referrer Event Ingestion API + Automated Redirect QA Cron.
+
+## CiteMend Year 1 Stage-1 Step 6: Recovery Signals & Automated Redirect QA (COMPLETED IN CODE)
+
+- [x] Add Migration 040 for normalized 404/referrer signal aggregation, event referrer hosts, per-finding QA state, and a bounded due-work index. New findings remain pending human review and user-agent verification stays false.
+- [x] Add origin-checked `POST /api/recovery/signals` with normalized paths, referrer-host-only storage, a per-domain atomic rate limit, and no user-agent proof. Wire the existing pixel event path into the same aggregator with a legacy telemetry fallback while Migration 040 is pending.
+- [x] Add an authenticated daily `/api/cron/recovery-qa` sweep for deployed URL-agnostic findings and previously Shopify-synced redirects. Use the DNS-pinned one-hop verifier to identify stale sources, 301/302-to-404 targets, chains/loops, unhealthy destinations, and unavailable checks.
+- [x] Add tests for normalized signal intake, spoofed-UA non-verification, Migration 040 event aggregation and initial review state, auth-before-storage, and QA result persistence across both redirect stores.
+- [x] Verify `npx tsc --noEmit`, `npm run lint` (zero errors; two pre-existing warnings in `app/layout.tsx`), `npm test` (310 passed), and optimized production build with `CITEMEND_BUILD_DIR=.next-s1-6-verified`.
+- [x] Require `DODO_PAYMENTS_ENABLED=true` in addition to Dodo keys/product IDs before checkout, portal, or webhook processing; the example defaults to `false` so billing remains off during the deferred live setup.
+
+Migration 040 still needs to be applied to hosted Supabase before signal aggregation and QA checks activate. Until then, the cron returns a successful skipped result and the pixel keeps its existing telemetry fallback. No Dodo API call, live payment, webhook registration, or external prospect email was performed. Next segment: S1.7 Agency Multi-Workspace Switcher & White-Label Monthly ROI Report Export.

@@ -1,36 +1,17 @@
-# Day 20 local billing and cron verification
+# Billing and cron verification
 
-The development checkout route uses Lemon Squeezy test mode only when
-`LEMON_SQUEEZY_TEST_MODE=true` and `NODE_ENV=development`. The checkout utility
-rejects a response unless Lemon Squeezy confirms `test_mode: true`. Production
-always creates its normal checkout, regardless of the development toggle.
+Billing now uses Dodo Payments. Set `DODO_PAYMENTS_ENVIRONMENT=test_mode` with a Dodo test API key, webhook key, and the three configured product IDs before creating a test checkout. If the environment is unset, the SDK defaults to live mode. Product prices are set in Dodo: Pilot $149 one-time, Growth $99/month, and Agency $249/month.
 
 Run the local checks with:
 
 ```powershell
 npm run dev:verify-checkout
-npm run dev:simulate-webhooks
 npm run dev:verify-cron
 npm run dev:verify-email
 ```
 
-The checkout check creates a real Lemon Squeezy test-mode checkout session for
-a synthetic owner. It does not submit a payment or activate a subscription.
-The webhook helper signs created, cancelled, and updated events, exercises the
-real webhook handler and Pro check, then runs one weekly job and renders one
-301 digest. Its database and delivery stay in memory; it cannot change hosted
-subscriptions or email a customer.
+The checkout check creates a Dodo test-mode session for a synthetic account; it does not submit a payment. Webhook signature verification, account/product binding, duplicate delivery handling, subscription lifecycle mapping, and the Migration 039 database transaction are covered by unit/integration tests. They run against a local PGlite database and mocked provider/database requests, not hosted billing state.
 
-The cron check authenticates a manual `drain` action and reads the count of
-currently eligible Pro subscription rows. On 1 November 2026 there were zero
-eligible Pro rows, so the drain returned `idle` and processed zero jobs. It
-does not start an out-of-schedule weekly run. The Resend check sent a rendered
-test digest to Resend's `delivered@resend.dev` test address and read back a
-`delivered` event. No Pro user's inbox was used.
+To verify billing after Vercel setup, apply migration 039, configure matching Dodo test-mode credentials and product IDs, register `https://YOUR_APP/api/webhooks/dodo` in Dodo, and complete a test checkout for a Clerk test account. Confirm the webhook creates the expected owner-bound subscription row and that the dashboard portal opens. Keep Dodo test and live credentials separate.
 
-To verify the full hosted flow after Vercel deployment, finish the production
-Lemon Squeezy webhook and weekly scheduler setup, complete a test checkout for
-a Clerk test account, confirm its subscription row grants Pro, run a scan for
-an owned domain with a newly confirmed 404, and check the digest row and the
-recipient inbox. A verified custom Resend sender domain is required for Pro
-user delivery. Keep test-mode billing separate from real subscriptions.
+The cron check authenticates a manual `drain` action and reads currently eligible Pro subscription rows. The Resend check sends a rendered test digest to Resend's `delivered@resend.dev` test address. No customer inbox is used by the checkout verification.

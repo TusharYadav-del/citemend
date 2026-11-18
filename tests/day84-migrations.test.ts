@@ -19,6 +19,7 @@ test("daily Vercel jobs and the every-minute Supabase worker use protected cron 
   assert.deepEqual(vercel.crons, [
     { path: "/api/cron/data-retention", schedule: "0 2 * * *" },
     { path: "/api/cron/scheduled-reports", schedule: "0 4 * * *" },
+    { path: "/api/cron/recovery-qa", schedule: "0 6 * * *" },
     { path: "/api/cron/outreach/daily", schedule: "0 9 * * *" },
   ]);
   const outreachSetup = await readFile(new URL("../supabase/setup/outreach_cron.sql", import.meta.url), "utf8");
@@ -26,28 +27,28 @@ test("daily Vercel jobs and the every-minute Supabase worker use protected cron 
   assert.match(outreachSetup, /\/api\/cron\/outreach\/daily/);
 });
 
-test("migrations 001 through 038 apply in order and expose the columns used by the application", async () => {
+test("migrations 001 through 040 apply in order and expose the columns used by the application", async () => {
   const db = new PGlite({ extensions: { vector } });
   try {
     await db.exec("create role anon; create role authenticated; create role service_role bypassrls;");
     await db.exec("create schema auth; create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$; grant usage on schema auth to authenticated, service_role; grant execute on function auth.jwt() to authenticated, service_role;");
     const directory = new URL("../supabase/migrations/", import.meta.url);
     const files = (await readdir(directory)).filter(name => /^\d{3}_.+\.sql$/.test(name)).sort();
-    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 38 }, (_, index) => String(index + 1).padStart(3, "0")));
+  assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 40 }, (_, index) => String(index + 1).padStart(3, "0")));
     for (const file of files) await db.exec(await readFile(new URL(file, directory), "utf8"));
     const expected: Record<string, string[]> = {
       audits: ["id", "user_id", "domain", "buyer_prompt", "status", "created_at", "completed_at", "competitor_domains", "ground_truth_pricing", "indexnow_key", "share_of_model_score", "engine_matrix_json", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text", "llms_txt_content", "webhook_url", "sitemap_url_count"],
       broken_links: ["id", "audit_id", "cited_url", "http_status", "suggested_redirect", "url_state", "approval_status", "approved_by", "approved_at", "previous_destination_url", "deployed_at", "rolled_back_at", "match_evidence_reason", "match_confidence", "created_at"],
-      recovery_findings: ["id", "audit_id", "broken_link_id", "domain", "finding_type", "normalized_path", "signal_evidence", "guardrail_classification", "approval_status", "suggested_target_url", "confidence_score", "match_reason", "rejected_soft_404_count", "blocked_loop_count", "created_at"],
-      subscriptions: ["id", "user_id", "store_id", "product_id", "variant_id", "status", "plan", "plan_name", "test_mode", "lemonsqueezy_customer_id", "lemonsqueezy_subscription_id", "lemonsqueezy_order_id", "customer_portal_url", "update_payment_method_url", "trial_ends_at", "current_period_end", "ends_at", "cancelled", "provider_updated_at"],
+      recovery_findings: ["id", "audit_id", "broken_link_id", "domain", "finding_type", "normalized_path", "signal_evidence", "guardrail_classification", "approval_status", "suggested_target_url", "confidence_score", "match_reason", "rejected_soft_404_count", "blocked_loop_count", "qa_checked_at", "qa_status", "qa_old_url_status", "qa_destination_status", "qa_detail", "created_at"],
+      subscriptions: ["id", "user_id", "store_id", "product_id", "variant_id", "billing_provider", "status", "plan", "plan_name", "test_mode", "lemonsqueezy_customer_id", "lemonsqueezy_subscription_id", "lemonsqueezy_order_id", "customer_portal_url", "update_payment_method_url", "trial_ends_at", "current_period_end", "ends_at", "cancelled", "provider_updated_at"],
       billing_webhook_events: ["id", "event_hash", "event_name", "payload", "processed_at"],
       weekly_scan_runs: ["id", "week_start", "status", "lease_token", "digests_prepared_at"],
       weekly_scan_jobs: ["id", "run_id", "user_id", "domain", "buyer_prompt", "status", "attempts", "lease_token", "audit_id"],
       weekly_scan_digests: ["id", "run_id", "user_id", "status", "lease_token", "provider_message_id"],
-      redirect_rules: ["id", "user_id", "source_link_id", "source_host", "source_path", "destination", "active", "domain", "target_url", "confidence", "is_active", "hits_recovered", "synced_to_cms", "shopify_redirect_id"],
+      redirect_rules: ["id", "user_id", "source_link_id", "source_host", "source_path", "destination", "active", "domain", "target_url", "confidence", "is_active", "hits_recovered", "synced_to_cms", "shopify_redirect_id", "qa_checked_at", "qa_status", "qa_old_url_status", "qa_destination_status", "qa_detail"],
       sitemap_pages: ["id", "domain", "url", "page_title", "embedding", "embedding_model", "updated_at"],
       audit_citation_gaps: ["audit_id", "user_id", "domain", "buyer_prompt", "provider", "competitor_urls"],
-      ai_404_events: ["id", "domain", "broken_path", "ai_referrer", "redirected_to", "user_agent", "created_at"],
+      ai_404_events: ["id", "domain", "broken_path", "ai_referrer", "redirected_to", "user_agent", "referrer_host", "created_at"],
       citation_hijack_opportunities: ["id", "audit_id", "domain", "opportunity_type", "target_url", "dead_competitor_url", "matched_user_live_url", "verification_status", "lifecycle_stage", "relevance_score", "buyer_intent_score", "citation_evidence_score", "replacement_quality_score", "composite_priority_score", "stage_history_json"],
       action_audit_logs: ["id", "workspace_domain", "actor_user_id", "action_type", "target_url", "previous_state_json", "new_state_json", "safety_check_passed", "created_at"],
       cms_connections: ["id", "user_id", "domain", "platform", "shop_subdomain", "access_token"],
@@ -92,6 +93,16 @@ test("migrations 001 through 038 apply in order and expose the columns used by t
     for (const table of Object.keys(expected)) assert.equal(rlsTables.rows.find((row) => row.table_name === table)?.rls_enabled, true, `${table} must have RLS enabled`);
     const outreachDefaults = (await db.query<{ outreach_enabled:boolean; outreach_enabled_override:boolean|null; daily_target:number; daily_send_limit:number; min_qualification_score:number }>("select outreach_enabled,outreach_enabled_override,daily_target,daily_send_limit,min_qualification_score from public.outreach_settings where id=1")).rows[0];
     assert.deepEqual(outreachDefaults,{outreach_enabled:false,outreach_enabled_override:null,daily_target:20,daily_send_limit:15,min_qualification_score:75});
+    await db.query("insert into public.audits(id,user_id,domain,status) values ($1,$2,$3,'completed')", ["10000000-0000-4000-8000-000000000040", "signal-owner", "signal.example"]);
+    const signalArgs = ["signal.example", "/products/shoe", "chatgpt.com", null, "spoofed-ai-user-agent"];
+    const signalOne = (await db.query<{ result: { accepted: boolean } }>("select public.record_recovery_signal($1,$2,$3,$4,$5) as result", signalArgs)).rows[0].result;
+    const signalTwo = (await db.query<{ result: { accepted: boolean } }>("select public.record_recovery_signal($1,$2,$3,$4,$5) as result", signalArgs)).rows[0].result;
+    assert.equal(signalOne.accepted, true);
+    assert.equal(signalTwo.accepted, true);
+    const signalFinding = (await db.query<{ approval_status: string; signal_evidence: { observed_404_visits: number; external_referrers: number; user_agent_verified: boolean } }>("select approval_status,signal_evidence from public.recovery_findings where domain='signal.example' and normalized_path='/products/shoe'")).rows[0];
+    assert.equal(signalFinding.approval_status, "pending_human_review");
+    assert.deepEqual(signalFinding.signal_evidence, { observed_404_visits: 2, external_referrers: 2, citation_snapshots: 0, user_agent_verified: false, priority_score: 56, url_variants: ["/products/shoe"] });
+    assert.equal((await db.query<{ count: number }>("select count(*)::int as count from public.ai_404_events where domain='signal.example' and ai_referrer='chatgpt.com' and user_agent='spoofed-ai-user-agent'")).rows[0].count, 2);
     await db.exec("insert into public.outreach_prospects(domain) values ('locked.example'); insert into public.outreach_emails(prospect_id,recipient,subject,body_text,body_html,status) select id,'founder@locked.example','Verified example','Draft only','<p>Draft only</p>','draft_locked' from public.outreach_prospects where domain='locked.example'");
     assert.equal((await db.query<{ status: string }>("select status from public.outreach_emails where recipient='founder@locked.example'")).rows[0].status, "draft_locked");
     assert.deepEqual((await db.query<{ table_name: string }>("select table_name from public.citemend_readiness_schema_status() order by table_name")).rows.length, 46);

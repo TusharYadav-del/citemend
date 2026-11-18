@@ -10,6 +10,7 @@ export function planTier(plan: string | null | undefined, active: boolean): Tier
   if (plan === "agency") return "agency";
   if (plan === "enterprise") return "enterprise";
   if (plan === "starter") return "starter";
+  if (plan === "pilot") return "starter";
   if (plan === "growth") return "growth";
   return "professional";
 }
@@ -32,7 +33,7 @@ export async function getAuditQuota(userId: string, requestedPromptCount: number
   const usedModelCalls = auditIds.length ? await db.from("ai_observation_evidence").select("id", { count: "exact", head: true }).in("audit_id", auditIds) : { count: 0, error: null };
   if (usedModelCalls.error) throw new Error("Tier model-call usage is temporarily unavailable.");
   const margin = marginGuardrailAllows({
-    workspaceMrrUsd: activePlanMonthlyPriceUsd(selected?.plan),
+    workspaceMrrUsd: activePlanMonthlyPriceUsd(selected?.plan_name ?? selected?.plan),
     completedAuditsThisMonth: auditResult.count ?? audits.length,
     observedBuyerPromptCountThisMonth: usedModelCalls.count ?? 0,
     nextAuditPromptCount: requestedPromptCount,

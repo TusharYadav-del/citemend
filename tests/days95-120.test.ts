@@ -54,7 +54,7 @@ test("bulk redirect interchange, API key hashing and tier quotas", () => {
   const generated = generateWorkspaceApiKey(); assert.equal(verifyWorkspaceApiKey(generated.key, generated.hash), true); assert.equal(verifyWorkspaceApiKey(generated.key + "x", generated.hash), false);
   assert.equal(withinTierQuota("free_audit", { audits: 1, pages: 10, modelCalls: 3 }), true); assert.equal(withinTierQuota("free_audit", { audits: 2, pages: 10, modelCalls: 3 }), false);
   assert.equal(withinTierQuota("starter", { audits: 1, pages: 101, modelCalls: 1 }), false); assert.equal(withinTierQuota("growth", { audits: 1, pages: 1, modelCalls: 301 }), false); assert.equal(planTier("agency", true), "agency"); assert.equal(planTier(null, false), "free_audit");
-  assert.equal(webhookEventIdentity("lemon_squeezy", "evt_123"), "lemon_squeezy:evt_123");
+  assert.equal(webhookEventIdentity("dodo", "evt_123"), "dodo:evt_123");
 });
 
 test("all forensic issue types keep observable evidence distinct from hypotheses", () => {

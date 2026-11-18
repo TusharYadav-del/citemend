@@ -8,7 +8,7 @@ export function isMissingBetaColumns(error: { code?: string } | null): boolean {
 }
 
 export function grantsProAccess(subscription: SubscriptionState, now = Date.now()): boolean {
-  if (process.env.NODE_ENV === "production" && process.env.LEMON_SQUEEZY_TEST_MODE !== "true" && subscription.test_mode === true) return false;
+  if (process.env.NODE_ENV === "production" && process.env.DODO_PAYMENTS_ENVIRONMENT !== "test_mode" && subscription.test_mode === true) return false;
   if (subscription.plan === "pro_beta") {
     const end = subscription.current_period_end ? Date.parse(subscription.current_period_end) : NaN;
     return subscription.status === "active" && Number.isFinite(end) && end > now;

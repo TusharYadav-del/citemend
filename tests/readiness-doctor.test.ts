@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { REQUIRED_READINESS_TABLES, runReadinessDoctor, type SchemaTableStatus } from "../lib/readiness-doctor";
 
 const completeEnvironment: Record<string, string> = {
+  DODO_PAYMENTS_ENABLED: "true",
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_live_real-looking-key",
   CLERK_SECRET_KEY: "sk_live_real-looking-key",
   GROQ_API_KEY: "groq-real-looking-key",
@@ -10,12 +11,11 @@ const completeEnvironment: Record<string, string> = {
   GEMINI_API_KEY: "gemini-real-looking-key",
   RESEND_API_KEY: "resend-real-looking-key",
   CRON_SECRET: "a-long-secret-value",
-  LEMON_SQUEEZY_API_KEY: "ls-real-looking-key",
-  LEMON_SQUEEZY_STORE_ID: "store-1",
-  LEMON_SQUEEZY_PRODUCT_ID: "product-1",
-  LEMONSQUEEZY_STARTER_VARIANT_ID: "variant-1",
-  LEMONSQUEEZY_AGENCY_VARIANT_ID: "variant-2",
-  LEMON_SQUEEZY_WEBHOOK_SECRET: "webhook-secret",
+  DODO_PAYMENTS_API_KEY: "dodo-real-looking-key",
+  DODO_PAYMENTS_WEBHOOK_KEY: "webhook-secret",
+  DODO_PRODUCT_PILOT_ID: "pilot-product",
+  DODO_PRODUCT_GROWTH_ID: "growth-product",
+  DODO_PRODUCT_AGENCY_ID: "agency-product",
 };
 
 function allTables(): SchemaTableStatus[] {
@@ -28,13 +28,12 @@ test("readiness doctor reports a complete schema and provider configuration with
     inspectDatabase: async () => ({ connected: true, tables: allTables() }),
     now: () => new Date("2026-11-06T00:00:00.000Z"),
   });
-  assert.equal(result.status, "PASS", "configured Lemon Squeezy is the active provider; Dodo is optional");
+  assert.equal(result.status, "PASS", "configured Dodo Payments is the active provider");
   assert.equal(result.databaseSetupPending, false);
   assert.equal(result.checks.find((check) => check.id === "database")?.status, "PASS");
   assert.equal(result.checkedAt, "2026-11-06T00:00:00.000Z");
   assert.doesNotMatch(JSON.stringify(result), /real-looking-key|long-secret-value|webhook-secret/);
 });
-
 test("readiness doctor flags missing tables and disabled RLS as pending database setup", async () => {
   const tables = allTables().map((table) => table.table_name === "audits"
     ? { ...table, rls_enabled: false }
@@ -58,18 +57,14 @@ test("readiness doctor differentiates missing required settings from optional fe
   assert.equal(result.checks.find((check) => check.id === "database")?.status, "MISSING");
 });
 
-test("readiness doctor accepts canonical Lemon Squeezy variable names", async () => {
+test("readiness doctor requires all Dodo billing credentials and product IDs", async () => {
   const env: Record<string, string> = { ...completeEnvironment };
-  for (const name of ["LEMON_SQUEEZY_API_KEY", "LEMON_SQUEEZY_STORE_ID", "LEMON_SQUEEZY_PRODUCT_ID", "LEMON_SQUEEZY_WEBHOOK_SECRET"]) delete env[name];
-  Object.assign(env, {
-    LEMONSQUEEZY_API_KEY: "key", LEMONSQUEEZY_STORE_ID: "123", LEMONSQUEEZY_PRODUCT_ID: "456",
-    LEMONSQUEEZY_WEBHOOK_SECRET: "secret",
-  });
+  delete env.DODO_PRODUCT_GROWTH_ID;
   const result = await runReadinessDoctor({ env, inspectDatabase: async () => ({ connected: true, tables: allTables() }) });
-  assert.equal(result.checks.find(check => check.id === "lemon-squeezy")?.status, "PASS");
+  assert.equal(result.checks.find(check => check.id === "dodo-payments")?.status, "MISSING");
 });
 
-test("readiness doctor checks all expected tables through migration 036", () => {
+test("readiness doctor checks all expected tables through migration 040", () => {
   assert.equal(REQUIRED_READINESS_TABLES.length, 45);
   assert.ok(REQUIRED_READINESS_TABLES.includes("billing_webhook_events"));
   assert.ok(REQUIRED_READINESS_TABLES.includes("workspace_api_rate_windows"));

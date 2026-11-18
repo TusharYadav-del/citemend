@@ -4,7 +4,9 @@ import { normalizeDashboardDomain } from "@/lib/audit-dashboard";
 import { cloudflareRows, formatCloudflareRedirects } from "@/lib/recovery/verify";
 
 export async function GET(request: Request) {
-  const { userId } = await auth();
+  let userId: string | null;
+  try { userId = (await auth()).userId; }
+  catch { return Response.json({ error: "Authentication is temporarily unavailable." }, { status: 503, headers: { "Cache-Control": "private, no-store" } }); }
   if (!userId) return Response.json({ error: "Sign in to export redirects." }, { status: 401, headers: { "Cache-Control": "private, no-store" } });
   const query = new URL(request.url).searchParams;
   let domain: string;

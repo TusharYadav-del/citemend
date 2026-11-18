@@ -135,12 +135,12 @@ a hosted audit or confirming the undeployed cron schedule.
    named cron job that checks every five minutes. The first dispatch occurs at
    or after Monday 09:00 Asia/Kolkata; subsequent dispatches only drain
    unfinished work. No HTTP request is sent when all weekly work is finished.
-6. Configure the deferred Lemon Squeezy production webhook and subscribe to
-   `subscription_created`, `subscription_cancelled`, and
-   `subscription_updated`. Without it, paid subscriptions cannot reliably
-   activate Pro access or enter the weekly queue. Verify Groq and Tavily
-   availability and a test-mode Pro account before relying on live scheduled
-   scans.
+6. Apply migration 039, configure the Dodo Payments API key, webhook key, and
+   product IDs, then register `/api/webhooks/dodo` and enable the subscription
+   lifecycle events used by the handler. Without a verified webhook, paid
+   subscriptions cannot reliably activate Pro access or enter the weekly
+   queue. Verify Groq and Tavily availability and a Dodo test-mode account
+   before relying on live scheduled scans.
 7. Create a Resend account, verify a sending domain, and set
    `RESEND_API_KEY` and `RESEND_FROM_EMAIL` in the deployed app. The sender
    must use the verified domain. The recipient is the Pro user's primary

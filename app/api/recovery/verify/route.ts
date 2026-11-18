@@ -7,7 +7,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const headers = { "Cache-Control": "private, no-store" };
 
 export async function POST(request: Request) {
-  const { userId } = await auth();
+  let userId: string | null;
+  try { userId = (await auth()).userId; }
+  catch { return Response.json({ error: "Authentication is temporarily unavailable." }, { status: 503, headers }); }
   if (!userId) return Response.json({ error: "Sign in to verify redirects." }, { status: 401, headers });
   const input = await request.json().catch(() => null) as { domain?: unknown; findingId?: unknown } | null;
   if (!input || typeof input.domain !== "string" || typeof input.findingId !== "string" || !UUID.test(input.findingId)) return Response.json({ error: "Provide a valid domain and finding ID." }, { status: 400, headers });

@@ -103,14 +103,23 @@ async function recordEvent(
   redirectedTo: string | null,
   request: Request,
 ) {
-  const { error } = await db.from("ai_404_events").insert({
+  const { error } = await db.rpc("record_recovery_signal", {
+    target_domain: domain,
+    target_path: input.brokenPath,
+    target_referrer_host: parseReferrer(input.referrer) || null,
+    target_redirected_to: redirectedTo,
+    target_user_agent: (request.headers.get("user-agent") ?? "").slice(0, 1024),
+  });
+  if (!error) return;
+  // Keep the existing pixel response usable during a rolling deploy before Migration 040 is applied.
+  const fallback = await db.from("ai_404_events").insert({
     domain,
     broken_path: input.brokenPath,
     ai_referrer: parseReferrer(input.referrer),
     redirected_to: redirectedTo,
     user_agent: (request.headers.get("user-agent") ?? "").slice(0, 1024),
   });
-  if (error) throw error;
+  if (fallback.error) throw fallback.error;
 }
 
 async function incrementRecoveredHit(db: ReturnType<typeof createServerDatabase>, ruleId: string, initialCount: number) {

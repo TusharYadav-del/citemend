@@ -54,3 +54,24 @@ test("live verifier accepts one direct 301 and a 200 destination, rejecting chai
   assert.equal(chained.ok, false);
   assert.match(chained.reason, /directly/);
 });
+
+test("live verifier reports non-redirecting sources, unavailable destinations, and network failures without following redirects", async () => {
+  const sourceMissing = await verifyDeployedRedirect("https://example.com/old", "https://example.com/new", "example.com", async () => new Response(null, { status: 404 }) as never);
+  assert.equal(sourceMissing.ok, false);
+  assert.equal(sourceMissing.oldUrlStatus, 404);
+  assert.equal(sourceMissing.destinationStatus, null);
+
+  let destinationCalls = 0;
+  const destinationRedirect = await verifyDeployedRedirect("https://example.com/old", "https://example.com/new", "example.com", async input => {
+    if (String(input).endsWith("/old")) return new Response(null, { status: 302, headers: { Location: "/new" } });
+    destinationCalls++;
+    return new Response(null, { status: 302, headers: { Location: "/final" } }) as never;
+  });
+  assert.equal(destinationRedirect.ok, false);
+  assert.equal(destinationRedirect.destinationStatus, 302);
+  assert.equal(destinationCalls, 1);
+
+  const unavailable = await verifyDeployedRedirect("https://example.com/old", "https://example.com/new", "example.com", async () => { throw new Error("offline"); });
+  assert.equal(unavailable.ok, false);
+  assert.match(unavailable.reason, /could not reach/);
+});

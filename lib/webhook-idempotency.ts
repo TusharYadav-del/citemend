@@ -2,7 +2,7 @@ import type { createServerDatabase } from "./supabase-server";
 type Database = ReturnType<typeof createServerDatabase>;
 
 export async function claimWebhookEvent(db: Database, eventId: string, eventType: string): Promise<{ claimed: true } | { claimed: false }> {
-  const inserted = await db.from("webhook_events_log").insert({ event_id: eventId, provider: "lemonsqueezy", event_type: eventType, delivery_status: "processing" }).select("event_id").maybeSingle();
+  const inserted = await db.from("webhook_events_log").insert({ event_id: eventId, provider: "dodo", event_type: eventType, delivery_status: "processing" }).select("event_id").maybeSingle();
   if (!inserted.error) return { claimed: true };
   if (inserted.error.code !== "23505") throw new Error("Webhook delivery log is unavailable.");
   const existing = await db.from("webhook_events_log").select("delivery_status,retry_count,received_at").eq("event_id", eventId).maybeSingle();

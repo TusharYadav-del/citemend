@@ -10,6 +10,10 @@
       "schedule": "0 4 * * *"
     },
     {
+      "path": "/api/cron/recovery-qa",
+      "schedule": "0 6 * * *"
+    },
+    {
       "path": "/api/cron/outreach/daily",
       "schedule": "0 9 * * *"
     }

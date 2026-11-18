@@ -1,26 +1,18 @@
 import "server-only";
-import { createServerDatabase } from "./supabase-server";
-import { signedUrlFresh, trustedBillingUrl } from "./billing-webhook";
+import type { ClientOptions } from "dodopayments";
+import { createDodoClient } from "./billing-checkout";
 
-type SubscriptionUrls = { id: string; user_id: string; customer_portal_url: string | null; update_payment_method_url: string | null };
-
-export async function freshBillingUrls(row: SubscriptionUrls) {
-  if (signedUrlFresh(row.customer_portal_url) && signedUrlFresh(row.update_payment_method_url)) {
-    return { customerPortalUrl: row.customer_portal_url!, updatePaymentMethodUrl: row.update_payment_method_url! };
+export async function createBillingPortalSession(customerId: string, userId: string, fetcher?: ClientOptions["fetch"]): Promise<string> {
+  if (!/^cus_[A-Za-z0-9_-]+$/.test(customerId) || !/^user_[A-Za-z0-9]+$/.test(userId)) throw new Error("A valid Dodo customer is required.");
+  const rawOrigin = process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://citemend.vercel.app";
+  let origin: URL;
+  try { origin = new URL(rawOrigin); } catch { throw new Error("NEXT_PUBLIC_APP_URL must be an absolute URL."); }
+  const local = origin.hostname === "localhost" || origin.hostname === "127.0.0.1";
+  if ((origin.protocol !== "https:" && !(local && origin.protocol === "http:")) || origin.username || origin.password || origin.pathname !== "/" || origin.search || origin.hash) {
+    throw new Error("NEXT_PUBLIC_APP_URL must be a trusted HTTPS origin.");
   }
-  if (!/^\d+$/.test(row.id)) throw new Error("This subscription has no provider billing portal.");
-  const key = (process.env.LEMONSQUEEZY_API_KEY || process.env.LEMON_SQUEEZY_API_KEY)?.trim();
-  if (!key) throw new Error("LEMONSQUEEZY_API_KEY is required for subscription management.");
-  const response = await fetch(`https://api.lemonsqueezy.com/v1/subscriptions/${encodeURIComponent(row.id)}`, {
-    headers: { Accept: "application/vnd.api+json", Authorization: `Bearer ${key}` }, cache: "no-store", signal: AbortSignal.timeout(8_000),
-  });
-  if (!response.ok) throw new Error("Lemon Squeezy could not refresh the billing portal.");
-  const payload = await response.json() as { data?: { id?: unknown; attributes?: { urls?: { customer_portal?: unknown; update_payment_method?: unknown } } } };
-  if (payload.data?.id !== row.id) throw new Error("Lemon Squeezy returned a different subscription.");
-  const customerPortalUrl = trustedBillingUrl(payload.data?.attributes?.urls?.customer_portal);
-  const updatePaymentMethodUrl = trustedBillingUrl(payload.data?.attributes?.urls?.update_payment_method);
-  if (!customerPortalUrl || !updatePaymentMethodUrl) throw new Error("Lemon Squeezy returned no trusted billing URLs.");
-  await createServerDatabase().from("subscriptions").update({ customer_portal_url: customerPortalUrl, update_payment_method_url: updatePaymentMethodUrl })
-    .eq("id", row.id).eq("user_id", row.user_id);
-  return { customerPortalUrl, updatePaymentMethodUrl };
+  const result = await createDodoClient(fetcher ? { fetch: fetcher } : {}).customers.customerPortal.create(customerId, { return_url: `${origin.origin}/dashboard#billing` });
+  const url = new URL(result.link);
+  if (url.protocol !== "https:" || !(url.hostname === "dodopayments.com" || url.hostname.endsWith(".dodopayments.com"))) throw new Error("Dodo Payments returned an untrusted customer portal URL.");
+  return url.href;
 }

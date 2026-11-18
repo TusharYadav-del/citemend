@@ -1,42 +1,30 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { freshBillingUrls } from "../lib/billing-portal";
-import { signedUrlFresh, trustedBillingUrl } from "../lib/billing-webhook";
+import { createBillingPortalSession } from "../lib/billing-portal";
 
-const oldFetch = globalThis.fetch;
 const oldEnv = process.env;
-afterEach(() => { globalThis.fetch = oldFetch; process.env = oldEnv; });
+afterEach(() => { process.env = oldEnv; });
 
-test("fresh signed billing links are reused and expired links are refreshed for the owned subscription", async () => {
-  process.env = { ...oldEnv, LEMONSQUEEZY_API_KEY: "provider-key", NEXT_PUBLIC_SUPABASE_URL: "https://db.example.com", SUPABASE_SECRET_KEY: "server-key" };
-  const expires = Math.floor(Date.now() / 1000) + 3600;
-  const portal = `https://store.lemonsqueezy.com/billing?expires=${expires}&signature=abc`;
-  const payment = `https://store.lemonsqueezy.com/payment?expires=${expires}&signature=def`;
-  const row = { id: "101", user_id: "user_123", customer_portal_url: portal, update_payment_method_url: payment };
-  globalThis.fetch = async () => { throw new Error("Fresh URLs should not need a provider request."); };
-  assert.equal(signedUrlFresh(portal), true);
-  assert.equal((await freshBillingUrls(row)).customerPortalUrl, portal);
-
-  let updated = false;
-  globalThis.fetch = async (input, init) => {
-    if (String(input).includes("api.lemonsqueezy.com/v1/subscriptions/101")) return Response.json({ data: { id: "101", attributes: { urls: { customer_portal: portal, update_payment_method: payment } } } });
-    assert.match(String(input), /\/subscriptions\?/);
-    const url = new URL(String(input));
-    assert.equal(url.searchParams.get("id"), "eq.101");
-    assert.equal(url.searchParams.get("user_id"), "eq.user_123");
-    assert.equal(init?.method, "PATCH");
-    updated = true;
-    return new Response(null, { status: 204 });
-  };
-  const expired = { ...row, customer_portal_url: "https://store.lemonsqueezy.com/billing?expires=1&signature=old" };
-  assert.deepEqual(await freshBillingUrls(expired), { customerPortalUrl: portal, updatePaymentMethodUrl: payment });
-  assert.equal(updated, true);
+test("Dodo portal sessions are customer-scoped and return to the billing panel", async () => {
+  process.env = { ...oldEnv, DODO_PAYMENTS_ENABLED: "true", DODO_PAYMENTS_API_KEY: "test-key", DODO_PAYMENTS_ENVIRONMENT: "test_mode", NEXT_PUBLIC_APP_URL: "https://citemend.vercel.app" };
+  let requestBody: Record<string, unknown> | null = null;
+  let requestUrl = "";
+  const url = await createBillingPortalSession("cus_123abc", "user_123", async (input, init) => {
+    requestUrl = String(input);
+    if (init?.body) requestBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+    return Response.json({ link: "https://customer.dodopayments.com/portal/abc" });
+  });
+  assert.equal(url, "https://customer.dodopayments.com/portal/abc");
+  assert.equal(requestBody, null);
+  const parsed = new URL(requestUrl);
+  assert.match(parsed.pathname, /\/customers\/cus_123abc\/customer-portal\/session$/);
+  assert.equal(parsed.searchParams.get("return_url"), "https://citemend.vercel.app/dashboard#billing");
 });
 
-test("billing links reject HTTP, outside domains, and mismatched provider subscriptions", async () => {
-  process.env = { ...oldEnv, LEMONSQUEEZY_API_KEY: "provider-key" };
-  assert.equal(trustedBillingUrl("http://store.lemonsqueezy.com/billing"), null);
-  assert.equal(trustedBillingUrl("https://evil.example.com/billing"), null);
-  globalThis.fetch = async () => Response.json({ data: { id: "999", attributes: { urls: { customer_portal: "https://store.lemonsqueezy.com/billing" } } } });
-  await assert.rejects(freshBillingUrls({ id: "101", user_id: "user_123", customer_portal_url: null, update_payment_method_url: null }), /different subscription/);
+test("Dodo portal rejects invalid customer identifiers and untrusted provider links", async () => {
+  process.env = { ...oldEnv, DODO_PAYMENTS_ENABLED: "true", DODO_PAYMENTS_API_KEY: "test-key", DODO_PAYMENTS_ENVIRONMENT: "test_mode" };
+  await assert.rejects(createBillingPortalSession("101", "user_123"), /valid Dodo customer/);
+  await assert.rejects(createBillingPortalSession("cus_123abc", "user_123", async () => Response.json({ link: "https://evil.example.com/portal" })), /untrusted customer portal URL/);
+  process.env.NEXT_PUBLIC_APP_URL = "https://attacker.example.com/path";
+  await assert.rejects(createBillingPortalSession("cus_123abc", "user_123", async () => { throw new Error("Provider must not be called."); }), /trusted HTTPS origin/);
 });

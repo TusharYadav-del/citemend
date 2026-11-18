@@ -32,7 +32,7 @@ export default function CheckoutButton({ plan }: { plan?: "pro" | "agency" } = {
   const [betaResult, setBetaResult] = useState<{ unlocked: boolean; message: string; emailMessages: string[] } | null>(null);
 
   useEffect(() => {
-    fetch("/api/lemonsqueezy/checkout", { cache: "no-store" })
+    fetch("/api/billing/checkout", { cache: "no-store" })
       .then((response) => response.json())
       .then((data: { mode?: string }) => setBetaMode(data.mode === "beta"))
       .catch(() => setBetaMode(true));
@@ -91,7 +91,7 @@ export default function CheckoutButton({ plan }: { plan?: "pro" | "agency" } = {
     setPending(true);
     setError("");
     try {
-      const response = await fetch("/api/billing/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tier: plan === "pro" ? "starter" : "agency" }) });
+      const response = await fetch("/api/billing/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tier: plan === "pro" ? "pilot" : "agency" }) });
       const result: unknown = await response.json();
       if (response.ok && result && typeof result === "object" && (result as { betaMode?: boolean }).betaMode) {
         setBetaMode(true);
@@ -106,7 +106,7 @@ export default function CheckoutButton({ plan }: { plan?: "pro" | "agency" } = {
           : "Checkout is temporarily unavailable. Please try again.";
         throw new Error(message);
       }
-      toast.info((result as { testMode?: boolean }).testMode ? "Opening Lemon Squeezy test checkout. No live payment will be charged." : `Opening secure checkout for Citemend ${plan === "agency" ? "Agency" : "Pro"}.`);
+      toast.info((result as { testMode?: boolean }).testMode ? "Opening Dodo Payments test checkout. No live payment will be charged." : `Opening secure Dodo Payments checkout for CiteMend ${plan === "agency" ? "Agency" : "Pilot"}.`);
       window.location.assign((result as { checkoutUrl: string }).checkoutUrl);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Checkout is temporarily unavailable. Please try again.";

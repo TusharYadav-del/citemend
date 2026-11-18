@@ -15,7 +15,7 @@ test("Pro access respects subscription status and cancellation grace period", ()
 });
 
 test("production paid access excludes test subscriptions when test mode is disabled", () => {
-  process.env = { ...oldEnv, NODE_ENV: "production", LEMON_SQUEEZY_TEST_MODE: "false" };
+  process.env = { ...oldEnv, NODE_ENV: "production", DODO_PAYMENTS_ENVIRONMENT: "live_mode" };
   assert.equal(grantsProAccess({ plan: "pro", status: "active", cancelled: false, ends_at: null, test_mode: true }, now), false);
   assert.equal(grantsProAccess({ plan: "pro", status: "active", cancelled: false, ends_at: null, test_mode: false }, now), true);
 });

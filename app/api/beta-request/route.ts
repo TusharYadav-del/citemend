@@ -1,7 +1,7 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { requestDesignPartnerBeta } from "@/lib/beta-request";
 import { founderEmailRecipient, sendFounderAlertEmail, type FounderEmailDelivery } from "@/lib/founder-alerts";
-import { isBillingEnabled } from "@/lib/lemonsqueezy";
+import { isBillingEnabled } from "@/lib/billing-checkout";
 
 export async function POST(request: Request) {
   if (isBillingEnabled()) {

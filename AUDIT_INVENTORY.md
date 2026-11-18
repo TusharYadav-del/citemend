@@ -18,7 +18,7 @@
 | Redirect approval, signed preview, confidence threshold, manual mapping, rollback, canonical/loop/conflict safety and immutable action events | `lib/recovery-workflow.ts`, `lib/recovery-policy.ts`, `lib/seo.ts`, migrations 020/021 and recovery/sync routes | Shipped in code; user confirmed hosted migration 021 was applied |
 | Slack/Discord alerts and weekly scans | `lib/alerts.ts`, `lib/weekly-alerts.ts`, `lib/weekly-scan.ts` | Shipped; saved webhook delivery and scheduled production invocation need verification |
 | Agency white-label reports and workspace switching | `lib/agency-store.ts`, `lib/agency-whitelabel.ts`, settings route, audit report/dashboard | Shipped; live agency billing variant remains unverified in Day 84 record |
-| Lemon Squeezy checkout and signed subscription updates | `lib/lemonsqueezy.ts`, `lib/lemonsqueezy-webhook.ts`, webhook route | Shipped; live product, webhook configuration, and completed live purchase need verification |
+| Dodo Payments checkout, signed subscription updates, and customer portal | `lib/billing-checkout.ts`, `lib/dodo-webhook.ts`, `app/api/webhooks/dodo/route.ts`, migration 039 | Implemented; configure Dodo products, secrets, and webhook, then run a test checkout |
 | Local fallback/mock audit | `lib/mock-audit.ts`, `lib/mock-audit-store.ts`, test fixture | Shipped as a development/test path; production availability is intentionally restricted |
 
 ## API route inventory
@@ -34,9 +34,9 @@
 | `GET,POST /api/cron/weekly-scan` | Requires configured bearer secret; token comparison is timing-safe; leased jobs prevent duplicate work | Shipped |
 | `GET,POST /api/integrations/shopify/connect` | Authenticated, owned-domain scoped integration setup | Shipped; live OAuth/store flow needs verification |
 | `POST /api/integrations/shopify/sync` | Authenticated domain integration sync | Shipped; remote store permissions need verification |
-| `POST /api/lemonsqueezy/checkout` | Clerk-owned checkout and configured variant | Shipped; live billing configuration needs verification |
+| `GET,POST /api/billing/checkout` | Returns billing/beta mode and creates Clerk-owned Dodo checkout from configured product IDs | Implemented; requires Dodo environment configuration |
 | `GET /api/subscription/status` | Clerk-scoped subscription state | Shipped |
-| `POST /api/webhooks/lemonsqueezy` | Bounded raw body; HMAC-SHA256 `x-signature` checked with constant-time comparison; owner/store/product validation | Shipped; production secret and live webhook delivery need verification |
+| `POST /api/webhooks/dodo` | Bounded raw body; Standard Webhooks signature verification and webhook-id idempotency; validates account/product metadata | Implemented; production secret and live webhook delivery need verification |
 | `GET /api/llm-facts` | Generates machine-readable factual metadata using stored owner/domain evidence | Shipped; publicly deployed domain configuration needs verification |
 | `GET /api/llms-txt`, `GET /api/llms-txt/[domain]` | Authenticated generation or public stored document retrieval, respectively | Shipped |
 | `GET /api/pixel/dashboard` | Clerk-scoped rescue and redirect metrics | Shipped |
@@ -59,7 +59,7 @@
 | --- | --- | --- |
 | `audits` | Owner-scoped audit reports, matrix, score, billing/report metadata | Shipped |
 | `broken_links` | Citation URL findings and suggested redirects; migration 020 adds verification, confidence and approval lifecycle fields | Shipped in code; hosted migration 020 needs verification |
-| `subscriptions` | Lemon Squeezy subscription entitlement | Shipped |
+| `subscriptions` | Provider-tagged billing entitlement; legacy records preserved | Implemented; apply migration 039 before enabling Dodo billing |
 | `weekly_scan_runs` | Weekly run leases and status | Shipped |
 | `weekly_scan_jobs` | Per-owner/domain scheduled audit jobs | Shipped |
 | `weekly_scan_digests` | Idempotent user digest tracking | Shipped |
@@ -86,10 +86,10 @@ Migration files are numbered 001-033 and the local schema test applies them in o
 | Supabase RLS | RLS is enabled across the audited application tables. Application reads/writes use the server-only service key and enforce Clerk owner/domain filters. `redirect_rules` public access is filtered by a security-definer approval predicate; telemetry, integrations, vectors, and action audit logs revoke anon/authenticated access. A complete hosted role/grant and policy audit cannot be inferred from local files alone. | Needs Verification (hosted grants/policies) |
 | SSRF protection | `lib/public-http.ts` rejects non-HTTP(S), credentials, non-standard ports, private/loopback/link-local DNS results and pins public DNS results in its Undici connection. SEO/sitemap redirects are manually followed with each hop revalidated and bounded. Recovery additionally requires a same-domain HTTPS destination and an exact HTTP 200 preview. | Shipped |
 | Rate limits | Pixel interception uses migration 019's atomic limit of 120 requests per audited domain per minute. Free audit reservations and weekly leases prevent duplicate/free overuse. There is no shared per-user limiter across all authenticated AI/provider routes; production traffic limits should be verified/configured at the platform/provider layer. | In Progress |
-| Webhook signature verification | Lemon Squeezy inbound subscription events require bounded payloads and constant-time HMAC-SHA256 signature verification. Weekly cron uses a separate constant-time bearer-secret check. Slack/Discord are outbound webhooks; no inbound Slack/Discord signature route exists. | Shipped (Lemon Squeezy/cron); other inbound providers not present |
+| Webhook signature verification | Dodo Payments inbound subscription events require bounded payloads and Standard Webhooks signature verification, with atomic delivery-id deduplication. Weekly cron uses a separate constant-time bearer-secret check. Slack/Discord are outbound webhooks; no inbound Slack/Discord signature route exists. | Shipped in code; production webhook setup needs verification |
 | Recovery safety and action history | Migrations 020/021 are additive; approval checks enforce canonical-host URLs, a non-looping same-host redirect chain, no live HTTP 200 source overwrite, no conflicting active source rule, and a final HTTP 200 destination. Action rows are append-only and service-role-only. | Shipped in code; user confirmed hosted migration 021 was applied |
 | Opportunity lifecycle guardrails | API stages advance one step at a time and keep actor/time/note events; scores use equal 25% weights for relevance, buyer intent, citation evidence, and replacement quality. Outreach and Reddit content remain human-reviewed drafts. | Shipped in code; user confirmed hosted migration 021 was applied |
-| External production state | This inspection did not make live provider calls or inspect Vercel, Shopify, Clerk, Lemon Squeezy, or hosted Supabase dashboards. Day 84 records the Agency variant as pending/test-mode. | Needs Verification |
+| External production state | This inspection did not make live provider calls or inspect Vercel, Shopify, Clerk, Dodo Payments, or hosted Supabase dashboards. Migration 039 and Dodo products/webhook require production setup. | Needs Verification |
 
 ## Month 12 additions
 
@@ -141,4 +141,4 @@ The score is for repository implementation and automated QA, not customer produc
 - `npm audit --omit=dev`: pass, zero production dependency vulnerabilities.
 - `npm run build`: pass (`.next-sprint11-final`, isolated output directory after the cron scheduler adjustment).
 
-Sprint 10/11 additions are covered by `lib/job-queue-core.ts`, `lib/job-queue.ts`, `lib/background-job-processor.ts`, `app/api/jobs/`, `app/api/cron/background-jobs/`, `lib/billing.ts`, `lib/unit-economics.ts`, `lib/founder-os.ts`, `/dashboard/founder-os`, migrations 032/033, and `tests/definition-of-done.test.ts` / `tests/sprint10-11-foundation.test.ts`. Vercel's Hobby plan does not allow the every-minute worker schedule, so migration 033 registers it through Supabase pg_cron and Vercel retains its two daily cron entries. Annual plan prices and gross-margin guardrails are estimates; new Lemon Squeezy variants remain to be configured. The user confirmed hosted migrations 032 and 033 and reported pg_net HTTP 200 idle responses at one-minute intervals without timeouts or errors. This verifies the scheduled idle path by user report; a queued non-idle job has not been observed in this audit.
+Sprint 10/11 additions are covered by `lib/job-queue-core.ts`, `lib/job-queue.ts`, `lib/background-job-processor.ts`, `app/api/jobs/`, `app/api/cron/background-jobs/`, `lib/billing.ts`, `lib/unit-economics.ts`, `lib/founder-os.ts`, `/dashboard/founder-os`, migrations 032/033, and `tests/definition-of-done.test.ts` / `tests/sprint10-11-foundation.test.ts`. Vercel's Hobby plan does not allow the every-minute worker schedule, so migration 033 registers it through Supabase pg_cron and Vercel retains its two daily cron entries. Annual plan prices and gross-margin guardrails are estimates; the current Dodo product configuration is limited to the three published offers. The user confirmed hosted migrations 032 and 033 and reported pg_net HTTP 200 idle responses at one-minute intervals without timeouts or errors. This verifies the scheduled idle path by user report; a queued non-idle job has not been observed in this audit.

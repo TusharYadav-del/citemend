@@ -6,7 +6,7 @@ CiteMend authenticates user sessions with Clerk and stores workspace ownership a
 
 ## Network and webhook security
 
-Public URL checks use DNS-pinned connections and reject non-public IP answers, private/loopback destinations, non-HTTP protocols, credentials, and nonstandard ports. Redirects are followed explicitly with a bounded hop count so every destination is validated again. Shopify Admin calls use the connected store's fixed `myshopify.com` hostname and encrypted access tokens. Lemon Squeezy webhook deliveries are signature-verified and deduplicated before processing.
+Public URL checks use DNS-pinned connections and reject non-public IP answers, private/loopback destinations, non-HTTP protocols, credentials, and nonstandard ports. Redirects are followed explicitly with a bounded hop count so every destination is validated again. Shopify Admin calls use the connected store's fixed `myshopify.com` hostname and encrypted access tokens. Dodo Payments webhook deliveries are Standard Webhooks signature-verified and atomically deduplicated by delivery ID before subscription state is applied.
 
 ## Data protection
 

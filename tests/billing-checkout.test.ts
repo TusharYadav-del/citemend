@@ -1,56 +1,53 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { BillingConfigError, buildBillingCheckout, createBillingCheckout } from "../lib/billing-checkout";
+import { BillingConfigError, createBillingCheckout, isBillingEnabled, productForTier } from "../lib/billing-checkout";
 
 const oldEnv = process.env;
-const oldFetch = globalThis.fetch;
-afterEach(() => { process.env = oldEnv; globalThis.fetch = oldFetch; });
-
+afterEach(() => { process.env = oldEnv; });
 function configure() {
-  process.env = { ...oldEnv, LEMONSQUEEZY_API_KEY: "test-api-key", LEMONSQUEEZY_STORE_ID: "123",
-    LEMONSQUEEZY_STARTER_VARIANT_ID: "2322742",
-    LEMONSQUEEZY_GROWTH_VARIANT_ID: "790", LEMONSQUEEZY_AGENCY_VARIANT_ID: "2336501",
-    NEXT_PUBLIC_APP_URL: "https://siteman.vercel.app", LEMON_SQUEEZY_TEST_MODE: "true" };
+  process.env = { ...oldEnv, DODO_PAYMENTS_ENABLED: "true", DODO_PAYMENTS_API_KEY: "test-api-key", DODO_PAYMENTS_ENVIRONMENT: "test_mode",
+    DODO_PRODUCT_PILOT_ID: "pdt_pilot", DODO_PRODUCT_GROWTH_ID: "pdt_growth", DODO_PRODUCT_AGENCY_ID: "pdt_agency",
+    NEXT_PUBLIC_APP_URL: "https://citemend.vercel.app" };
 }
 
-test("checkout payload binds Clerk owner, email, plan tier, store, variant, redirect and test mode", async () => {
+test("Dodo checkout binds the authenticated owner, email, tier, product, and return path", async () => {
   configure();
-  for (const [tier, variant] of [["starter", "2322742"], ["growth", "790"], ["agency", "2336501"]] as const) {
-    const payload = buildBillingCheckout(tier, "user_123", "owner@example.com");
-    assert.equal(payload.data.relationships.store.data.id, "123");
-    assert.equal(payload.data.relationships.variant.data.id, variant);
-    assert.equal(payload.data.attributes.checkout_data.email, "owner@example.com");
-    assert.deepEqual(payload.data.attributes.checkout_data.custom, { user_id: "user_123", user_email: "owner@example.com", plan_tier: tier });
-    assert.equal(payload.data.attributes.product_options.redirect_url, "https://siteman.vercel.app/dashboard?billing=success");
-    assert.equal(payload.data.attributes.test_mode, true);
-  }
-  const requestedVariants: string[] = [];
-  globalThis.fetch = async (url, init) => {
-    assert.equal(String(url), "https://api.lemonsqueezy.com/v1/checkouts");
-    const body = JSON.parse(String(init?.body));
-    assert.equal(body.data.attributes.checkout_data.custom.user_id, "user_123");
-    requestedVariants.push(body.data.relationships.variant.data.id);
-    return Response.json({ data: { attributes: { test_mode: true, url: "https://store.lemonsqueezy.com/checkout/custom/abc" } } });
-  };
-  assert.match(await createBillingCheckout("starter", "user_123", "owner@example.com"), /checkout\/custom/);
-  assert.match(await createBillingCheckout("agency", "user_123", "owner@example.com"), /checkout\/custom/);
-  assert.deepEqual(requestedVariants, ["2322742", "2336501"]);
+  assert.equal(isBillingEnabled(), true);
+  assert.deepEqual([productForTier("pilot"), productForTier("growth"), productForTier("agency")], ["pdt_pilot", "pdt_growth", "pdt_agency"]);
+  let body: Record<string, unknown> | null = null;
+  const url = await createBillingCheckout("pilot", "user_123", "owner@example.com", async (_url, init) => {
+    body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    return Response.json({ checkout_url: "https://checkout.dodopayments.com/session/abc" });
+  });
+  const request = body as unknown as { product_cart: Array<{ product_id: string; quantity: number }>; customer: { email: string }; metadata: Record<string, string>; return_url: string };
+  assert.equal(url, "https://checkout.dodopayments.com/session/abc");
+  assert.deepEqual(request.product_cart, [{ product_id: "pdt_pilot", quantity: 1 }]);
+  assert.equal(request.customer.email, "owner@example.com");
+  assert.deepEqual(request.metadata, { user_id: "user_123", user_email: "owner@example.com", plan_tier: "pilot" });
+  assert.equal(request.return_url, "https://citemend.vercel.app/dashboard?billing=success");
 });
 
-test("checkout rejects unconfigured variants, invalid origins and untrusted provider URLs", async () => {
+test("Dodo checkout rejects invalid identity, incomplete configuration, invalid origin, and unsafe provider URLs", async () => {
   configure();
-  delete process.env.LEMONSQUEEZY_STARTER_VARIANT_ID;
-  assert.throws(() => buildBillingCheckout("starter", "user_123", "owner@example.com"), /LEMONSQUEEZY_STARTER_VARIANT_ID/);
-  process.env.LEMONSQUEEZY_STARTER_VARIANT_ID = "2322742";
-  delete process.env.LEMONSQUEEZY_AGENCY_VARIANT_ID;
-  process.env.LEMON_SQUEEZY_AGENCY_VARIANT_ID = "2336501";
-  assert.throws(() => buildBillingCheckout("agency", "user_123", "owner@example.com"), /LEMONSQUEEZY_AGENCY_VARIANT_ID/);
-  process.env.LEMONSQUEEZY_AGENCY_VARIANT_ID = "2336501";
-  delete process.env.LEMONSQUEEZY_GROWTH_VARIANT_ID;
-  assert.throws(() => buildBillingCheckout("growth", "user_123", "owner@example.com"), BillingConfigError);
+  delete process.env.DODO_PRODUCT_PILOT_ID;
+  delete process.env.DODO_PRODUCT_PILOT_ID;
+  assert.throws(() => productForTier("pilot"), BillingConfigError);
+  process.env.DODO_PRODUCT_PILOT_ID = "pdt_pilot";
+  await assert.rejects(createBillingCheckout("pilot", "bad-user", "owner@example.com"), /authenticated Clerk user/);
   process.env.NEXT_PUBLIC_APP_URL = "https://attacker.example.com/path";
-  assert.throws(() => buildBillingCheckout("starter", "user_123", "owner@example.com"), /trusted HTTPS origin/);
-  process.env.NEXT_PUBLIC_APP_URL = "https://siteman.vercel.app";
-  globalThis.fetch = async () => Response.json({ data: { attributes: { test_mode: true, url: "https://evil.example.com/checkout" } } });
-  await assert.rejects(createBillingCheckout("starter", "user_123", "owner@example.com"), /untrusted checkout URL/);
+  await assert.rejects(createBillingCheckout("pilot", "user_123", "owner@example.com"), /trusted HTTPS origin/);
+  process.env.NEXT_PUBLIC_APP_URL = "https://citemend.vercel.app";
+  await assert.rejects(createBillingCheckout("pilot", "user_123", "owner@example.com", async () => Response.json({ checkout_url: "https://evil.example.com/session" })), /untrusted checkout URL/);
+  delete process.env.DODO_PRODUCT_GROWTH_ID;
+  assert.equal(isBillingEnabled(), false);
+});
+
+test("Dodo checkout stays disabled until the explicit environment gate is enabled", () => {
+  configure();
+  delete process.env.DODO_PAYMENTS_ENABLED;
+  assert.equal(isBillingEnabled(), false);
+  process.env.DODO_PAYMENTS_ENABLED = "false";
+  assert.equal(isBillingEnabled(), false);
+  process.env.DODO_PAYMENTS_ENABLED = "true";
+  assert.equal(isBillingEnabled(), true);
 });
