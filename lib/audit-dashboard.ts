@@ -42,14 +42,16 @@ export function parseDashboardReport(value: unknown): DashboardReport {
     if (!entry || typeof entry !== "object") return fail();
     const finding = entry as Record<string, unknown>;
     if (!httpUrl(finding.url) || !(finding.httpStatus === null || typeof finding.httpStatus === "number" && Number.isInteger(finding.httpStatus) && finding.httpStatus >= 100 && finding.httpStatus <= 599) || !urlStates.includes(String(finding.urlState)) || !(finding.suggestedRedirect === null || httpUrl(finding.suggestedRedirect)) || !(finding.error === null || typeof finding.error === "string") || !(finding.matchEvidenceReason === undefined || typeof finding.matchEvidenceReason === "string")) return fail();
+    if (finding.normalizedPath !== undefined && typeof finding.normalizedPath !== "string") return fail();
+    if (finding.recoveryGuardrail !== undefined && (!finding.recoveryGuardrail || typeof finding.recoveryGuardrail !== "object" || !["recoverable_equivalent", "leave_as_404_or_410", "chain_or_loop_risk"].includes(String((finding.recoveryGuardrail as Record<string, unknown>).classification)))) return fail();
     if (finding.httpStatus === 404 && finding.urlState !== "404" || finding.httpStatus === 410 && finding.urlState !== "410" || finding.httpStatus === 301 && finding.urlState !== "301" || finding.httpStatus === 200 && finding.urlState !== "200") return fail();
   }
   for (const entry of report.findings) {
     const finding = entry as Record<string, unknown>;
     if (finding.matchConfidence !== undefined && (typeof finding.matchConfidence !== "number" || !Number.isInteger(finding.matchConfidence)
       || finding.matchConfidence < 0 || finding.matchConfidence > 100 || finding.httpStatus !== 404
-      || finding.matchConfidence < 70 && (finding.suggestedRedirect !== null || typeof finding.matchEvidenceReason !== "string" || !finding.matchEvidenceReason.includes("manual_mapping_required"))
-      || finding.matchConfidence >= 70 && !finding.suggestedRedirect)) return fail();
+      || finding.matchConfidence < 65 && (finding.suggestedRedirect !== null || typeof finding.matchEvidenceReason !== "string" || !finding.matchEvidenceReason.includes("manual_mapping_required"))
+      || finding.matchConfidence >= 65 && (!finding.recoveryGuardrail || (finding.recoveryGuardrail as Record<string, unknown>).classification === "recoverable_equivalent" && !finding.suggestedRedirect))) return fail();
   }
   if (report.citationGap !== undefined && !parseCitationGap(report.citationGap)) return fail();
   if (report.searchGrounding !== undefined && (!report.searchGrounding || typeof report.searchGrounding !== "object" || !["available", "unavailable", "not_configured"].includes(String((report.searchGrounding as Record<string, unknown>).status)))) return fail();

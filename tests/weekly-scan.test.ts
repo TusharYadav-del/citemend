@@ -148,8 +148,9 @@ test("scheduled persistence writes only confirmed 404s under the job ID and owne
     }
     if (url.pathname.endsWith("/broken_links") && method === "POST") {
       insertedLinks = JSON.parse(String(init?.body));
-      return new Response(null, { status: 201 });
+      return Response.json([{ id: "link-1", cited_url: "https://example.com/missing" }], { status: 201 });
     }
+    if (url.pathname.endsWith("/recovery_findings") && method === "POST") return Response.json([], { status: 201});
     if (url.pathname.endsWith("/audits") && method === "PATCH") {
       assert.equal(JSON.parse(String(init?.body)).buyer_prompt, "Find docs");
       return new Response(null, { status: 204 });

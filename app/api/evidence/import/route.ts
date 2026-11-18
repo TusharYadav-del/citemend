@@ -5,6 +5,8 @@ import { resolveWorkspaceAccess } from "@/lib/workspace-access";
 import { verifyUrl } from "@/lib/seo";
 import { fetchSitemapUrls } from "@/lib/seo";
 import { matchSitemapUrls } from "@/lib/sitemap-embeddings";
+import { groupRecoverySignals } from "@/lib/recovery/normalize";
+import { evaluateRecoveryCandidate, hasCommercialTopicEquivalence } from "@/lib/recovery/guardrails";
 
 type ImportBody = { auditId?: unknown; urls?: unknown; prompt?: unknown; provider?: unknown; model?: unknown; locale?: unknown; rawAnswer?: unknown };
 function validUrl(value: unknown): value is string {
@@ -51,7 +53,11 @@ export async function POST(request: Request) {
             const checked = await verifyUrl(candidate.url);
             try {
               const target = new URL(candidate.url);
-              if (target.hostname === domain && checked.state === "200" && checked.finalUrl && new URL(checked.finalUrl).hostname === domain) verified.push({ url: checked.finalUrl, similarity: candidate.similarity });
+              if (target.hostname === domain && checked.state === "200" && checked.httpStatus === 200 && checked.finalUrl && new URL(checked.finalUrl).hostname === domain) {
+                const confidence = Math.round(candidate.similarity * 100);
+                const guardrail = evaluateRecoveryCandidate({ deadUrl: item.url, suggestedTargetUrl: checked.finalUrl, sourceStatus: item.httpStatus ?? 404, targetStatus: checked.httpStatus, confidenceScore: confidence, semanticEquivalent: confidence >= 65, commerciallyEquivalent: hasCommercialTopicEquivalence(item.url, checked.finalUrl) });
+                if (guardrail.classification === "recoverable_equivalent") verified.push({ url: checked.finalUrl, similarity: candidate.similarity });
+              }
             } catch { /* malformed or cross-host targets are excluded */ }
           }
           mappings.set(item.url, verified);
@@ -64,9 +70,21 @@ export async function POST(request: Request) {
     });
     let saved = 0;
     if (inserts.length) {
-      const response = await db.from("broken_links").insert(inserts).select("id");
+      const response = await db.from("broken_links").insert(inserts).select("id,cited_url");
       if (response.error) return Response.json({ error: "HTTP checks were recorded, but broken URL recovery rows could not be saved." }, { status: 503 });
       saved = response.data?.length ?? inserts.length;
+      const ids = new Map((response.data ?? []).map(row => [row.cited_url, row.id]));
+      const groups = new Map(groupRecoverySignals(broken.map(item => ({ url: item.url, kind: "citation" }))).map(group => [group.normalized_path, group]));
+      const recoveryRows = [...groups.values()].map(group => {
+        const related = broken.map((item, index) => ({ item, row: inserts[index] })).filter(({ item }) => groupRecoverySignals([{ url: item.url }])[0].normalized_path === group.normalized_path);
+        const evaluations = related.map(({ item, row }) => ({ item, row, result: evaluateRecoveryCandidate({ deadUrl: item.url, suggestedTargetUrl: row.suggested_redirect, sourceStatus: row.http_status, targetStatus: row.suggested_redirect ? 200 : null, confidenceScore: row.match_confidence, semanticEquivalent: (row.match_confidence ?? 0) >= 65, commerciallyEquivalent: !!row.suggested_redirect && hasCommercialTopicEquivalence(item.url, row.suggested_redirect) }) }));
+        const selected = evaluations.find(entry => entry.result.classification === "chain_or_loop_risk") ?? evaluations.find(entry => entry.result.classification === "recoverable_equivalent") ?? evaluations[0];
+        const rejectedSoft404 = evaluations.filter(entry => entry.result.rejected_soft_404).length;
+        const blockedLoops = evaluations.filter(entry => entry.result.blocked_loop).length;
+        return { audit_id: auditRow.id, broken_link_id: ids.get(selected.item.url) ?? null, domain, finding_type: "dead_url" as const, normalized_path: group.normalized_path, signal_evidence: { observed_404_visits: 0, external_referrers: 0, citation_snapshots: group.citation_snapshots, user_agent_verified: false, priority_score: group.priority_score, url_variants: related.map(entry => entry.item.url), rejected_soft_404_count: rejectedSoft404, blocked_loop_count: blockedLoops }, guardrail_classification: selected.result.classification, approval_status: "pending_human_review" as const, suggested_target_url: selected.result.classification === "recoverable_equivalent" ? selected.row.suggested_redirect : null, confidence_score: selected.result.confidence_score, match_reason: selected.result.match_reason, rejected_soft_404_count: rejectedSoft404, blocked_loop_count: blockedLoops };
+      });
+      const recoverySaved = await db.from("recovery_findings").insert(recoveryRows);
+      if (recoverySaved.error) return Response.json({ error: "Recovery candidates were checked, but their guardrail records could not be saved." }, { status: 503 });
     }
     return Response.json({ evidenceCategory: "Recorded Platform / Provider Observation", importedProviderRecord: true, provider, model, locale, observedAt, checked: checks, ownDomainBrokenCount: broken.length, recoveryRowsCreated: saved, externalBrokenCount: checks.filter(item => !ownDomainUrls.includes(item) && (item.state === "404" || item.state === "410")).length, note: "Imported provider details are customer supplied. HTTP states below were checked by CiteMend. External publisher URLs are not eligible redirect sources. Similarity ranks candidate relevance; it is not a probability. Redirect candidates remain pending human approval." }, { headers: { "Cache-Control": "private, no-store" } });
   } catch { return Response.json({ error: "Evidence import is temporarily unavailable." }, { status: 503 }); }

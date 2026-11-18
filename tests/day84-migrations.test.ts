@@ -26,18 +26,19 @@ test("daily Vercel jobs and the every-minute Supabase worker use protected cron 
   assert.match(outreachSetup, /\/api\/cron\/outreach\/daily/);
 });
 
-test("migrations 001 through 037 apply in order and expose the columns used by the application", async () => {
+test("migrations 001 through 038 apply in order and expose the columns used by the application", async () => {
   const db = new PGlite({ extensions: { vector } });
   try {
     await db.exec("create role anon; create role authenticated; create role service_role bypassrls;");
     await db.exec("create schema auth; create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$; grant usage on schema auth to authenticated, service_role; grant execute on function auth.jwt() to authenticated, service_role;");
     const directory = new URL("../supabase/migrations/", import.meta.url);
     const files = (await readdir(directory)).filter(name => /^\d{3}_.+\.sql$/.test(name)).sort();
-    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 37 }, (_, index) => String(index + 1).padStart(3, "0")));
+    assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 38 }, (_, index) => String(index + 1).padStart(3, "0")));
     for (const file of files) await db.exec(await readFile(new URL(file, directory), "utf8"));
     const expected: Record<string, string[]> = {
       audits: ["id", "user_id", "domain", "buyer_prompt", "status", "created_at", "completed_at", "competitor_domains", "ground_truth_pricing", "indexnow_key", "share_of_model_score", "engine_matrix_json", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text", "llms_txt_content", "webhook_url", "sitemap_url_count"],
       broken_links: ["id", "audit_id", "cited_url", "http_status", "suggested_redirect", "url_state", "approval_status", "approved_by", "approved_at", "previous_destination_url", "deployed_at", "rolled_back_at", "match_evidence_reason", "match_confidence", "created_at"],
+      recovery_findings: ["id", "audit_id", "broken_link_id", "domain", "finding_type", "normalized_path", "signal_evidence", "guardrail_classification", "approval_status", "suggested_target_url", "confidence_score", "match_reason", "rejected_soft_404_count", "blocked_loop_count", "created_at"],
       subscriptions: ["id", "user_id", "store_id", "product_id", "variant_id", "status", "plan", "plan_name", "test_mode", "lemonsqueezy_customer_id", "lemonsqueezy_subscription_id", "lemonsqueezy_order_id", "customer_portal_url", "update_payment_method_url", "trial_ends_at", "current_period_end", "ends_at", "cancelled", "provider_updated_at"],
       billing_webhook_events: ["id", "event_hash", "event_name", "payload", "processed_at"],
       weekly_scan_runs: ["id", "week_start", "status", "lease_token", "digests_prepared_at"],
@@ -93,7 +94,7 @@ test("migrations 001 through 037 apply in order and expose the columns used by t
     assert.deepEqual(outreachDefaults,{outreach_enabled:false,outreach_enabled_override:null,daily_target:20,daily_send_limit:15,min_qualification_score:75});
     await db.exec("insert into public.outreach_prospects(domain) values ('locked.example'); insert into public.outreach_emails(prospect_id,recipient,subject,body_text,body_html,status) select id,'founder@locked.example','Verified example','Draft only','<p>Draft only</p>','draft_locked' from public.outreach_prospects where domain='locked.example'");
     assert.equal((await db.query<{ status: string }>("select status from public.outreach_emails where recipient='founder@locked.example'")).rows[0].status, "draft_locked");
-    assert.deepEqual((await db.query<{ table_name: string }>("select table_name from public.citemend_readiness_schema_status() order by table_name")).rows.length, 45);
+    assert.deepEqual((await db.query<{ table_name: string }>("select table_name from public.citemend_readiness_schema_status() order by table_name")).rows.length, 46);
     const firstOutreachRun = (await db.query<{ claimed: boolean; run_id: string }>("select * from public.outreach_begin_daily_run('2026-11-08')")).rows[0];
     assert.equal(firstOutreachRun.claimed, true);
     const duplicateOutreachRun = (await db.query<{ claimed: boolean; run_id: string }>("select * from public.outreach_begin_daily_run('2026-11-08')")).rows[0];

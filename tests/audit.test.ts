@@ -157,7 +157,8 @@ test("checks only target-domain citations and verifies next-best live sitemap de
   });
   assert.equal(report.status, "completed");
   assert.equal(report.findings.length, 2);
-  assert.equal(report.findings.find((item) => item.httpStatus === 404)?.suggestedRedirect, "https://example.com/docs/setup");
+  assert.equal(report.findings.find((item) => item.httpStatus === 404)?.suggestedRedirect, null);
+  assert.equal(report.findings.find((item) => item.httpStatus === 404)?.recoveryGuardrail?.classification, "leave_as_404_or_410");
   assert.ok(checked.every((url) => new URL(url).hostname === "example.com"));
   assert.equal(new Set(checked).size, checked.length);
   assert.ok(stored);
@@ -229,7 +230,8 @@ test("POST runs real SDK/parser/checker/store code against controlled HTTP fixtu
     if (url === "https://example.com/sitemap.xml") return new Response('<urlset><url><loc>https://example.com/docs/setup</loc></url></urlset>');
     if (url.startsWith("https://example.com/")) return new Response(null, { status: url.endsWith("setup-old") ? 404 : 200 });
     if (url.startsWith("https://db.example.com/rest/v1/audits") && method === "POST") { persistedAudit = JSON.parse(String(options?.body)); insertCount++; return Response.json({ id, created_at: "2026-10-30T00:00:00Z" }); }
-    if (url.startsWith("https://db.example.com/rest/v1/broken_links")) { persistedLinks = JSON.parse(String(options?.body)); return new Response(null, { status: 201 }); }
+    if (url.startsWith("https://db.example.com/rest/v1/broken_links")) { persistedLinks = JSON.parse(String(options?.body)); return Response.json([{ id: "child-id", cited_url: "https://example.com/docs/setup-old" }], { status: 201 }); }
+    if (url.startsWith("https://db.example.com/rest/v1/recovery_findings")) return Response.json([], { status: 201 });
     if (url.startsWith("https://db.example.com/rest/v1/ai_observation_evidence")) return new Response(null, { status: 201 });
     if (url.startsWith("https://db.example.com/rest/v1/audits") && method === "GET") return Response.json({ id, user_id: "user_test_123", status: "completed", broken_links: [{ id: "child-id" }] });
     if (url.startsWith("https://db.example.com/rest/v1/audits") && method === "PATCH") return new Response(null, { status: 204 });
@@ -239,10 +241,10 @@ test("POST runs real SDK/parser/checker/store code against controlled HTTP fixtu
   assert.equal(response.status, 201);
   const report = await response.json();
   assert.equal(report.auditId, id);
-  assert.equal(report.findings[0].suggestedRedirect, "https://example.com/docs/setup");
+  assert.equal(report.findings[0].suggestedRedirect, null);
   assert.equal(insertCount, 1);
   assert.equal(persistedAudit?.user_id, "user_test_123");
-  assert.deepEqual(persistedLinks, [{ audit_id: id, cited_url: "https://example.com/docs/setup-old", http_status: 404, url_state: "404", approval_status: "pending_review", suggested_redirect: "https://example.com/docs/setup", match_confidence: null, match_evidence_reason: "URL path overlap candidate verified live; human review is required because no semantic confidence was recorded." }]);
+  assert.deepEqual(persistedLinks, [{ audit_id: id, cited_url: "https://example.com/docs/setup-old", http_status: 404, url_state: "404", approval_status: "pending_review", suggested_redirect: null, match_confidence: null, match_evidence_reason: "The live candidate does not meet the semantic and commercial equivalence threshold; preserve the source 404/410." }]);
 });
 
 test("POST returns a safe Groq 429 without writing to Supabase", async () => {
@@ -278,7 +280,8 @@ test("failed child persistence removes only the new parent and missing credentia
 test("path similarity handles typos, and no-404 reports do not invent broken links", async () => {
   const typoProbe = { ...probe, text: "See https://example.com/prcing", sources: [], groundingMetadata: { groundingChunks: [] } };
   const report = await runAudit(input, { probe: async () => typoProbe, sitemap: async () => ["https://example.com/contact", "https://example.com/pricing"], check: async (url) => url.endsWith("prcing") ? 404 : 200, save });
-  assert.equal(report.findings[0].suggestedRedirect, "https://example.com/pricing");
+  assert.equal(report.findings[0].suggestedRedirect, null);
+  assert.equal(report.findings[0].recoveryGuardrail?.classification, "leave_as_404_or_410");
   const healthy = await runAudit(input, { probe: async () => probe, sitemap: async () => [], check: async () => 200, save });
   assert.ok(healthy.findings.every((item) => item.httpStatus === 200 && item.suggestedRedirect === null));
 });

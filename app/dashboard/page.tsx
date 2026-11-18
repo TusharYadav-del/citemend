@@ -58,6 +58,7 @@ import { RecoveryCenter, type RecoveryEvidence, type RecoveryOutcome } from "@/c
 import { CitationEvidenceImport } from "@/components/citation-evidence-import";
 import { EvidenceCategoryBadge } from "@/components/evidence-category-badge";
 import type { SidebarItem } from "@/components/ui/sidebar";
+import { RecoveryDeploymentTools } from "@/components/recovery-deployment-tools";
 
 function MetricCards({ audits, rescued, deployments, citations, activeWorkspaces }: { audits: UserAuditHistoryItem[]; rescued: number | null; deployments: number | null; citations: number | null; activeWorkspaces: number }) {
   if (!audits.length) return <div className="mb-6"><EmptyState title="Your first audit starts here" description="Connect a website and run one buyer prompt to establish your baseline." action={<Link href="/#audit" className="inline-flex min-h-10 items-center rounded-lg bg-emerald-300 px-4 text-xs font-semibold text-[#07110d]">Run first audit</Link>} /></div>;
@@ -81,10 +82,10 @@ function MonthlyRecoveryValueSummary({ highIntent, recoveredVisits, prevented, h
   return <section aria-label="Monthly Recovery and QA Value Summary" className="mb-6 rounded-2xl border border-emerald-300/20 bg-emerald-300/[.04] p-5">
     <div><h2 className="text-base font-semibold text-white">Monthly Recovery &amp; QA Value Summary</h2><p className="mt-1 text-xs text-slate-400">Last 30 days · measured events are separated from estimates.</p></div>
     <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <MetricCard label="New Verified High-Intent Dead URLs Caught" value={highIntent.toLocaleString()} detail="Only findings with recorded semantic + commercial match evidence qualify." />
-      <MetricCard label="Estimated Visits / Orders / Leads Recovered" value={recoveredVisits === null ? "Unavailable" : recoveredVisits.toLocaleString()} detail="Verified recovered visits; order and lead attribution is not connected." />
-      <MetricCard label="Soft-404s, Loops & Bad Redirects Prevented" value={prevented.toLocaleString()} detail="Logged redirect conflict and safety rejections; not inferred from all 404s." />
-      <MetricCard label="Engineering / SEO Hours Saved" value={`~${hoursSaved.toLocaleString()}h`} detail="Estimate at 30 minutes per verified high-intent finding; replace with team time tracking when available." />
+      <MetricCard label="New Verified High-Intent Errors Caught" value={highIntent.toLocaleString()} detail="Dead URL findings pending human review or approved in the last 30 days." />
+      <MetricCard label="Post-Fix Visits & Orders Recovered" value={recoveredVisits === null ? "Unavailable" : recoveredVisits.toLocaleString()} detail="Observed visits on deployed findings; order attribution is not connected." />
+      <MetricCard label="Bad Recommendations & Soft-404s Prevented" value={prevented.toLocaleString()} detail="Leave-as-404/410 and explicitly rejected bad recommendations." />
+      <MetricCard label="Engineering & SEO Hours Saved" value={`~${hoursSaved.toLocaleString()}h`} detail="Estimate at 0.25 hours per handled finding; replace with team time tracking when available." />
     </div>
   </section>;
 }
@@ -153,6 +154,8 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
   let actionLogs: { id: string; workspace_domain: string; actor_user_id: string; action_type: string; target_url: string | null; safety_check_passed: boolean; created_at: string }[] = [];
   let recoveryEvidence: RecoveryEvidence[] = [];
   let recoveryOutcomes: RecoveryOutcome[] = [];
+  let recoveryFindings: { id: string; audit_id: string; domain: string; finding_type: string; normalized_path: string; signal_evidence: Record<string, unknown>; guardrail_classification: string; approval_status: string; suggested_target_url: string | null; created_at: string }[] = [];
+  let recoveryFindingsAvailable = false;
   let recoveryEvidenceError = false;
   let onboarding: OnboardingProgress = getOnboardingProgress({ ownedDomains: allDomains.length, savedAudit: audits.some((audit) => ["completed", "partial"].includes(audit.status)), approvedRecovery: audits.some(audit => audit.broken_links.some(link => ["approved", "deployed"].includes(link.approval_status))), technicalDeploymentVerified: false });
   try {
@@ -160,13 +163,15 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
     const domains = [...new Set(audits.map((audit) => audit.domain))];
     const auditIds = audits.map(audit => audit.id);
     if (auditIds.length) {
-      const [outcomes, evidenceResult] = await Promise.all([
+      const [outcomes, evidenceResult, findingsResult] = await Promise.all([
         db.from("recovery_outcomes").select("audit_id,broken_link_id,technical_deployment_verified_at,ai_citation_observed_at").in("audit_id", auditIds).limit(500),
         db.from("ai_observation_evidence").select("id,audit_id,domain,prompt_query,prompt_version,provider,model_name,search_method,locale,raw_answer,extracted_urls_json,sample_size,observed_at").in("audit_id", auditIds).order("observed_at", { ascending: false }).limit(500),
+        db.from("recovery_findings").select("id,audit_id,domain,finding_type,normalized_path,signal_evidence,guardrail_classification,approval_status,suggested_target_url,created_at").in("audit_id", auditIds).gte("created_at", new Date(Date.now() - 30 * 86400000).toISOString()).limit(5000),
       ]);
       if (!outcomes.error) recoveryOutcomes = outcomes.data ?? [];
       if (!evidenceResult.error) recoveryEvidence = evidenceResult.data ?? [];
       else recoveryEvidenceError = true;
+      if (!findingsResult.error) { recoveryFindings = findingsResult.data ?? []; recoveryFindingsAvailable = true; }
       if (!outcomes.error) {
         deploymentCount = (outcomes.data ?? []).filter(row => row.technical_deployment_verified_at).length;
         citationCount = (outcomes.data ?? []).filter(row => row.ai_citation_observed_at).length;
@@ -245,10 +250,10 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
       <AuditTemplates />
       <MetricCards audits={audits} rescued={access.organizationId?null:rescued} deployments={deploymentCount} citations={citationCount} activeWorkspaces={new Set(audits.map(audit => audit.domain)).size} />
       <MonthlyRecoveryValueSummary
-        highIntent={recoveryRows.filter(link => link.http_status === 404 && link.suggested_redirect && (link.match_confidence ?? 0) >= 85 && /semantic.*commercial|commercial.*semantic/i.test(link.match_evidence_reason ?? "") && Date.now() - Date.parse(link.auditCreatedAt) <= 30 * 86400000).length}
-        recoveredVisits={rescued}
-        prevented={actionLogs.filter(log => log.action_type === "redirect_conflict_rejection" && Date.now() - Date.parse(log.created_at) <= 30 * 86400000).length}
-        hoursSaved={Math.round(recoveryRows.filter(link => link.http_status === 404 && link.suggested_redirect && (link.match_confidence ?? 0) >= 85 && /semantic.*commercial|commercial.*semantic/i.test(link.match_evidence_reason ?? "") && Date.now() - Date.parse(link.auditCreatedAt) <= 30 * 86400000).length * 0.5 * 10) / 10}
+        highIntent={recoveryFindingsAvailable ? recoveryFindings.filter(row => row.finding_type === "dead_url" && ["pending_human_review", "approved"].includes(row.approval_status)).length : recoveryRows.filter(link => link.http_status === 404 && link.suggested_redirect && (link.match_confidence ?? 0) >= 85 && /semantic.*commercial|commercial.*semantic/i.test(link.match_evidence_reason ?? "") && Date.now() - Date.parse(link.auditCreatedAt) <= 30 * 86400000).length}
+        recoveredVisits={recoveryFindingsAvailable ? recoveryFindings.filter(row => row.approval_status === "deployed").reduce((sum, row) => sum + (typeof row.signal_evidence.observed_404_visits === "number" && Number.isFinite(row.signal_evidence.observed_404_visits) ? row.signal_evidence.observed_404_visits : 0), 0) : rescued}
+        prevented={recoveryFindingsAvailable ? recoveryFindings.filter(row => row.guardrail_classification === "leave_as_404_or_410" || row.approval_status === "rejected_bad_recommendation").length : actionLogs.filter(log => log.action_type === "redirect_conflict_rejection" && Date.now() - Date.parse(log.created_at) <= 30 * 86400000).length}
+        hoursSaved={recoveryFindingsAvailable ? Math.round(recoveryFindings.filter(row => row.approval_status !== "pending_human_review").length * 0.25 * 100) / 100 : Math.round(recoveryRows.filter(link => link.http_status === 404 && link.suggested_redirect && (link.match_confidence ?? 0) >= 85 && /semantic.*commercial|commercial.*semantic/i.test(link.match_evidence_reason ?? "") && Date.now() - Date.parse(link.auditCreatedAt) <= 30 * 86400000).length * 0.5 * 10) / 10}
       />
       <Suspense fallback={<OperatingMetricsSkeleton />}><WorkspaceOperatingMetrics domain={selectedDomain || allDomains[0] || ""} ownerUserIds={ownerIds} actorUserIds={[...new Set([...ownerIds, userId])]} organizationId={access.organizationId} /></Suspense>
       {latestReport && <section aria-label="Quick tools" className="mb-6 rounded-xl border border-white/10 bg-white/[0.03] p-4"><h2 className="text-sm font-semibold text-white">Quick Tools</h2><a href={`/audit/${latestReport.id}?print=1`} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg border border-emerald-400/30 px-3 py-2 text-xs font-semibold text-emerald-300">Export Report / Save as PDF</a><p className="mt-2 text-xs text-slate-500">Opens the latest report for {latestReport.domain}.</p></section>}
@@ -262,6 +267,7 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
       <div id="ai-visibility" className="mb-5 rounded-xl border border-white/10 bg-white/[0.02] p-4"><h2 className="text-sm font-semibold">AI Visibility</h2><p className="mt-1 text-xs text-slate-400">Share of Model and engine profiles appear on each saved audit report. Profile results are modeled from shared grounding sources.</p><AiVisibilityInsights domain={selectedDomain || allDomains[0] || ""} /></div>
       {canApprove&&<BulkRedirectManager domain={selectedDomain || allDomains[0] || ""} auditId={latestReport?.id} />}
       <p id="redirect-export" className="mb-6 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-xs leading-5 text-slate-400">Pro users can publish or disable verified 301 suggestions below. Rules become active when the Cloudflare Worker is attached to the domain; edge lookups can retain a change for up to five seconds.</p>
+      <RecoveryDeploymentTools domain={selectedDomain || latestReport?.domain || allDomains[0] || ""} findings={recoveryFindings.filter(row => !selectedDomain || row.domain === selectedDomain)} />
       <div id="workspaces"><AgencyReferralConversionTracker domain={selectedDomain||allDomains[0]||""} /><WorkspaceSettingsTabs settings={<><section className="mb-5 rounded-xl border border-white/10 bg-white/[0.03] p-4"><h2 className="text-sm font-semibold">Security Overview</h2><p className="mt-1 text-xs text-slate-400">Architecture, tenant isolation, SSRF, webhook, encryption, retention and incident response notes.</p><a href="/security-overview.md" download className="mt-3 inline-flex rounded-lg border border-emerald-300/30 px-3 py-2 text-xs font-semibold text-emerald-300">Download Security Overview</a>{access.role==="owner"&&<a href={`/api/workspaces/governance?domain=${encodeURIComponent(selectedDomain||allDomains[0]||"")}&action=export`} className="ml-3 inline-flex rounded-lg border border-white/10 px-3 py-2 text-xs">Export workspace data</a>}</section>{canManageSettings&&<ProductionReadinessPanel />}{canManageSettings&&<WorkspaceGovernanceSettings domain={selectedDomain||allDomains[0]||""} />}{canManageSettings&&<ScheduledReportSettings domain={selectedDomain||allDomains[0]||""} />}{canManageSettings&&<WorkspaceIntegrations key={`workspace-${selectedDomain}`} domains={[...new Set(audits.map(audit => audit.domain))]} />}{canManageOwnerSettings&&<WorkspaceApiKeys domains={[...new Set(audits.map(audit => audit.domain))]} />}{access.organizationId===null&&<AgencyProfileSettings key={`agency-${selectedDomain}`} domains={[...new Set(audits.map(audit => audit.domain))]} isPro={isPro} />}</>} partner={canManageSettings?<AgencyPartnerPanel key={selectedDomain || allDomains[0] || ""} domain={selectedDomain||allDomains[0]||""} domains={allDomains} />:<section id="agency-partner" className="rounded-xl border border-white/10 bg-white/[.03] p-5"><h2 className="text-sm font-semibold">Agency Partner Program</h2><p className="mt-2 text-xs leading-5 text-slate-400">Workspace owner or admin access is required to create and manage partner referrals.</p></section>} /></div>
       {access.role==="owner" && (isBillingEnabled() ? <BillingPanel available={{ starter: !!process.env.LEMONSQUEEZY_STARTER_VARIANT_ID, growth: !!process.env.LEMONSQUEEZY_GROWTH_VARIANT_ID, agency: !!process.env.LEMONSQUEEZY_AGENCY_VARIANT_ID }} /> : <div id="billing" className="mb-5 rounded-xl border border-white/10 bg-white/[0.02] p-4"><h2 className="text-sm font-semibold">Billing</h2><p className="mt-1 text-xs text-slate-400">Request beta access while billing is deferred.</p><CheckoutButton /></div>)}
       <section id="audit-history" className="mb-6 scroll-mt-8"><div className="mb-4"><p className="font-mono text-[10px] uppercase tracking-[.16em] text-emerald-300">4 · Prove</p><h2 className="mt-1 text-xl font-semibold text-white">Reports</h2></div>{latestReport && canWorkspace(access.role, "draft") && <CaseStudyGenerator auditId={latestReport.id} />}{audits.length ? <div className="space-y-4">{audits.map(audit => <AuditCard key={audit.id} audit={audit} gap={gaps.get(audit.id)} />)}</div> : <EmptyState title="No audits saved yet" description="Run an audit and it will appear here." action={<Link href="/#audit" className="inline-flex rounded-full bg-emerald-300 px-5 py-3 text-sm font-semibold text-[#07110d]">Run an audit</Link>} />}</section>

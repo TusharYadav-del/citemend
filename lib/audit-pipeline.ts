@@ -12,9 +12,11 @@ import { persistAudit } from "./audit-store";
 import { matchSitemapUrls, SEMANTIC_MATCH_THRESHOLD } from "./sitemap-embeddings";
 import { buildEngineMatrix, type EngineCitation, type EngineName, type EnginePromptInput } from "./engine-matrix";
 import { synthesizeEngineProfiles, type SynthesizedProfile } from "./engine-synthesis";
+import { normalizeRecoveryUrl } from "./recovery/normalize";
+import { evaluateRecoveryCandidate, hasCommercialTopicEquivalence, type RecoveryGuardrailResult } from "./recovery/guardrails";
 
 export class AuditInputError extends Error {}
-export type AuditFinding = { url: string; httpStatus: number | null; urlState: UrlState; error: string | null; suggestedRedirect: string | null; matchConfidence?: number; matchEvidenceReason?: string };
+export type AuditFinding = { url: string; httpStatus: number | null; urlState: UrlState; error: string | null; suggestedRedirect: string | null; matchConfidence?: number; matchEvidenceReason?: string; normalizedPath?: string; recoveryGuardrail?: RecoveryGuardrailResult };
 export type AuditReport = {
   domain: string; buyerPrompt: string; buyerPrompts?: string[]; competitorDomains?: string[]; groundTruthPricing?: string; visibilityScore?: number; generatedText: string;
   groundingMetadata: GeminiProbeResult["groundingMetadata"];
@@ -256,6 +258,18 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
       const code = await status(candidate.url);
       if (code === null) warnings.push("A redirect candidate could not be verified within the checking budget.");
       if (code !== null && code >= 200 && code < 300) { finding.suggestedRedirect = candidate.url; finding.matchEvidenceReason = "URL path overlap candidate verified live; human review is required because no semantic confidence was recorded."; break; }
+    }
+  }
+  for (const finding of broken) {
+    const sourcePath = normalizeRecoveryUrl(finding.url).normalized_path;
+    const confidence = finding.matchConfidence === undefined ? null : finding.matchConfidence;
+    const commercialEquivalent = !!finding.suggestedRedirect && hasCommercialTopicEquivalence(finding.url, finding.suggestedRedirect);
+    const result = evaluateRecoveryCandidate({ deadUrl: finding.url, suggestedTargetUrl: finding.suggestedRedirect, sourceStatus: finding.httpStatus ?? 0, targetStatus: finding.suggestedRedirect ? await status(finding.suggestedRedirect) : null, confidenceScore: confidence, semanticEquivalent: confidence !== null && confidence >= 65, commerciallyEquivalent: commercialEquivalent });
+    finding.normalizedPath = sourcePath;
+    finding.recoveryGuardrail = result;
+    if (result.classification !== "recoverable_equivalent") {
+      finding.suggestedRedirect = null;
+      finding.matchEvidenceReason = confidence !== null && confidence < 70 ? `manual_mapping_required: ${result.match_reason}` : result.match_reason;
     }
   }
   if (findings.some((item) => item.error)) warnings.push("Some citation statuses are unknown; these are not classified as 404s.");

@@ -116,7 +116,8 @@ test("authenticated audit response returns a live-verified semantic destination 
   const response = await post(new Request("http://localhost/api/audit", {method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(input)}));
   assert.equal(response.status, 201);
   const report = parseDashboardReport(await response.json());
-  assert.equal(report.findings[0].suggestedRedirect, destination);
+  assert.equal(report.findings[0].suggestedRedirect, null);
+  assert.equal(report.findings[0].recoveryGuardrail?.classification, "leave_as_404_or_410");
   assert.equal(report.findings[0].matchConfidence, 94);
 });
 
@@ -125,7 +126,8 @@ test("semantic candidates must be live; provider failure preserves lexical match
   assert.equal(dead.findings[0].suggestedRedirect, null);
   assert.equal(dead.findings[0].matchConfidence, undefined);
   const fallback = await runAudit(input, {...auditOptions, sitemap: async () => ["https://example.com/new-enterprise-tier"], semantic: async () => {throw new Error("private provider message");}});
-  assert.equal(fallback.findings[0].suggestedRedirect, "https://example.com/new-enterprise-tier");
+  assert.equal(fallback.findings[0].suggestedRedirect, null);
+  assert.equal(fallback.findings[0].recoveryGuardrail?.classification, "leave_as_404_or_410");
   assert.equal(fallback.findings[0].matchConfidence, undefined);
   assert.ok(fallback.warnings.some(warning => warning.includes("Semantic matching was unavailable")));
   const low = await runAudit(input, {...auditOptions, sitemap: async () => [destination], semantic: async () => new Map([[broken, [{url: destination, similarity: 0.69}]]])});
@@ -135,7 +137,7 @@ test("semantic candidates must be live; provider failure preserves lexical match
 });
 
 test("report parser rejects fabricated or malformed confidence values", () => {
-  const report = {auditId:"saved", domain:"example.com", generatedText:"answer", status:"completed", sitemapUrlCount:1, warnings:[], findings:[{url:broken, httpStatus:404, urlState:"404", error:null, suggestedRedirect:destination, matchConfidence:94}]};
+  const report = {auditId:"saved", domain:"example.com", generatedText:"answer", status:"completed", sitemapUrlCount:1, warnings:[], findings:[{url:broken, httpStatus:404, urlState:"404", error:null, suggestedRedirect:destination, matchConfidence:94, recoveryGuardrail:{ classification:"recoverable_equivalent" }}]};
   assert.equal(parseDashboardReport(report).findings[0].matchConfidence, 94);
   for (const matchConfidence of [NaN, -1, 101, "94", 0.94]) assert.throws(() => parseDashboardReport({...report, findings:[{...report.findings[0], matchConfidence}]}));
   assert.throws(() => parseDashboardReport({...report, findings:[{...report.findings[0], suggestedRedirect:null}]}));

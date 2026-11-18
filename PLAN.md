@@ -1030,3 +1030,21 @@ Previous days remain unchanged. Paid pilot checkout currently uses the configure
 - [x] The user confirmed migration 037 applied successfully to hosted Supabase.
 
 Live Vercel checks on 2026-11-18 returned HTTP 200 for `/`, `/pricing`, `/terms`, `/privacy`, `/refund-policy`, `/robots.txt`, and `/sitemap.xml`. The homepage served all six pillars in HTML with canonical and OpenGraph URLs at `https://citemend.vercel.app`; robots.txt named all five requested crawler agents and excluded private paths, and the sitemap contained 64 URLs at the Vercel origin. Outbound prospect delivery stays locked until the server environment variable is explicitly set to `true` after launch.
+
+## CiteMend Year 1 Stage-1 Step 2: URL-Agnostic Recovery & Soft-404 Guardrails (COMPLETED IN CODE)
+
+- [x] Add migration 038 and matching database types for normalized, outcome-led recovery findings, signal evidence, guardrail classification, confidence, and human approval state.
+- [x] Add URL normalization and variant grouping with tracking-parameter removal, canonical paths, citation/referrer counts, and commercial-intent priority scoring.
+- [x] Add deterministic destination checks for self loops, known/multi-hop chains, non-200 responses, homepage soft-404s, and below-threshold equivalence; preserve only high-confidence equivalent suggestions for recovery review.
+- [x] Wire guardrail classification and grouped normalized findings into the audit and imported-evidence pipelines while preserving legacy audit rows and explicit human approval.
+- [x] Pass 301 unit/integration tests, `npx tsc --noEmit`, and lint with zero errors (two existing font wrapper warnings). Production build passed with `CITEMEND_BUILD_DIR=.next-step2-final` due the existing corrupt default Turbopack cache.
+- [x] The user confirmed migration 038 applied successfully to hosted Supabase.
+
+## CiteMend Year 1 Stage-1 Step 3: Redirect Deployment, Verification & Retention (COMPLETED IN CODE)
+
+- [x] Add a Shopify Admin GraphQL redirect deployment service using API version 2026-10, encrypted workspace tokens, create/update mutations, duplicate-path recovery, owner-scoped approved findings, and immediate deployed-state persistence.
+- [x] Add Cloudflare Bulk Redirect CSV/JSON downloads with `source_url`, `target_url`, and `status_code` fields; add a DNS-pinned, one-hop HTTP verifier for automatic post-Shopify checks and manual live verification.
+- [x] Upgrade the dashboard Monthly Recovery & QA Value Summary to aggregate the four 30-day metrics from Migration 038 recovery findings, and add Shopify deploy, Cloudflare download, and Verify Live controls.
+- [x] Add unit tests for Shopify GraphQL duplicate-path handling and errors, Cloudflare CSV/JSON formatting, and direct redirect verification.
+- [x] Verify `npx tsc --noEmit`, lint (zero errors; two existing `app/layout.tsx` warnings), 305 passing unit tests, and optimized production build with `CITEMEND_BUILD_DIR=.next-step3-verified`.
+- [x] No new database migration was required; Step 3 uses the Migration 038 columns and the existing encrypted Shopify workspace integration.

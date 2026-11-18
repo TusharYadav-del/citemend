@@ -2,6 +2,7 @@ import "server-only";
 import { createServerDatabase } from "./supabase-server";
 import type { AuditReport } from "./audit-pipeline";
 import { detectCitationChanges } from "./citation-change-detector";
+import { groupRecoverySignals } from "./recovery/normalize";
 
 export class AuditStorageError extends Error {}
 
@@ -48,13 +49,24 @@ export async function persistAudit(report: AuditReport, userId?: string, reserva
   const broken = report.findings.filter((item) => item.httpStatus === 404);
   try {
     if (broken.length) {
-      const { error: linkError } = await db.from("broken_links").insert(broken.map((item) => ({
+      const { data: savedLinks, error: linkError } = await db.from("broken_links").insert(broken.map((item) => ({
         audit_id: audit.id, cited_url: item.url, http_status: 404, url_state: item.urlState,
         approval_status: "pending_review", suggested_redirect: item.suggestedRedirect,
         match_confidence: item.matchConfidence ?? null,
         match_evidence_reason: item.matchEvidenceReason ?? (item.suggestedRedirect ? "A live destination candidate was found; human approval is required." : "manual_mapping_required: no eligible live destination candidate was found."),
-      })));
-      if (linkError) throw new Error("Link insert failed.");
+      }))).select("id,cited_url");
+      if (linkError || !savedLinks) throw new Error("Link insert failed.");
+      const groups = groupRecoverySignals(broken.map(item => ({ url: item.url, kind: "citation", citationSnapshots: report.observationEvidence?.filter(observation => observation.urls.some(url => { try { return new URL(url).pathname.toLowerCase() === new URL(item.url).pathname.toLowerCase(); } catch { return false; } })).length ?? 0 })));
+      const byUrl = new Map(savedLinks.map(link => [link.cited_url, link.id]));
+      const recoveryRows = groups.map(signal => {
+        const related = broken.filter(item => groupRecoverySignals([{ url: item.url }])[0].normalized_path === signal.normalized_path);
+        const item = related[0];
+        const guardrails = related.map(row => row.recoveryGuardrail).filter((value): value is NonNullable<typeof value> => !!value);
+        const guardrail = guardrails.find(value => value.classification === "chain_or_loop_risk") ?? guardrails.find(value => value.classification === "leave_as_404_or_410") ?? guardrails[0];
+        return { audit_id: audit.id, broken_link_id: byUrl.get(item.url) ?? null, domain: report.domain, finding_type: "dead_url" as const, normalized_path: signal.normalized_path, signal_evidence: { observed_404_visits: 0, external_referrers: 0, citation_snapshots: signal.citation_snapshots, user_agent_verified: false, priority_score: signal.priority_score, url_variants: related.map(row => row.url), rejected_soft_404_count: guardrails.filter(value => value.rejected_soft_404).length, blocked_loop_count: guardrails.filter(value => value.blocked_loop).length }, guardrail_classification: guardrail?.classification ?? "leave_as_404_or_410", approval_status: "pending_human_review" as const, suggested_target_url: guardrail?.classification === "recoverable_equivalent" ? item.suggestedRedirect : null, confidence_score: guardrail?.confidence_score, match_reason: guardrail?.match_reason ?? item.matchEvidenceReason ?? "No verified equivalent destination is available." };
+      });
+      const { error: recoveryError } = await db.from("recovery_findings").insert(recoveryRows);
+      if (recoveryError) console.warn("URL-agnostic recovery classification was unavailable; legacy audit findings were preserved.");
     }
     if (report.observationEvidence?.length) {
       const observedStatus = Object.fromEntries(report.findings.filter(item => item.httpStatus !== null).map(item => [item.url, item.httpStatus! as number]));
