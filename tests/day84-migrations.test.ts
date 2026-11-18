@@ -27,14 +27,14 @@ test("daily Vercel jobs and the every-minute Supabase worker use protected cron 
   assert.match(outreachSetup, /\/api\/cron\/outreach\/daily/);
 });
 
-test("migrations 001 through 040 apply in order and expose the columns used by the application", async () => {
+test("migrations 001 through 041 apply in order and expose the columns used by the application", async () => {
   const db = new PGlite({ extensions: { vector } });
   try {
     await db.exec("create role anon; create role authenticated; create role service_role bypassrls;");
     await db.exec("create schema auth; create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$; grant usage on schema auth to authenticated, service_role; grant execute on function auth.jwt() to authenticated, service_role;");
     const directory = new URL("../supabase/migrations/", import.meta.url);
     const files = (await readdir(directory)).filter(name => /^\d{3}_.+\.sql$/.test(name)).sort();
-  assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 40 }, (_, index) => String(index + 1).padStart(3, "0")));
+  assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 41 }, (_, index) => String(index + 1).padStart(3, "0")));
     for (const file of files) await db.exec(await readFile(new URL(file, directory), "utf8"));
     const expected: Record<string, string[]> = {
       audits: ["id", "user_id", "domain", "buyer_prompt", "status", "created_at", "completed_at", "competitor_domains", "ground_truth_pricing", "indexnow_key", "share_of_model_score", "engine_matrix_json", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text", "llms_txt_content", "webhook_url", "sitemap_url_count"],
@@ -78,11 +78,11 @@ test("migrations 001 through 040 apply in order and expose the columns used by t
       outreach_evidence: ["id", "prospect_id", "evidence_type", "observed_state", "http_status"],
       outreach_contacts: ["id", "prospect_id", "email", "email_status", "source_url"],
       outreach_campaigns: ["id", "name", "status", "daily_target"],
-      outreach_emails: ["id", "prospect_id", "recipient", "factuality_report", "status"],
+      outreach_emails: ["id", "prospect_id", "recipient", "factuality_report", "status", "founder_review_decision", "founder_reviewed_at", "founder_reviewed_by"],
       outreach_events: ["id", "email_id", "prospect_id", "event_type", "provider_event_id"],
       outreach_suppressions: ["id", "email", "reason", "source"],
       outreach_daily_runs: ["id", "run_date", "status", "sends_reserved", "telemetry"],
-      outreach_settings: ["id", "outreach_enabled", "outreach_enabled_override", "kill_switch", "daily_target", "daily_send_limit", "min_qualification_score"],
+      outreach_settings: ["id", "outreach_enabled", "outreach_enabled_override", "kill_switch", "daily_target", "daily_send_limit", "min_qualification_score", "deliverability_domain", "deliverability_checklist", "deliverability_checked_at"],
     };
     const result = await db.query<{ table_name: string; column_name: string; is_nullable: string }>("select table_name, column_name, is_nullable from information_schema.columns where table_schema = 'public'");
     for (const [table, columns] of Object.entries(expected)) {
@@ -91,8 +91,8 @@ test("migrations 001 through 040 apply in order and expose the columns used by t
     }
     const rlsTables = await db.query<{ table_name: string; rls_enabled: boolean }>("select c.relname as table_name,c.relrowsecurity as rls_enabled from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p')");
     for (const table of Object.keys(expected)) assert.equal(rlsTables.rows.find((row) => row.table_name === table)?.rls_enabled, true, `${table} must have RLS enabled`);
-    const outreachDefaults = (await db.query<{ outreach_enabled:boolean; outreach_enabled_override:boolean|null; daily_target:number; daily_send_limit:number; min_qualification_score:number }>("select outreach_enabled,outreach_enabled_override,daily_target,daily_send_limit,min_qualification_score from public.outreach_settings where id=1")).rows[0];
-    assert.deepEqual(outreachDefaults,{outreach_enabled:false,outreach_enabled_override:null,daily_target:20,daily_send_limit:15,min_qualification_score:75});
+    const outreachDefaults = (await db.query<{ outreach_enabled:boolean; outreach_enabled_override:boolean|null; daily_target:number; daily_send_limit:number; min_qualification_score:number; deliverability_domain:string|null; deliverability_checklist:Record<string,boolean>; deliverability_checked_at:string|null }>("select outreach_enabled,outreach_enabled_override,daily_target,daily_send_limit,min_qualification_score,deliverability_domain,deliverability_checklist,deliverability_checked_at from public.outreach_settings where id=1")).rows[0];
+    assert.deepEqual(outreachDefaults,{outreach_enabled:false,outreach_enabled_override:null,daily_target:20,daily_send_limit:15,min_qualification_score:75,deliverability_domain:null,deliverability_checklist:{provider_domain_verified:false,spf_aligned:false,dkim_verified:false,dmarc_published:false,from_address_aligned:false,reply_mailbox_monitored:false,unsubscribe_tested:false,suppression_ledger_reviewed:false},deliverability_checked_at:null});
     await db.query("insert into public.audits(id,user_id,domain,status) values ($1,$2,$3,'completed')", ["10000000-0000-4000-8000-000000000040", "signal-owner", "signal.example"]);
     const signalArgs = ["signal.example", "/products/shoe", "chatgpt.com", null, "spoofed-ai-user-agent"];
     const signalOne = (await db.query<{ result: { accepted: boolean } }>("select public.record_recovery_signal($1,$2,$3,$4,$5) as result", signalArgs)).rows[0].result;
@@ -105,6 +105,12 @@ test("migrations 001 through 040 apply in order and expose the columns used by t
     assert.equal((await db.query<{ count: number }>("select count(*)::int as count from public.ai_404_events where domain='signal.example' and ai_referrer='chatgpt.com' and user_agent='spoofed-ai-user-agent'")).rows[0].count, 2);
     await db.exec("insert into public.outreach_prospects(domain) values ('locked.example'); insert into public.outreach_emails(prospect_id,recipient,subject,body_text,body_html,status) select id,'founder@locked.example','Verified example','Draft only','<p>Draft only</p>','draft_locked' from public.outreach_prospects where domain='locked.example'");
     assert.equal((await db.query<{ status: string }>("select status from public.outreach_emails where recipient='founder@locked.example'")).rows[0].status, "draft_locked");
+    await db.query("update public.outreach_emails set status='draft',founder_review_decision='approved',founder_reviewed_at=now(),founder_reviewed_by='founder-test' where recipient='founder@locked.example'");
+    assert.deepEqual((await db.query<{ status: string; founder_review_decision: string }>("select status,founder_review_decision from public.outreach_emails where recipient='founder@locked.example'")).rows[0], { status: "draft", founder_review_decision: "approved" });
+    await db.query("update public.outreach_emails set status='unsubscribed' where recipient='founder@locked.example'");
+    assert.equal((await db.query<{ status: string }>("select status from public.outreach_emails where recipient='founder@locked.example'")).rows[0].status, "unsubscribed");
+    await db.exec("insert into public.outreach_emails(prospect_id,recipient,subject,body_text,body_html,status,founder_review_decision,founder_reviewed_at,founder_reviewed_by) select id,'rejected@locked.example','Rejected','Draft only','<p>Draft only</p>','draft_rejected','rejected',now(),'founder-test' from public.outreach_prospects where domain='locked.example'");
+    assert.equal((await db.query<{ status: string }>("select status from public.outreach_emails where recipient='rejected@locked.example'")).rows[0].status, "draft_rejected");
     assert.deepEqual((await db.query<{ table_name: string }>("select table_name from public.citemend_readiness_schema_status() order by table_name")).rows.length, 46);
     const firstOutreachRun = (await db.query<{ claimed: boolean; run_id: string }>("select * from public.outreach_begin_daily_run('2026-11-08')")).rows[0];
     assert.equal(firstOutreachRun.claimed, true);

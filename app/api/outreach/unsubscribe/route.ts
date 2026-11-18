@@ -11,7 +11,7 @@ async function unsubscribe(request: Request) {
     const tokenHash = createHmac("sha256", process.env.OUTREACH_TOKEN_SECRET || process.env.CRON_SECRET || "").update(token).digest("hex");
     const { error } = await db.from("outreach_suppressions").upsert({ email, reason: "unsubscribe", source: "one_click", token_hash: tokenHash }, { onConflict: "email" });
     if (error) throw error;
-    await db.from("outreach_emails").update({ status: "unsubscribed" }).eq("recipient", email).in("status", ["sent", "delivered"]);
+    await db.from("outreach_emails").update({ status: "unsubscribed" }).eq("recipient", email).in("status", ["draft_locked", "draft", "queued", "sent", "delivered"]);
     return request.method === "GET" ? new Response("You have been unsubscribed from CiteMend outreach.", { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } }) : Response.json({ unsubscribed: true });
   } catch { return Response.json({ error: "Unsubscribe could not be recorded." }, { status: 503 }); }
 }

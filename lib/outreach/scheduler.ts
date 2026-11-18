@@ -56,7 +56,8 @@ export async function runDailyOutreach() {
         if (!message || !validateFactualityReport(message.factualityReport)) continue;
         const compliance = checkOutreachCompliance({ publicContact: true, contactSourceUrl: prospect.contact?.sourceUrl ?? null, emailStatus: contactCheck.status, score: qualification.score, minimumScore: settings.min_qualification_score, suppressed: false, reportExists: true, factualityPassed: message.factualityReport.passed, unsubscribeToken: message.text.match(/unsubscribe here: (\S+)/)?.[1] ?? "", country: prospect.country });
         if (!compliance.eligible) continue;
-        const { error: emailSaveError } = await database.from("outreach_emails").insert({ prospect_id: saved.id, contact_id: contactId, campaign_id: campaign.data?.id ?? null, recipient: email, subject: message.subject, body_text: message.text, body_html: message.html, factuality_report: message.factualityReport, status: process.env.OUTBOUND_EMAILS_ENABLED === "true" ? "draft" : "draft_locked" });
+        // Every generated prospect email begins locked. A founder review never sends it.
+        const { error: emailSaveError } = await database.from("outreach_emails").insert({ prospect_id: saved.id, contact_id: contactId, campaign_id: campaign.data?.id ?? null, recipient: email, subject: message.subject, body_text: message.text, body_html: message.html, factuality_report: message.factualityReport, status: "draft_locked" });
         if (emailSaveError) throw emailSaveError;
       } catch { errors++; }
     }

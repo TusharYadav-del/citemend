@@ -1087,4 +1087,15 @@ The user confirmed Migration 040 was successfully applied to hosted Supabase; re
 - [x] Add unit coverage for month boundaries, invalid/future month input, metric calculations, and null telemetry.
 - [x] Verify `npx tsc --noEmit`, lint with zero errors (two existing `app/layout.tsx` warnings), all 312 tests, and the optimized production build with `CITEMEND_BUILD_DIR=.next-s1-7-verified`.
 
-No new database migration is needed; S1.7 uses the existing workspace ownership, recovery findings, redirected telemetry, and agency branding tables. Next segment: S1.8 Self-Serve Diagnostic Preview & Manual 1-Verified-Example Outreach Workbench.
+No new database migration is needed; S1.7 uses the existing workspace ownership, recovery findings, redirected telemetry, and agency branding tables.
+
+## CiteMend Year 1 Stage-1 Step 8: Diagnostic Preview & Founder Outreach Workbench (COMPLETED IN CODE)
+
+- [x] Extend the founder-only AI Outreach dashboard with detailed one-example draft previews, approve/reject decisions, recipient suppression actions, and a searchable suppression/opt-out ledger.
+- [x] Add Migration 041 for per-draft founder review metadata/status and a persistent sending-domain deliverability checklist.
+- [x] Require the explicit `OUTBOUND_EMAILS_ENABLED === "true"` environment gate, founder approval, a completed checklist, one valid verified example, and a live suppression check before a draft can be approved for manual use; approval never sends email.
+- [x] Keep every generated prospect email in `draft_locked` state until an individual founder review; rejection and suppression remain usable while sending is locked, and suppressions disable any existing unsent drafts.
+- [x] Preserve normal founder notification email delivery and verify locked prospect attempts never call Resend, Brevo, or the outbound webhook.
+- [x] Verify `npx tsc --noEmit`, lint with zero errors (two existing `app/layout.tsx` warnings), all 316 tests, and optimized production build with `CITEMEND_BUILD_DIR=.next-s1-8-verified`.
+
+Apply `supabase/migrations/041_outreach_founder_workbench.sql` to hosted Supabase before using persistent checklist and founder review controls. No prospect email was sent. Year 1 implementation is complete; Year 2 remains locked until its customer validation gate is met.

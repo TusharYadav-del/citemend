@@ -36,3 +36,20 @@ for (const flag of [undefined, "false"]) {
     }
   });
 }
+
+test("enabled environment still requires founder approval and completed deliverability before transport", async () => {
+  const previous = process.env.OUTBOUND_EMAILS_ENABLED;
+  const previousFrom = process.env.EMAIL_FROM;
+  process.env.OUTBOUND_EMAILS_ENABLED = "true";
+  process.env.EMAIL_FROM = "CiteMend <sender@example.com>";
+  let calls = 0;
+  const fetcher: typeof fetch = async () => { calls++; return Response.json({ id: "unexpected" }); };
+  try {
+    await assert.rejects(sendOutreachEmail({ idempotencyKey: "test", to: "founder@prospect.example", from: "sender@example.com", message, fetcher }), /founder approval/);
+    await assert.rejects(sendOutreachEmail({ idempotencyKey: "test", to: "founder@prospect.example", from: "sender@example.com", message, founderApproved: true, fetcher }), /deliverability checklist/);
+    assert.equal(calls, 0);
+  } finally {
+    if (previous === undefined) delete process.env.OUTBOUND_EMAILS_ENABLED; else process.env.OUTBOUND_EMAILS_ENABLED = previous;
+    if (previousFrom === undefined) delete process.env.EMAIL_FROM; else process.env.EMAIL_FROM = previousFrom;
+  }
+});
