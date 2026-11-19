@@ -5,7 +5,7 @@ export const REQUIRED_READINESS_TABLES = [
   "ai_observation_evidence", "ai_provenance_events", "recovery_outcomes", "webhook_events_log", "billing_webhook_events", "workspace_api_keys",
   "autonomous_agent_runs", "ecommerce_catalog_items", "organization_members", "workspace_governance_policies",
   "scheduled_reports", "citation_change_events", "workspace_api_rate_windows", "workspace_operating_metrics",
-  "case_studies", "design_partner_applications", "agency_referrals", "forensic_teaser_rate_windows",
+  "case_studies", "design_partner_applications", "agency_referrals", "forensic_teaser_rate_windows", "free_provenance_leads",
   "background_jobs", "founder_weekly_scorecards", "support_tickets",
   "outreach_prospects", "outreach_evidence", "outreach_contacts", "outreach_campaigns", "outreach_emails",
   "outreach_events", "outreach_suppressions", "outreach_daily_runs", "outreach_settings",

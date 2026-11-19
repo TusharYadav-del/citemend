@@ -229,8 +229,11 @@ function apiRequest(body: string, contentType = "application/json") {
   return new Request("http://localhost/api/audit", { method: "POST", headers: { "content-type": contentType }, body });
 }
 
-test("GET remains compatible; POST rejects malformed input and supports authenticated production use", async () => {
-  assert.deepEqual(await (await GET()).json(), { status: "ok", message: "CiteMind audit API placeholder" });
+test("GET returns 405; POST rejects malformed input and supports authenticated production use", async () => {
+  const getResponse = await GET();
+  assert.equal(getResponse.status, 405);
+  assert.equal(getResponse.headers.get("allow"), "POST");
+  assert.deepEqual(await getResponse.json(), { error: "Use POST /api/audit to run an audit" });
   assert.equal((await POST(apiRequest("{"))).status, 400);
   assert.equal((await POST(apiRequest("{}"))).status, 400);
   assert.equal((await POST(apiRequest("{}", "text/plain"))).status, 415);

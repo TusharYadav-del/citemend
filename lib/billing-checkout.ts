@@ -38,15 +38,15 @@ function appOrigin(): string {
   return url.origin;
 }
 
-export async function createBillingCheckout(tier: BillingTier, userId: string, email: string, fetcher?: ClientOptions["fetch"]): Promise<string> {
-  if (!/^user_[A-Za-z0-9]+$/.test(userId) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new BillingConfigError("An authenticated Clerk user and email are required.");
+export async function createBillingCheckout(tier: BillingTier, userId: string, email: string, workspaceId: string, fetcher?: ClientOptions["fetch"]): Promise<string> {
+  if (!/^user_[A-Za-z0-9]+$/.test(userId) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^(?:user|org)_[A-Za-z0-9]+$/.test(workspaceId)) throw new BillingConfigError("An authenticated Clerk user, email, and workspace are required.");
   const productId = productForTier(tier);
   const origin = appOrigin();
   try {
     const checkout = await createDodoClient(fetcher ? { fetch: fetcher } : {}).checkoutSessions.create({
       product_cart: [{ product_id: productId, quantity: 1 }],
       customer: { email },
-      metadata: { user_id: userId, user_email: email, plan_tier: tier },
+      metadata: { user_id: userId, user_email: email, plan_tier: tier, workspace_id: workspaceId },
       return_url: `${origin}/dashboard?billing=success`,
       cancel_url: `${origin}/pricing?billing=cancelled`,
     });

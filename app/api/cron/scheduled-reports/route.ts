@@ -1,6 +1,6 @@
 import { createServerDatabase } from "@/lib/supabase-server";
 import { nextScheduledReportAt } from "@/lib/scheduled-report-cadence";
-import { sendEmail } from "@/lib/email-provider";
+import { isOutboundEmailBlocked, sendEmail } from "@/lib/email-provider";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -21,11 +21,16 @@ async function send(request: Request) {
 
   let sent = 0;
   let failed = 0;
+  let blocked = 0;
   for (const item of due.data ?? []) {
     const recipient = item.payload_json.recipient;
     if (typeof recipient !== "string" || !/^\S+@\S+\.\S+$/.test(recipient)) {
       failed++;
       await db.from("scheduled_reports").update({ status: "failed", updated_at: new Date().toISOString() }).eq("id", item.id);
+      continue;
+    }
+    if (isOutboundEmailBlocked(recipient)) {
+      blocked++;
       continue;
     }
     const audit = await db.from("audits").select("id,status,created_at").eq("user_id", item.user_id).eq("domain", item.workspace_domain).order("created_at", { ascending: false }).limit(1).maybeSingle();
@@ -44,6 +49,10 @@ async function send(request: Request) {
       const recurrence = item.recurrence_interval ?? "one_time";
       const nextScheduleAt = nextScheduledReportAt(item.schedule_at, recurrence);
       const result = await sendEmail({ from: process.env.EMAIL_FROM?.trim() || process.env.RESEND_FROM_EMAIL?.trim(), to: recipient, subject, text, idempotencyKey: `scheduled-${item.id}-${Date.parse(item.schedule_at)}` });
+      if (result.status === "blocked_by_outbound_lock") {
+        blocked++;
+        continue;
+      }
       const updated = await db.from("scheduled_reports").update({ status: nextScheduleAt ? "scheduled" : "completed", schedule_at: nextScheduleAt ?? item.schedule_at, updated_at: new Date().toISOString(), payload_json: { ...item.payload_json, email_id: result.id, last_sent_at: new Date().toISOString() } }).eq("id", item.id);
       if (updated.error) throw new Error("Report state update failed.");
       sent++;
@@ -52,7 +61,7 @@ async function send(request: Request) {
       await db.from("scheduled_reports").update({ status: "failed", updated_at: new Date().toISOString() }).eq("id", item.id);
     }
   }
-  return Response.json({ sent, failed, processed: (due.data ?? []).length });
+  return Response.json({ sent, failed, blocked, processed: (due.data ?? []).length });
 }
 
 export const GET = send;

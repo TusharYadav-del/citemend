@@ -7,7 +7,8 @@ import { MonthlyRoiReportSwitcher } from "@/components/monthly-roi-report-switch
 import PrintReportButton from "@/components/print-report-button";
 import { getUserAuditHistory } from "@/lib/audit-history";
 import { getAgencyProfile } from "@/lib/agency-store";
-import { currentReportMonth, parseReportMonth } from "@/lib/monthly-roi-report";
+import { currentReportMonth, parseReportMonth, summarizeMonthlyProvenance } from "@/lib/monthly-roi-report";
+import { summarizeProvenanceEvents, type ProvenanceEvent } from "@/lib/provenance-analytics";
 import { resolveWorkspaceAccess } from "@/lib/workspace-access";
 import { createServerDatabase } from "@/lib/supabase-server";
 
@@ -41,7 +42,7 @@ export default async function MonthlyRoiReportPage({ searchParams }: Props) {
   const auditIds = completedAudits.filter(audit => audit.domain === domain).map(audit => audit.id);
   if (!auditIds.length) notFound();
 
-  const [highIntentResult, preventedResult, handledResult, visitsResult, agency] = await Promise.all([
+  const [highIntentResult, preventedResult, handledResult, visitsResult, observationsResult, provenanceEventsResult, agency] = await Promise.all([
     db.from("recovery_findings").select("id", { count: "exact", head: true })
       .in("audit_id", auditIds).eq("domain", domain).gte("created_at", month.start).lt("created_at", month.end)
       .eq("finding_type", "dead_url").in("approval_status", ["pending_human_review", "approved"]),
@@ -51,11 +52,15 @@ export default async function MonthlyRoiReportPage({ searchParams }: Props) {
     db.from("recovery_findings").select("id", { count: "exact", head: true })
       .in("audit_id", auditIds).eq("domain", domain).gte("created_at", month.start).lt("created_at", month.end)
       .neq("approval_status", "pending_human_review"),
-    db.from("ai_404_events").select("id", { count: "exact", head: true }).eq("domain", domain)
-      .gte("created_at", month.start).lt("created_at", month.end).not("redirected_to", "is", null),
+    db.from("rescued_ai_visits").select("id", { count: "exact", head: true }).eq("user_id", access.ownerUserIds[0]).eq("domain", domain)
+      .gte("created_at", month.start).lt("created_at", month.end),
+    db.from("ai_observation_evidence").select("retrieved_urls_json,rendered_urls_json")
+      .in("audit_id", auditIds).eq("domain", domain).gte("observed_at", month.start).lt("observed_at", month.end).limit(500),
+    db.from("ai_provenance_events").select("event_type,crawler_name,crawler_verified,referral_host,journey_hash,occurred_at")
+      .eq("user_id", access.ownerUserIds[0]).eq("workspace_domain", domain).gte("occurred_at", month.start).lt("occurred_at", month.end).limit(1000),
     getAgencyProfile(access.ownerUserIds[0], domain).catch(() => null),
   ]);
-  if (highIntentResult.error || preventedResult.error || handledResult.error || visitsResult.error) notFound();
+  if (highIntentResult.error || preventedResult.error || handledResult.error || visitsResult.error || observationsResult.error || provenanceEventsResult.error) notFound();
 
   const handledFindings = handledResult.count ?? 0;
   const metrics = {
@@ -64,6 +69,8 @@ export default async function MonthlyRoiReportPage({ searchParams }: Props) {
     preventedRecommendations: preventedResult.count ?? 0,
     estimatedHoursSaved: Math.round(handledFindings * 0.25 * 100) / 100,
   };
+  const provenance = summarizeMonthlyProvenance(observationsResult.data ?? [], domain);
+  const eventMetrics = summarizeProvenanceEvents((provenanceEventsResult.data ?? []) as ProvenanceEvent[]);
   const brand = agency?.agency_brand_name ?? "CiteMend Recovery Report";
   const reportTitle = `${month.label} Recovery & QA Report`;
 
@@ -80,16 +87,27 @@ export default async function MonthlyRoiReportPage({ searchParams }: Props) {
       </header>
       <section className="mt-5 grid gap-3 sm:grid-cols-2" aria-label="Monthly Recovery and QA Value Summary">
         <Metric label="New Verified High-Intent Errors Caught" value={metrics.highIntentErrors.toLocaleString()} note="Dead URL findings created this month and still pending review or approved." />
-        <Metric label="Post-Fix Visits & Orders Recovered" value={metrics.recoveredVisits?.toLocaleString() ?? "Unavailable"} note="Redirected recovery events observed this month. Order attribution is not connected." />
+        <Metric label="Post-Fix Visits & Orders Recovered" value={metrics.recoveredVisits?.toLocaleString() ?? "Unavailable"} note="Owner-tagged rescued visits this month. Signed Shopify orders and matched journeys are shown separately below." />
         <Metric label="Bad Recommendations & Soft-404s Prevented" value={metrics.preventedRecommendations.toLocaleString()} note="Findings left as 404/410 or explicitly rejected this month." />
         <Metric label="Engineering & SEO Hours Saved" value={`~${metrics.estimatedHoursSaved.toLocaleString()}h`} note="Estimate: 0.25 hours per finding handled this month; it is not tracked staff time." />
       </section>
+      <section className="mt-5 rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-700" aria-label="Monthly provenance breakdown">
+        <h2 className="font-semibold text-slate-950">Retrieved vs rendered provenance</h2>
+        <p className="mt-1 text-xs text-slate-600">{provenance.observationCount} saved observations this month. Counts are URL appearances across observations; repeated URLs can appear more than once.</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Metric label="Retrieved source URLs" value={provenance.retrievedUrls.toLocaleString()} note="Sources recorded as retrieved for answer synthesis." />
+          <Metric label="Rendered answer links" value={provenance.renderedUrls.toLocaleString()} note="Links explicitly rendered in saved answers." />
+          <Metric label="Owned-domain citation links" value={provenance.ownedRenderedUrls.toLocaleString()} note="Rendered links pointing to this client workspace." />
+          <Metric label="Third-party rendered links" value={provenance.thirdPartyRenderedUrls.toLocaleString()} note="Third-party sources; brand influence is not inferred from a link alone." />
+        </div>
+        <p className="mt-3 text-xs text-slate-600">Signed log sample: {eventMetrics.verifiedCrawlerFetches} verified crawler fetches, {eventMetrics.aiReferrals} AI referrals, {eventMetrics.shopifyOrders} Shopify orders, and {eventMetrics.matchedReferralOrderJourneys} matched referral-to-order journeys. These are observed events, not attributed revenue.</p>
+      </section>
       <section className="mt-5 rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-700">
         <h2 className="font-semibold text-slate-950">Measurement notes</h2>
-        <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5"><li>Findings are limited to completed audits for this client domain and the selected calendar month.</li><li>Recovered visits count pixel events that recorded a redirect destination during the month.</li><li>Orders and revenue are not attributed by this report.</li><li>Time saved is an estimate based on handled finding count.</li></ul>
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5"><li>Findings and answer observations are limited to completed audits for this client domain and the selected calendar month.</li><li>Recovered visits count owner-tagged rescue telemetry; legacy events without an owner are excluded.</li><li>Signed provenance events are bounded to 1,000 rows and observations to 500; counts may be partial above those limits.</li><li>Orders and revenue are not attributed by this report.</li><li>Time saved is an estimate based on handled finding count.</li></ul>
       </section>
       <div className="mt-5"><AgencyReportCTA agency={agency} /></div>
-      <footer className="mt-8 border-t border-white/10 pt-4 text-xs text-slate-500"><p>Prepared for {domain} · {month.label} · CiteMend Recovery</p></footer>
+      <footer className="mt-8 border-t border-white/10 pt-4 text-xs text-slate-500"><p>Prepared for {domain} · {month.label} · {agency?.agency_brand_name ?? "CiteMend Recovery"}</p></footer>
     </div>
   </main>;
 }

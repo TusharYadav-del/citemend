@@ -11,7 +11,9 @@ export type OutgoingEmail = {
   idempotencyKey?: string;
 };
 
-export type EmailDelivery = { provider: "brevo" | "resend"; id: string };
+export type EmailDelivery =
+  | { status: "sent"; provider: "brevo" | "resend"; id: string }
+  | { status: "blocked_by_outbound_lock"; provider: "none"; id: null };
 export type EmailProviderAttempt = { status: number | null; data: unknown; messageId?: string; error: string | null };
 export type EmailTransportOptions = {
   fetcher?: typeof fetch;
@@ -24,6 +26,8 @@ export const RESEND_FOUNDER_FROM = "CiteMend <onboarding@resend.dev>";
 export const DEFAULT_FOUNDER_EMAIL = "citemend.official@outlook.com";
 
 const PERSONAL_EMAIL_DOMAINS = new Set(["gmail.com", "yahoo.com", "outlook.com"]);
+export const OUTBOUND_LOCK_BLOCKED = "blocked_by_outbound_lock" as const;
+const blockedDelivery: EmailDelivery = { status: OUTBOUND_LOCK_BLOCKED, provider: "none", id: null };
 
 export function founderNotificationEmail(): string {
   return process.env.FOUNDER_NOTIFICATION_EMAIL?.trim() || DEFAULT_FOUNDER_EMAIL;
@@ -48,6 +52,25 @@ function recipientList(value: string | string[]) {
   const recipients = Array.isArray(value) ? value : [value];
   if (!recipients.length || recipients.some(address => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address.trim()))) throw new Error("Configure valid email recipients.");
   return recipients.map(email => email.trim());
+}
+
+function internalRecipientAllowlist(): Set<string> {
+  const entries = [founderNotificationEmail(), process.env.SUPPORT_NOTIFICATION_EMAIL ?? "", process.env.BETA_INVITED_EMAILS ?? ""]
+    .flatMap(value => value.split(/[;,]/)).map(value => value.trim()).filter(Boolean);
+  const addresses = new Set([DEFAULT_FOUNDER_EMAIL.toLowerCase()]);
+  for (const entry of entries) {
+    try { addresses.add(parseEmailMailbox(entry).email.toLowerCase()); } catch { /* Ignore invalid internal configuration. */ }
+  }
+  return addresses;
+}
+
+/** When the send lock is closed, only explicitly configured internal mailboxes may receive email. */
+export function isOutboundEmailBlocked(to: string | string[]): boolean {
+  if (process.env.OUTBOUND_EMAILS_ENABLED === "true") return false;
+  try {
+    const allowed = internalRecipientAllowlist();
+    return !recipientList(to).every(recipient => allowed.has(recipient.toLowerCase()));
+  } catch { return true; }
 }
 
 function parseBody(body: string): unknown {
@@ -81,6 +104,7 @@ export async function attemptResendEmail(
   message: OutgoingEmail,
   options: { apiKey?: string; fetcher?: typeof fetch; from?: string } = {},
 ): Promise<EmailProviderAttempt> {
+  if (isOutboundEmailBlocked(message.to)) return { status: 423, data: null, error: OUTBOUND_LOCK_BLOCKED };
   const apiKey = options.apiKey?.trim() || process.env.RESEND_API_KEY?.trim();
   if (!apiKey) return { status: null, data: null, error: "RESEND_API_KEY is not configured." };
   try {
@@ -113,6 +137,7 @@ export async function attemptBrevoEmail(
   message: OutgoingEmail,
   options: { apiKey?: string; fetcher?: typeof fetch; from?: string } = {},
 ): Promise<EmailProviderAttempt> {
+  if (isOutboundEmailBlocked(message.to)) return { status: 423, data: null, error: OUTBOUND_LOCK_BLOCKED };
   const apiKey = options.apiKey?.trim() || process.env.BREVO_API_KEY?.trim();
   if (!apiKey) return { status: null, data: null, error: "BREVO_API_KEY is not configured." };
   try {
@@ -159,9 +184,7 @@ function isFounderRecipient(recipients: string[]): boolean {
 }
 
 export async function sendEmail(message: OutgoingEmail, options: EmailTransportOptions = {}): Promise<EmailDelivery> {
-  if (message.idempotencyKey?.startsWith("outreach-") && process.env.OUTBOUND_EMAILS_ENABLED !== "true") {
-    throw new Error("Prospect email delivery is locked. Save and review the draft instead.");
-  }
+  if (isOutboundEmailBlocked(message.to)) return blockedDelivery;
   const recipients = recipientList(message.to);
   const configuredFromEnv = message.from?.trim() || process.env.EMAIL_FROM?.trim() || process.env.RESEND_FROM_EMAIL?.trim();
   const resendKey = process.env.RESEND_API_KEY?.trim();
@@ -179,13 +202,13 @@ export async function sendEmail(message: OutgoingEmail, options: EmailTransportO
       const attempt = options.sendResend
         ? await attemptResendOverride(options.sendResend, deliveryMessage, resendFrom)
         : await attemptResendEmail(deliveryMessage, { apiKey: resendKey, fetcher: options.fetcher, from: resendFrom });
-      if (attempt.messageId) return { provider: "resend", id: attempt.messageId };
+      if (attempt.messageId) return { status: "sent", provider: "resend", id: attempt.messageId };
       if (attempt.error) failures.push(attempt.error);
     } else failures.push("RESEND_API_KEY is not configured.");
 
     if (brevoKey) {
       const attempt = await attemptBrevoEmail(deliveryMessage, { apiKey: brevoKey, fetcher: options.fetcher, from: configuredFromEnv ?? "" });
-      if (attempt.messageId) return { provider: "brevo", id: attempt.messageId };
+      if (attempt.messageId) return { status: "sent", provider: "brevo", id: attempt.messageId };
       if (attempt.error) failures.push(attempt.error);
     } else failures.push("BREVO_API_KEY is not configured.");
     throw new Error(failures.join(" | "));
@@ -193,13 +216,13 @@ export async function sendEmail(message: OutgoingEmail, options: EmailTransportO
 
   if (brevoKey) {
     const attempt = await attemptBrevoEmail(deliveryMessage, { apiKey: brevoKey, fetcher: options.fetcher, from: configuredFromEnv ?? "" });
-    if (attempt.messageId) return { provider: "brevo", id: attempt.messageId };
+    if (attempt.messageId) return { status: "sent", provider: "brevo", id: attempt.messageId };
     throw new Error(attempt.error ?? "Brevo delivery failed.");
   }
   if (!resendKey) throw new Error("Configure BREVO_API_KEY or RESEND_API_KEY before sending.");
   const attempt = options.sendResend
     ? await attemptResendOverride(options.sendResend, deliveryMessage, resendFrom)
     : await attemptResendEmail(deliveryMessage, { apiKey: resendKey, fetcher: options.fetcher, from: resendFrom });
-  if (attempt.messageId) return { provider: "resend", id: attempt.messageId };
+  if (attempt.messageId) return { status: "sent", provider: "resend", id: attempt.messageId };
   throw new Error(attempt.error ?? "Resend delivery failed.");
 }

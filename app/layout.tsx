@@ -3,8 +3,8 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
-const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains-mono", display: "swap" });
+const inter = Inter();
+const jetbrainsMono = JetBrains_Mono();
 
 export const metadata: Metadata = {
   title: "CiteMend | Commerce Reliability & Revenue Infrastructure",
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: "CiteMend | Commerce Reliability & Revenue Infrastructure", description: "Make digital commerce interactions across Search, AI Assistants, and Autonomous Agents accurate, accessible, and measurable." },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   const clerkConfigured = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY);
   return (
     <html lang="en" className={`h-full antialiased ${inter.variable} ${jetbrainsMono.variable}`}>
@@ -27,10 +27,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   );
 }
 
-function Inter(_config: Record<string, unknown>) {
+function Inter() {
   return { variable: "font-inter-local" };
 }
 
-function JetBrains_Mono(_config: Record<string, unknown>) {
+function JetBrains_Mono() {
   return { variable: "font-mono-local" };
 }

@@ -21,6 +21,7 @@ function withEnvironment(values: Record<string, string | undefined>, run: () => 
 
 test("Resend personal sender domains use its verified onboarding sender and preserve reply-to", withEnvironment({
   BREVO_API_KEY: undefined,
+  OUTBOUND_EMAILS_ENABLED: "true",
   RESEND_API_KEY: "re_test_key",
   EMAIL_FROM: undefined,
   RESEND_FROM_EMAIL: 'CiteMend <founder@gmail.com>',
@@ -31,11 +32,12 @@ test("Resend personal sender domains use its verified onboarding sender and pres
   });
 
   assert.deepEqual(captured, { from: "CiteMend <onboarding@resend.dev>", replyTo: "founder@gmail.com" });
-  assert.deepEqual(result, { provider: "resend", id: "resend_test_id" });
+  assert.deepEqual(result, { status: "sent", provider: "resend", id: "resend_test_id" });
 }));
 
 test("Brevo keeps a Gmail sender and sends through its native REST API", withEnvironment({
   BREVO_API_KEY: "brevo_test_key",
+  OUTBOUND_EMAILS_ENABLED: "true",
   RESEND_API_KEY: "re_test_key",
   EMAIL_FROM: 'CiteMend <founder@gmail.com>',
   RESEND_FROM_EMAIL: "ignored@example.test",
@@ -53,5 +55,5 @@ test("Brevo keeps a Gmail sender and sends through its native REST API", withEnv
   assert.equal(new Headers(captured?.init.headers).get("api-key"), "brevo_test_key");
   assert.deepEqual(captured?.payload.sender, { name: "CiteMend", email: "founder@gmail.com" });
   assert.deepEqual(captured?.payload.replyTo, { name: "CiteMend", email: "founder@gmail.com" });
-  assert.deepEqual(result, { provider: "brevo", id: "<brevo_test_id>" });
+  assert.deepEqual(result, { status: "sent", provider: "brevo", id: "<brevo_test_id>" });
 }));

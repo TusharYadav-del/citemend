@@ -1138,4 +1138,14 @@ No database migration is required; the analysis uses saved answer observations a
 - [x] Compute mean pairwise Jaccard retrieval-set consistency and URL-level Wilson confidence intervals across repeated prompt/provider/model observations; flag fewer than five runs.
 - [x] Verify `npx tsc --noEmit`, lint (zero errors; two existing `app/layout.tsx` warnings), all 338 tests, and optimized production build with `CITEMEND_BUILD_DIR=.next-s2-4-verified`.
 
-The user confirmed hosted Migration 043 is applied and `PROVENANCE_LOG_INGEST_SECRET` is configured. The signed adapter contract is documented in `docs/provenance-log-ingestion.md`. Next unlocked segment: S2.5 Agency Multi-Workspace Hub, White-Label Reports & Free Provenance Auditor Lead Magnet.
+The user confirmed hosted Migration 043 is applied and `PROVENANCE_LOG_INGEST_SECRET` is configured. The signed adapter contract is documented in `docs/provenance-log-ingestion.md`. S2.5 followed this step and is recorded below.
+
+## CiteMend Year 2 Stage-2 Step 5: Agency Hub, Provenance Reports & Free Auditor (COMPLETED IN CODE)
+
+- [x] Add a client-workspace hub to the authenticated dashboard with domain-specific scan summaries and monthly report links.
+- [x] Extend the branded print report with retrieved versus rendered source counts, owned-domain citation links, signed crawler/referral/order event totals, and owner-tagged rescued visits. Legacy unowned visit events are excluded from client reports.
+- [x] Add a public, rate-limited single-page provenance and broken-citation auditor using DNS-pinned public HTTP checks, Wayback snapshots for 404/410, per-bot robots rules, 60-link bloat, SSR text, and metadata validity. No paid AI API call is used.
+- [x] Add explicit email follow-up intake in Migration 044 and purge those lead records after 180 days. The existing founder-only draft-locked one-example outreach workbench remains gated by `OUTBOUND_EMAILS_ENABLED === "true"`; no prospect email is sent by the auditor.
+- [x] Verify TypeScript, lint, unit tests, SQL migration sequence, and optimized production build in `.next-s2-5-verified`.
+
+The user confirmed hosted Migration 044 applied successfully. The public lead endpoint, readiness check, and 180-day retention cleanup are ready for deployment. Stage 2 is complete in code; Stage 3 remains locked pending the documented validation gate.

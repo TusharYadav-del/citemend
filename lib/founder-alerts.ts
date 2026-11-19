@@ -33,6 +33,7 @@ export async function sendFounderAlertEmail(
       to: message.to?.trim() || founderEmailRecipient(),
       from: message.from?.trim() || process.env.EMAIL_FROM?.trim() || process.env.RESEND_FROM_EMAIL?.trim(),
     }, { ...options, preferResendFirst: true });
+    if (delivery.status === "blocked_by_outbound_lock") return { sent: false, provider: "none", error: delivery.status };
     return { sent: true, provider: delivery.provider, messageId: delivery.id };
   } catch (error) {
     return { sent: false, provider: "none", error: error instanceof Error ? error.message : "Unknown email delivery error." };

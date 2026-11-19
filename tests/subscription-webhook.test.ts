@@ -17,7 +17,7 @@ function subscription(type: string, timestamp: string, changes: Record<string, u
     subscription_id: "sub_123", product_id: "pdt_growth", status: "active", created_at: timestamp,
     updated_at: timestamp, next_billing_date: "2026-12-01T00:00:00Z", cancel_at_next_billing_date: false,
     customer: { customer_id: "cus_123", email: "owner@example.com" },
-    metadata: { user_id: "user_123", user_email: "owner@example.com", plan_tier: "growth" }, ...changes,
+    metadata: { user_id: "user_123", user_email: "owner@example.com", plan_tier: "growth", workspace_id: "org_456" }, ...changes,
   } };
 }
 
@@ -26,6 +26,7 @@ test("Dodo subscription events map configured products, preserve owner metadata,
   const active = dodoSubscriptionRecord(subscription("subscription.active", "2026-11-01T10:00:00Z"));
   assert.equal(active.billing_provider, "dodo");
   assert.equal(active.user_id, "user_123");
+  assert.equal(active.workspace_id, "org_456");
   assert.equal(active.customer_id, "cus_123");
   assert.equal(active.plan_name, "growth");
   assert.equal(active.status, "active");
@@ -37,6 +38,8 @@ test("Dodo subscription events map configured products, preserve owner metadata,
   assert.throws(() => dodoSubscriptionRecord(wrongProduct), /configured product/);
   const wrongOwner = subscription("subscription.active", "2026-11-01T10:00:00Z", { metadata: { user_id: "user!" } });
   assert.throws(() => dodoSubscriptionRecord(wrongOwner), /configured product/);
+  const legacy = subscription("subscription.active", "2026-11-01T10:00:00Z", { metadata: { user_id: "user_123", user_email: "owner@example.com", plan_tier: "growth" } });
+  assert.equal(dodoSubscriptionRecord(legacy).workspace_id, "user_123");
 });
 
 test("Dodo pilot payment grants 30 days only for the configured one-time pilot product", () => {
@@ -44,15 +47,16 @@ test("Dodo pilot payment grants 30 days only for the configured one-time pilot p
   const payment: DodoWebhook = { type: "payment.succeeded", timestamp: "2026-11-01T10:00:00Z", data: {
     payment_id: "pay_123", business_id: "biz_123", created_at: "2026-11-01T10:00:00Z", product_cart: [{ product_id: "pdt_pilot", quantity: 1 }],
     subscription_ids: [], customer: { customer_id: "cus_123", email: "owner@example.com" },
-    metadata: { user_id: "user_123", user_email: "owner@example.com", plan_tier: "pilot" },
+    metadata: { user_id: "user_123", user_email: "owner@example.com", plan_tier: "pilot", workspace_id: "org_456" },
   } };
   const record = dodoPilotPaymentRecord(payment);
   assert.equal(record?.plan_name, "pilot");
+  assert.equal(record?.workspace_id, "org_456");
   assert.equal(record?.ends_at, "2026-12-01T10:00:00.000Z");
   assert.equal(dodoPilotPaymentRecord({ ...payment, data: { ...payment.data, product_cart: [{ product_id: "pdt_growth", quantity: 1 }] } }), null);
 });
 
-test("Migration 039 atomically deduplicates Dodo events and enforces provider ownership and idempotency", async () => {
+test("Dodo billing migrations atomically deduplicate events and enforce owner/workspace scope", async () => {
   configure();
   const db = new PGlite({ extensions: { vector } });
   try {
@@ -71,6 +75,7 @@ test("Migration 039 atomically deduplicates Dodo events and enforces provider ow
     assert.equal(await apply("evt_2", { ...record, user_id: "user_other" }).then(() => "accepted", () => "rejected"), "rejected");
     const row = (await db.query<{ billing_provider: string; plan_name: string; status: string }>("select billing_provider,plan_name,status from public.subscriptions where id='sub_123'")).rows[0];
     assert.deepEqual(row, { billing_provider: "dodo", plan_name: "growth", status: "active" });
+    assert.equal((await db.query<{ workspace_id: string }>("select workspace_id from public.subscriptions where id='sub_123'")).rows[0].workspace_id, "org_456");
     assert.equal((await db.query<{ count: string }>("select count(*)::text as count from public.billing_webhook_events")).rows[0].count, "1");
   } finally { await db.close(); }
 });

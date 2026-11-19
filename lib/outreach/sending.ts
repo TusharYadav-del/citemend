@@ -26,6 +26,7 @@ export async function sendOutreachEmail(input: { idempotencyKey: string; to: str
     headers: { "List-Unsubscribe": `<${extractUnsubscribe(input.message.text)}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
     idempotencyKey: `outreach-${input.idempotencyKey}`,
   }, input.fetcher ? { fetcher: input.fetcher } : {});
+  if (delivery.status === "blocked_by_outbound_lock") throw new Error(delivery.status);
   return { provider: delivery.provider, messageId: delivery.id };
 }
 function extractUnsubscribe(text: string) { return text.match(/https:\/\/[^\s]+\/api\/outreach\/unsubscribe\?token=[^\s]+/)?.[0] ?? ""; }

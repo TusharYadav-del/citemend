@@ -43,7 +43,7 @@ export function normalizeTeaserDomain(value: unknown): string {
   return hostname;
 }
 
-export function teaserRateLimitKey(request: Request, purpose: "scan" | "application"): string {
+export function teaserRateLimitKey(request: Request, purpose: "scan" | "application" | "provenance_scan" | "provenance_lead"): string {
   const secret = process.env.CITEMEND_PUBLIC_RATE_LIMIT_SECRET?.trim()
     || process.env.CRON_SECRET?.trim()
     || process.env.CLERK_SECRET_KEY?.trim()

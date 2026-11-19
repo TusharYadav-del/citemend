@@ -17,6 +17,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   try {
     const audit = await getPublicAudit(id);
     if (!audit) return { title: "Citation report unavailable | CiteMend", robots: { index: false, follow: false } };
+    if (audit.status === "mock_completed") return { title: `${audit.domain} simulated report | CiteMend`, robots: { index: false, follow: false } };
     const title = `${audit.domain} citation recovery report | CiteMend`;
     const description = `Saved audit with ${audit.broken_links.length} verified HTTP 404 citation${audit.broken_links.length === 1 ? "" : "s"} and reviewed recovery context.`;
     const url = `/audit/${audit.id}`;

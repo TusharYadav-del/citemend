@@ -23,9 +23,11 @@ test("Dodo route verifies Standard Webhooks signatures and acknowledges duplicat
     DODO_PAYMENTS_ENVIRONMENT: "test_mode", DODO_PRODUCT_PILOT_ID: "pdt_pilot", DODO_PRODUCT_GROWTH_ID: "pdt_growth", DODO_PRODUCT_AGENCY_ID: "pdt_agency",
     NEXT_PUBLIC_SUPABASE_URL: "https://db.example.com", SUPABASE_SECRET_KEY: "server-key" };
   let dbCalls = 0;
+  const appliedRecords: Record<string, unknown>[] = [];
   globalThis.fetch = async (input, init) => {
     assert.match(String(input), /\/rpc\/apply_dodo_billing_event$/);
     assert.equal(init?.method, "POST");
+    appliedRecords.push((JSON.parse(String(init?.body)) as { p_record: Record<string, unknown> }).p_record);
     dbCalls++;
     return Response.json(dbCalls === 1 ? "processed" : "duplicate");
   };
@@ -33,7 +35,7 @@ test("Dodo route verifies Standard Webhooks signatures and acknowledges duplicat
     type: "subscription.active", business_id: "biz_123", timestamp: new Date().toISOString(),
     data: { subscription_id: "sub_123", product_id: "pdt_growth", status: "active", updated_at: new Date().toISOString(),
       customer: { customer_id: "cus_123", email: "owner@example.com" },
-      metadata: { user_id: "user_123", user_email: "owner@example.com", plan_tier: "growth" } },
+      metadata: { user_id: "user_123", user_email: "owner@example.com", plan_tier: "growth", workspace_id: "org_456" } },
   };
   const body = JSON.stringify(event);
   const webhookId = "msg_delivery_123";
@@ -46,6 +48,7 @@ test("Dodo route verifies Standard Webhooks signatures and acknowledges duplicat
   assert.equal((await deliver("v1,invalid")).status, 401);
   assert.equal(dbCalls, 0);
   assert.equal((await deliver(`v1,${signature}`)).status, 200);
+  assert.equal(appliedRecords[0]?.workspace_id, "org_456");
   const duplicate = await deliver(`v1,${signature}`);
   assert.equal(duplicate.status, 200);
   assert.deepEqual(await duplicate.json(), { duplicate: true });

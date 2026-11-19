@@ -51,11 +51,15 @@ export async function POST(request: Request) {
     if (data === "duplicate") return Response.json({ duplicate: true }, { headers });
     if (data === "processed" && record && ["subscription.on_hold", "subscription.failed", "subscription.past_due"].includes(event.type) && typeof record.email === "string") {
       const recipients = [...new Set([founderNotificationEmail(), record.email].filter((value): value is string => !!value))];
-      const results = await Promise.allSettled(recipients.map(to => sendEmail({
+      const results = await Promise.allSettled(recipients.map(async to => {
+        const delivery = await sendEmail({
         to, subject: "CiteMend subscription needs attention",
         text: `A Dodo Payments subscription needs attention (${String(record?.id)}). Review the account in CiteMend billing.`,
         idempotencyKey: `dodo-billing-attention-${eventHash}-${createHash("sha256").update(to).digest("hex").slice(0, 12)}`,
-      })));
+        });
+        if (delivery.status === "blocked_by_outbound_lock") throw new Error(delivery.status);
+        return delivery;
+      }));
       if (results.some(result => result.status === "rejected")) console.error("A Dodo billing alert could not be delivered.");
     }
     return Response.json({ received: true, ...(data === "ignored" ? { ignored: true } : {}) }, { headers });

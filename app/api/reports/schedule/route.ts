@@ -4,6 +4,7 @@ import { normalizeDashboardDomain } from "@/lib/audit-dashboard";
 import { readRequestJson } from "@/lib/read-request-json";
 import { canWorkspace } from "@/lib/rbac";
 import { resolveWorkspaceAccess } from "@/lib/workspace-access";
+import { isOutboundEmailBlocked } from "@/lib/email-provider";
 
 const json=(value:unknown,status=200)=>Response.json(value,{status,headers:{"Cache-Control":"private, no-store"}});
 
@@ -41,6 +42,7 @@ export async function POST(request:Request){
   const email=typeof input.email==="string"?input.email.trim():"";
   if(!Number.isFinite(at)||at<Date.now()+60000||at>Date.now()+90*86400000||!("weekly_summary,reverification,citation_changes".split(",") as unknown[]).includes(type)||!("one_time,weekly,biweekly,monthly".split(",") as unknown[]).includes(recurrence)||!/^\S+@\S+\.\S+$/.test(email))return json({error:"Choose a report type, recurrence, valid recipient email, and a future schedule within 90 days."},400);
   const access=await workspace(request,domain);if("error"in access)return access.error;
+  if(isOutboundEmailBlocked(email))return json({error:"blocked_by_outbound_lock"},423);
   const saved=await access.db.from("scheduled_reports").insert({user_id:access.ownerId,workspace_domain:domain,report_type:type as "weekly_summary"|"reverification"|"citation_changes",schedule_at:new Date(at).toISOString(),recurrence_interval:recurrence as "one_time"|"weekly"|"biweekly"|"monthly",status:"scheduled",payload_json:{recipient:email}}).select("id,report_type,schedule_at,recurrence_interval,status").single();
   return saved.error?json({error:"Report schedule could not be saved."},503):json({schedule:saved.data},201);
 }

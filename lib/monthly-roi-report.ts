@@ -55,3 +55,30 @@ export function calculateMonthlyRoiMetrics(
     estimatedHoursSaved: Math.round(handled * 0.25 * 100) / 100,
   };
 }
+
+export type MonthlyProvenanceObservation = { retrieved_urls_json: unknown; rendered_urls_json: unknown };
+
+export function summarizeMonthlyProvenance(rows: MonthlyProvenanceObservation[], domain: string) {
+  const root = domain.toLowerCase().replace(/^www\./, "");
+  let retrievedUrls = 0, renderedUrls = 0, ownedRenderedUrls = 0, thirdPartyRenderedUrls = 0;
+  for (const row of rows) {
+    for (const [kind, value] of [["retrieved", row.retrieved_urls_json], ["rendered", row.rendered_urls_json]] as const) {
+      if (!Array.isArray(value)) continue;
+      const urls = new Set<string>();
+      for (const item of value) {
+        if (typeof item !== "string") continue;
+        try { const url = new URL(item); if (["http:", "https:"].includes(url.protocol)) { url.hash = ""; urls.add(url.href); } } catch { /* Malformed evidence is ignored. */ }
+      }
+      if (kind === "retrieved") retrievedUrls += urls.size;
+      else {
+        renderedUrls += urls.size;
+        for (const value of urls) {
+          const host = new URL(value).hostname.toLowerCase();
+          if (host === root || host.endsWith(`.${root}`)) ownedRenderedUrls++;
+          else thirdPartyRenderedUrls++;
+        }
+      }
+    }
+  }
+  return { observationCount: rows.length, retrievedUrls, renderedUrls, ownedRenderedUrls, thirdPartyRenderedUrls };
+}

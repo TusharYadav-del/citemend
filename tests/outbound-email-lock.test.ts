@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { sendOutreachEmail } from "../lib/outreach/sending";
-import { sendEmail } from "../lib/email-provider";
+import { attemptBrevoEmail, attemptResendEmail, isOutboundEmailBlocked, sendEmail } from "../lib/email-provider";
 import type { GeneratedOutreachEmail } from "../lib/outreach/email-generation";
 
 const message: GeneratedOutreachEmail = {
@@ -27,7 +27,11 @@ for (const flag of [undefined, "false"]) {
         process.env.OUTBOUND_WEBHOOK_URL = transport === "webhook" ? "https://outbound.example/send" : "";
         await assert.rejects(sendOutreachEmail({ idempotencyKey: "test", to: "founder@prospect.example", from: "sender@example.com", message, fetcher }), /locked/, transport);
       }
-      await assert.rejects(sendEmail({ to: "founder@prospect.example", subject: "Prospect", text: "Draft", idempotencyKey: "outreach-test" }, { fetcher }), /locked/);
+      assert.deepEqual(await sendEmail({ to: "founder@prospect.example", subject: "Prospect", text: "Draft", idempotencyKey: "scheduled-report-test" }, { fetcher }), {
+        status: "blocked_by_outbound_lock", provider: "none", id: null,
+      });
+      assert.equal((await attemptResendEmail({ to: "founder@prospect.example", subject: "Prospect" }, { apiKey: "test", fetcher })).error, "blocked_by_outbound_lock");
+      assert.equal((await attemptBrevoEmail({ to: "founder@prospect.example", subject: "Prospect" }, { apiKey: "test", fetcher })).error, "blocked_by_outbound_lock");
       assert.equal(calls, 0);
     } finally {
       for (const [key, value] of previous) {
@@ -36,6 +40,32 @@ for (const flag of [undefined, "false"]) {
     }
   });
 }
+
+test("the lock admits only founder, support, and beta-invited mailboxes when disabled", async () => {
+  const keys = ["OUTBOUND_EMAILS_ENABLED", "FOUNDER_NOTIFICATION_EMAIL", "SUPPORT_NOTIFICATION_EMAIL", "BETA_INVITED_EMAILS", "RESEND_API_KEY"];
+  const previous = new Map(keys.map(key => [key, process.env[key]]));
+  try {
+    delete process.env.OUTBOUND_EMAILS_ENABLED;
+    process.env.FOUNDER_NOTIFICATION_EMAIL = "founder@internal.test";
+    process.env.SUPPORT_NOTIFICATION_EMAIL = "support@internal.test";
+    process.env.BETA_INVITED_EMAILS = "beta1@internal.test,beta2@internal.test";
+    assert.equal(isOutboundEmailBlocked("founder@internal.test"), false);
+    assert.equal(isOutboundEmailBlocked("support@internal.test"), false);
+    assert.equal(isOutboundEmailBlocked("beta2@internal.test"), false);
+    assert.equal(isOutboundEmailBlocked("prospect@example.com"), true);
+    process.env.RESEND_API_KEY = "test-resend-key";
+    let calls = 0;
+    const delivery = await sendEmail({ to: "founder@internal.test", subject: "Internal alert" }, {
+      fetcher: async () => { calls++; return Response.json({ id: "internal-message-1" }); },
+    });
+    assert.deepEqual(delivery, { status: "sent", provider: "resend", id: "internal-message-1" });
+    assert.equal(calls, 1);
+  } finally {
+    for (const [key, value] of previous) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
+});
 
 test("enabled environment still requires founder approval and completed deliverability before transport", async () => {
   const previous = process.env.OUTBOUND_EMAILS_ENABLED;

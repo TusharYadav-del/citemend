@@ -10,7 +10,7 @@ Status Legend: `[DONE]` | `[NEXT]` | `[PENDING]` | `[LOCKED]`
 
 *(Note to Codex: If any remaining file or test in S1.4 is still unfinished in the repo, verify and finish it automatically during S2.1 startup.)*
 
-## STAGE 2 (Active Unlocked Queue) — Two-Sided Provenance, GEO Diagnostics & AI Analytics
+## STAGE 2 (Completed; validation gate pending) — Two-Sided Provenance, GEO Diagnostics & AI Analytics
 - **[S2.1] [DONE]** Two-Sided Broken-Citation Reclamation (Defensive + Offensive) & Link-Health Waterfall v1:
   - Separate page-level broken-link counts from unique failed destination URLs across schemas, APIs, and UI cards.
   - Upgrade HTTP link-health checking with retry classification to distinguish temporary errors (`timeout`/`5xx`/rate-limit) from permanent link rot (`404`/`410`).
@@ -28,14 +28,14 @@ Status Legend: `[DONE]` | `[NEXT]` | `[PENDING]` | `[LOCKED]`
   - Build a lightweight Next.js/Cloudflare/Shopify-compatible edge log ingestion endpoint that matches real `GPTBot`, `PerplexityBot`, `ClaudeBot`, and `Google-Extended` crawler hits and AI referral headers (`chatgpt.com`, `perplexity.ai`, `gemini.google.com`, `claude.ai`) to cited URLs and downstream Shopify orders (without trusting spoofable user-agents alone).
   - Separate internal RAG-retrieved sources from explicitly rendered user links, and separate **Domain Influence** (third-party brand mentions) from **Citation Authority** (direct domain links).
   - Compute the **Retrieval Consistency & Confidence Index** across repeated prompt/URL checks so users see statistical stability rather than noisy single-run scores.
-- **[S2.5] [NEXT]** Agency Multi-Workspace Hub, White-Label 4-Metric Reports & Free Provenance Auditor Lead Magnet:
+- **[S2.5] [DONE]** Agency Multi-Workspace Hub, White-Label 4-Metric Reports & Free Provenance Auditor Lead Magnet:
   - Build the multi-client Agency Workspace Switcher and 1-click **White-Label Monthly ROI & Provenance Report** (HTML/print-PDF ready) displaying the 4-Metric Retention Gate + Retrieved-vs-Rendered breakdown.
   - Ship a rate-limited, $0-API-cost **"Free CiteMend Provenance & Broken-Citation Auditor"** widget on the public homepage (checking live HTTP status, Wayback snapshot, crawler access, 60-link bloat, and metadata validity) to capture inbound B2B leads organically.
   - Wire the internal Draft-Locked **"1-Verified-Example" Outreach Workbench** (strictly gated behind `OUTBOUND_EMAILS_ENABLED === "true"`).
 
 ---
 ### VALIDATION GATE: Stage 2 -> Stage 3
-*Unlock Stage 3 (`unlock stage 3`) once Stage 2 passes full end-to-end verification and initial customer pilots.*
+*There is no unlocked `[NEXT]` build segment. Unlock Stage 3 (`unlock stage 3`) once Stage 2 passes full end-to-end verification and initial customer pilots.*
 ---
 
 ## STAGE 3 (2028–2029) — Deep Entailment, Catalog Feeds & Agentic Commerce Reliability [LOCKED]

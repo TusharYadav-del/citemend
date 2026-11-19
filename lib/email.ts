@@ -42,5 +42,6 @@ export async function sendWeeklyDigest(userId: string, digestId: string, links: 
     text: message.text,
     idempotencyKey: `weekly-${digestId}`,
   });
+  if (delivery.status === "blocked_by_outbound_lock") throw new Error(delivery.status);
   return delivery.id;
 }

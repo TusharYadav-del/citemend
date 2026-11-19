@@ -61,6 +61,7 @@ import { ExtractabilityAuditPanel } from "@/components/ExtractabilityAuditPanel"
 import type { SidebarItem } from "@/components/ui/sidebar";
 import { RecoveryDeploymentTools } from "@/components/recovery-deployment-tools";
 import ProvenanceAnalyticsPanel from "@/components/ProvenanceAnalyticsPanel";
+import { AgencyWorkspaceHub } from "@/components/agency-workspace-hub";
 
 function MetricCards({ audits, rescued, deployments, citations, activeWorkspaces }: { audits: UserAuditHistoryItem[]; rescued: number | null; deployments: number | null; citations: number | null; activeWorkspaces: number }) {
   if (!audits.length) return <div className="mb-6"><EmptyState title="Your first audit starts here" description="Connect a website and run one buyer prompt to establish your baseline." action={<Link href="/#audit" className="inline-flex min-h-10 items-center rounded-lg bg-emerald-300 px-4 text-xs font-semibold text-[#07110d]">Run first audit</Link>} /></div>;
@@ -127,6 +128,7 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
   let audits: UserAuditHistoryItem[];
   try { audits = await getUserAuditHistory(userId,ownerIds); }
   catch { return <HistoryUnavailable />; }
+  const workspaceAudits = audits;
   const allDomains = [...new Set(audits.map(audit => audit.domain))];
   const params = await searchParams;
   const requestedDomain = params.domain;
@@ -250,6 +252,7 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
       </div>
       <OnboardingChecklist progress={onboarding} />
       <AuditTemplates />
+      <AgencyWorkspaceHub audits={workspaceAudits} selectedDomain={selectedDomain} />
       <MetricCards audits={audits} rescued={access.organizationId?null:rescued} deployments={deploymentCount} citations={citationCount} activeWorkspaces={new Set(audits.map(audit => audit.domain)).size} />
       <MonthlyRecoveryValueSummary
         highIntent={recoveryFindingsAvailable ? recoveryFindings.filter(row => row.finding_type === "dead_url" && ["pending_human_review", "approved"].includes(row.approval_status)).length : recoveryRows.filter(link => link.http_status === 404 && link.suggested_redirect && (link.match_confidence ?? 0) >= 85 && /semantic.*commercial|commercial.*semantic/i.test(link.match_evidence_reason ?? "") && Date.now() - Date.parse(link.auditCreatedAt) <= 30 * 86400000).length}
