@@ -1138,4 +1138,4 @@ No database migration is required; the analysis uses saved answer observations a
 - [x] Compute mean pairwise Jaccard retrieval-set consistency and URL-level Wilson confidence intervals across repeated prompt/provider/model observations; flag fewer than five runs.
 - [x] Verify `npx tsc --noEmit`, lint (zero errors; two existing `app/layout.tsx` warnings), all 338 tests, and optimized production build with `CITEMEND_BUILD_DIR=.next-s2-4-verified`.
 
-Migration 043 must be applied to hosted Supabase before ingestion and provenance analytics are available; it has not yet been confirmed applied. Configure `PROVENANCE_LOG_INGEST_SECRET` and follow `docs/provenance-log-ingestion.md` for the signed adapter contract. Next unlocked segment: S2.5 Agency Multi-Workspace Hub, White-Label Reports & Free Provenance Auditor Lead Magnet.
+The user confirmed hosted Migration 043 is applied and `PROVENANCE_LOG_INGEST_SECRET` is configured. The signed adapter contract is documented in `docs/provenance-log-ingestion.md`. Next unlocked segment: S2.5 Agency Multi-Workspace Hub, White-Label Reports & Free Provenance Auditor Lead Magnet.
