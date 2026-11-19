@@ -245,7 +245,7 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
           <RedirectExportDrawer rules={exportRules} />
           {access.organizationId === null && <Link href="/dashboard/pixel" className="rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-emerald-300 hover:bg-white/5">Pixel &amp; traffic</Link>}
           {canWorkspace(access.role, "scan") && <Link href="/#audit" className="rounded-lg bg-emerald-300 px-3 py-2 text-xs font-semibold text-[#07110d]">Run live audit</Link>}
-          {access.role === "owner" && <BillingCheckoutButton tier="growth" label="Upgrade to Growth" />}
+          {access.role === "owner" && <div className="flex flex-wrap gap-2" aria-label="Paid plans">{(["pilot", "growth", "agency"] as const).map(tier => <BillingCheckoutButton key={tier} tier={tier} label={tier === "pilot" ? "Pilot · $149 one-time" : tier === "growth" ? "Growth · $99/mo" : "Agency · $249/mo"} />)}</div>}
           <Link href="/" className="px-3 py-2 text-xs text-slate-400 hover:text-white">Public site</Link>
         </div>
       </div>
