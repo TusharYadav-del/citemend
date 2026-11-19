@@ -5,6 +5,7 @@ import { checkUrlStatus, indexDomainSitemap } from "./seo";
 import { createServerDatabase } from "./supabase-server";
 import { matchDeadCitationToOwnSitemap, type HijackOpportunity } from "./hijacker";
 import { rankOpportunityEvidence } from "./opportunity-lifecycle";
+import { checkLinkHealth, draftReplacementSnippet, failedDestinationKey, lookupWaybackSnapshot, verifyLiveReplacementUrl, type WaybackSnapshot } from "./link-health";
 
 const MAX_ARTICLES = 6;
 const MAX_LINKS_PER_ARTICLE = 5;
@@ -17,6 +18,7 @@ export type ListicleCrawlerDependencies = {
   check: typeof checkUrlStatus;
   index: typeof indexDomainSitemap;
   match: typeof matchDeadCitationToOwnSitemap;
+  wayback: typeof lookupWaybackSnapshot;
   save: (rows: ListicleOpportunity[]) => Promise<void>;
 };
 
@@ -66,7 +68,7 @@ function competitorHost(url: string, domains: string[]): string | null {
     const parsed = new URL(url);
     if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null;
     const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
-    return domains.some(domain => host === domain || host.endsWith(`.${domain}`)) ? host : null;
+    return domains.some(domain => host === domain || host.endsWith(`.${domain}`)) || host.endsWith(".com") ? host : null;
   } catch { return null; }
 }
 
@@ -124,6 +126,7 @@ const defaultDependencies: ListicleCrawlerDependencies = {
   check: checkUrlStatus,
   index: indexDomainSitemap,
   match: matchDeadCitationToOwnSitemap,
+  wayback: lookupWaybackSnapshot,
   save: async (rows) => {
     if (!rows.length) return;
     const ranked = rows.map(row => ({ ...row, ...rankOpportunityEvidence(row) }));
@@ -143,6 +146,7 @@ export async function inspectThirdPartyCitations(input: {
   }).slice(0, MAX_ARTICLES);
   const knownCompetitors = [...new Set(input.competitorDomains.map(value => value.toLowerCase().replace(/^www\./, "")))];
   const brand = (input.brandName?.trim() || domain.split(".")[0]).toLowerCase();
+  let temporaryFailureCount = 0;
   const articleResults = await mapLimited(sources, 2, async (url) => {
     try {
       const host = new URL(url).hostname.toLowerCase();
@@ -170,8 +174,11 @@ export async function inspectThirdPartyCitations(input: {
       });
       const outbound = extractCompetitorLinks($, article, domain, knownCompetitors);
       const checked = await mapLimited(outbound, 2, async link => {
-        try { const status = await deps.check(link.url); return status === 404 || status === 410 ? { ...link, article, brandMentioned, contact, status } : null; }
-        catch { return null; }
+        const health = await checkLinkHealth(async () => ({ httpStatus: await deps.check(link.url) }));
+        if (health.classification === "temporary_failure") temporaryFailureCount++;
+        return health.classification === "permanent_dead" && (health.httpStatus === 404 || health.httpStatus === 410)
+          ? { ...link, article, brandMentioned, contact, status: health.httpStatus }
+          : null;
       });
       const dead = checked.filter((value): value is NonNullable<typeof value> => value !== null);
       return { rows, dead };
@@ -185,9 +192,19 @@ export async function inspectThirdPartyCitations(input: {
   if (dead.length) {
     try { await deps.index(domain); } catch { /* Existing indexed pages may still be searchable. */ }
   }
+  const uniqueDeadUrls = [...new Set(dead.map(item => item.url))];
+  const snapshots = new Map<string, WaybackSnapshot | null>();
+  await mapLimited(uniqueDeadUrls.slice(0, 12), 3, async url => { snapshots.set(url, await deps.wayback(url)); });
   const outboundRows = await mapLimited(dead, 3, async item => {
     let match: Awaited<ReturnType<typeof matchDeadCitationToOwnSitemap>>;
-    try { match = await deps.match(domain, item.url, input.prompt); } catch { match = undefined; }
+    try {
+      const candidate = await deps.match(domain, item.url, input.prompt);
+      if (candidate) {
+        const verified = await verifyLiveReplacementUrl(candidate.url, domain, deps.check);
+        if (verified.temporaryFailure) temporaryFailureCount++;
+        if (verified.live) match = candidate;
+      }
+    } catch { match = undefined; }
     return {
       audit_id: input.auditId, domain, opportunity_type: "listicle_outbound_404" as const,
       prompt_query: input.prompt.slice(0, 4000), cited_engine: input.citedEngine.slice(0, 100),
@@ -195,12 +212,24 @@ export async function inspectThirdPartyCitations(input: {
       competitor_domain: item.host, http_status: item.status, matched_user_live_url: match?.url ?? null,
       similarity_score: match?.similarity ?? null, brand_mentioned: item.brandMentioned,
       contact_email_or_link: item.contact, verification_status: "unverified" as const,
+      source_page_url: item.article.url,
+      failed_destination_url_key: failedDestinationKey(item.url),
+      replacement_snippet: match ? draftReplacementSnippet(match.url) : null,
+      wayback_snapshot_json: snapshots.get(item.url) ?? null,
     };
   });
   rows.push(...outboundRows);
-  let warning: string | null = null;
+  const warnings: string[] = [];
+  if (temporaryFailureCount) warnings.push(`${temporaryFailureCount} outbound URL check(s) remained temporary after retries; they were excluded from permanent link-rot findings.`);
+  if (uniqueDeadUrls.length > 12) warnings.push(`Wayback snapshot lookup was limited to the first 12 of ${uniqueDeadUrls.length} unique permanent dead destinations.`);
   if (rows.length) {
-    try { await deps.save(rows); } catch { warning = "Listicle and Reddit opportunities were detected but could not be saved."; }
+    try { await deps.save(rows); } catch { warnings.push("Listicle and Reddit opportunities were detected but could not be saved."); }
   }
-  return { opportunities: rows, warning };
+  const outboundOccurrences = rows.filter(row => row.opportunity_type === "listicle_outbound_404");
+  const uniqueFailedDestinationCount = new Set(outboundOccurrences.map(row => row.failed_destination_url_key ?? failedDestinationKey(row.dead_competitor_url ?? "")).filter((key): key is string => !!key)).size;
+  return {
+    opportunities: rows,
+    warning: warnings.join(" ") || null,
+    linkCounts: { pageLevelBrokenLinkCount: outboundOccurrences.length, uniqueFailedDestinationCount, temporaryFailureCount },
+  };
 }

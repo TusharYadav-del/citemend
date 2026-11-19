@@ -12,7 +12,7 @@ test("invalid UUIDs never access the database", async () => {
   for (const value of ["invalid", "", id + "?select=*", "../dashboard"]) assert.equal(await getPublicAudit(value), null);
 });
 
-test("public lookup selects only report fields and the exact UUID, and excludes non-404 rows", async () => {
+test("public lookup selects report evidence and includes only permanent 404/410 rows", async () => {
   process.env = { ...originalEnv, NEXT_PUBLIC_SUPABASE_URL: "https://db.example.com", SUPABASE_SECRET_KEY: "test-secret" };
   globalThis.fetch = async (input) => {
     const url = new URL(String(input));
@@ -23,12 +23,14 @@ test("public lookup selects only report fields and the exact UUID, and excludes 
     }
     assert.equal(url.searchParams.get("id"), "eq." + id);
     assert.equal(url.searchParams.get("status"), "in.(completed,partial,mock_completed)");
-    assert.equal(url.searchParams.get("select"), "id,domain,status,created_at,share_of_model_score,engine_matrix_json,agency_brand_name,agency_logo_url,agency_primary_color,agency_cta_text,agency_cta_url,broken_links(id,cited_url,http_status,suggested_redirect,approval_status)");
-    return Response.json({ id, domain: "example.com", status: "partial", created_at: "2026-10-31T00:00:00Z", broken_links: [{ id: "broken", http_status: 404 }, { id: "healthy", http_status: 200 }] });
+    assert.equal(url.searchParams.get("select"), "id,domain,status,created_at,share_of_model_score,engine_matrix_json,agency_brand_name,agency_logo_url,agency_primary_color,agency_cta_text,agency_cta_url,broken_links(id,cited_url,http_status,suggested_redirect,approval_status,link_health_json,wayback_snapshot_json)");
+    return Response.json({ id, domain: "example.com", status: "partial", created_at: "2026-10-31T00:00:00Z", broken_links: [{ id: "broken", http_status: 404, wayback_snapshot_json: { url: "https://web.archive.org/web/20200101000000/https://example.com/old" } }, { id: "gone", http_status: 410 }, { id: "healthy", http_status: 200 }] });
   };
   const report = await getPublicAudit(id);
-  assert.equal(report?.broken_links.length, 1);
+  assert.equal(report?.broken_links.length, 2);
   assert.equal(report?.broken_links[0].id, "broken");
+  assert.equal(report?.broken_links[0].wayback_snapshot_json?.url, "https://web.archive.org/web/20200101000000/https://example.com/old");
+  assert.equal(report?.broken_links[1].id, "gone");
 });
 
 test("branded reports show safe saved agency details and audit-specific competitor targets", async () => {

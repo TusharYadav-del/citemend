@@ -3,6 +3,7 @@ import { checkUrlStatus, indexDomainSitemap } from "./seo";
 import { createServerDatabase } from "./supabase-server";
 import { generateUrlEmbedding, normalizeUrlEmbedding, urlEmbeddingModel } from "./gemini";
 import { rankOpportunityEvidence } from "./opportunity-lifecycle";
+import { checkLinkHealth, draftReplacementSnippet, failedDestinationKey, lookupWaybackSnapshot, verifyLiveReplacementUrl, type WaybackSnapshot } from "./link-health";
 
 export type CitationBucket = "own_domain" | "competitor_domain" | "third_party_source";
 export type CitationClassification = { url: string; domain: string; bucket: CitationBucket };
@@ -13,6 +14,8 @@ export type HijackOpportunity = {
   competitor_domain: string | null; http_status: number | null; matched_user_live_url: string | null;
   similarity_score: number | null; brand_mentioned: boolean; contact_email_or_link: string | null;
   verification_status: "unverified";
+  source_page_url?: string | null; failed_destination_url_key?: string | null; replacement_snippet?: string | null;
+  wayback_snapshot_json?: WaybackSnapshot | null;
 };
 type Match = { url: string; similarity: number };
 export type HijackerDependencies = {
@@ -21,12 +24,14 @@ export type HijackerDependencies = {
   search: (domain: string, embedding: number[]) => Promise<Match[]>;
   save: (opportunities: HijackOpportunity[]) => Promise<void>;
   index: typeof indexDomainSitemap;
+  wayback: typeof lookupWaybackSnapshot;
 };
 
 const DEFAULT_DEPENDENCIES: HijackerDependencies = {
   check: checkUrlStatus,
   embed: generateUrlEmbedding,
   index: indexDomainSitemap,
+  wayback: lookupWaybackSnapshot,
   search: async (domain, embedding) => {
     const { data, error } = await createServerDatabase().rpc("match_sitemap_url", {
       query_embedding: JSON.stringify(normalizeUrlEmbedding(embedding)), target_domain: domain,
@@ -126,19 +131,28 @@ export async function findCompetitor404Opportunities(input: {
   const deps = { ...DEFAULT_DEPENDENCIES, ...overrides };
   const classifications = [...new Map(input.citationUrls.map(url => [url, classifyCitationUrl(url, input.domain, input.competitorDomains)])).values()];
   const targets = classifications.filter(item => item.bucket === "competitor_domain" && item.domain).slice(0, 50);
+  let temporaryFailureCount = 0;
   const checked = await mapLimited(targets, 5, async (citation) => {
-    try { return { citation, status: await deps.check(citation.url) }; }
-    catch { return { citation, status: null }; }
+    const health = await checkLinkHealth(async () => ({ httpStatus: await deps.check(citation.url) }));
+    if (health.classification === "temporary_failure") temporaryFailureCount++;
+    return { citation, status: health.classification === "permanent_dead" ? health.httpStatus : null };
   });
   const dead = checked.filter((item): item is { citation: CitationClassification; status: number } => item.status === 404 || item.status === 410).slice(0, 20);
   if (dead.length) {
     try { await deps.index(input.domain); }
     catch { /* Existing index may still be searchable; retain opportunities without a semantic match. */ }
   }
+  const snapshots = new Map<string, WaybackSnapshot | null>();
+  await mapLimited(dead.slice(0, 12), 3, async ({ citation }) => { snapshots.set(citation.url, await deps.wayback(citation.url)); });
   const rows = await mapLimited(dead, 3, async ({ citation, status }): Promise<HijackOpportunity> => {
     let match: Match | undefined;
     try {
-      match = await matchDeadCitationToOwnSitemap(input.domain, citation.url, input.prompt, deps);
+      const candidate = await matchDeadCitationToOwnSitemap(input.domain, citation.url, input.prompt, deps);
+      if (candidate) {
+        const verified = await verifyLiveReplacementUrl(candidate.url, input.domain, deps.check);
+        if (verified.temporaryFailure) temporaryFailureCount++;
+        if (verified.live) match = candidate;
+      }
     } catch { /* Keep the dead citation opportunity even when embedding search is unavailable. */ }
     return {
       audit_id: input.auditId, domain: input.domain, opportunity_type: "competitor_direct_404",
@@ -146,12 +160,16 @@ export async function findCompetitor404Opportunities(input: {
       target_url: match?.url ?? `https://${input.domain}/`, dead_competitor_url: citation.url,
       competitor_domain: citation.domain, http_status: status, matched_user_live_url: match?.url ?? null,
       similarity_score: match?.similarity ?? null, brand_mentioned: input.responseText.toLowerCase().includes(input.domain.toLowerCase()),
-      contact_email_or_link: null, verification_status: "unverified",
+      contact_email_or_link: null, verification_status: "unverified", source_page_url: null,
+      failed_destination_url_key: failedDestinationKey(citation.url),
+      replacement_snippet: match ? draftReplacementSnippet(match.url) : null,
+      wayback_snapshot_json: snapshots.get(citation.url) ?? null,
     };
   });
-  let warning: string | null = null;
+  const warnings: string[] = [];
+  if (dead.length > 12) warnings.push(`Wayback snapshot lookup was limited to the first 12 of ${dead.length} permanent dead citations.`);
   if (rows.length) {
-    try { await deps.save(rows); } catch { warning = "Competitor 404 opportunities were detected but could not be saved."; }
+    try { await deps.save(rows); } catch { warnings.push("Competitor 404 opportunities were detected but could not be saved."); }
   }
-  return { classifications, opportunities: rows, warning };
+  return { classifications, opportunities: rows, warning: warnings.join(" ") || null, temporaryFailureCount };
 }

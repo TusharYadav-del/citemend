@@ -180,6 +180,7 @@ test("recovery smoke path carries a verified scan through human approval to depl
     probe: async () => ({ text: `The product is cited at ${source}`, citedUrls: [source], providerUsed: "test", searchGrounding: { status: "available", sources: [] }, warnings: [] }),
     sitemap: async () => [target],
     check: async url => url === source ? 404 : 200,
+    wayback: async () => null,
     semantic: async () => new Map([[source, [{ url: target, similarity: 0.94 }]]]),
     synthesize: null,
     save: async report => { assert.equal(report.findings[0]?.recoveryGuardrail?.classification, "recoverable_equivalent"); return { id: auditId, createdAt: "2026-11-18T00:00:00.000Z" }; },

@@ -21,7 +21,7 @@ export async function persistAudit(report: AuditReport, userId?: string, reserva
         db.from("ai_observation_evidence").select("id", { count: "exact", head: true }).eq("audit_id", stableId),
       ]);
       if (brokenRows.error || evidenceRows.error) throw new AuditStorageError("Could not verify prior background evidence rows.");
-      const expectedBroken = report.findings.filter(item => item.httpStatus === 404).length;
+      const expectedBroken = report.findings.filter(item => item.httpStatus === 404 || item.httpStatus === 410).length;
       const expectedEvidence = report.observationEvidence?.length ?? 0;
       if (existing.data.status === report.status && (brokenRows.count ?? 0) === expectedBroken && (evidenceRows.count ?? 0) === expectedEvidence) {
         return { id: stableId, createdAt: existing.data.created_at };
@@ -46,14 +46,16 @@ export async function persistAudit(report: AuditReport, userId?: string, reserva
   }
   const { data: audit, error } = created;
   if (error || !audit) throw new AuditStorageError("Supabase could not create the audit.");
-  const broken = report.findings.filter((item) => item.httpStatus === 404);
+  const broken = report.findings.filter((item) => item.httpStatus === 404 || item.httpStatus === 410);
   try {
     if (broken.length) {
       const { data: savedLinks, error: linkError } = await db.from("broken_links").insert(broken.map((item) => ({
-        audit_id: audit.id, cited_url: item.url, http_status: 404, url_state: item.urlState,
+        audit_id: audit.id, cited_url: item.url, http_status: item.httpStatus!, url_state: item.urlState,
         approval_status: "pending_review", suggested_redirect: item.suggestedRedirect,
         match_confidence: item.matchConfidence ?? null,
         match_evidence_reason: item.matchEvidenceReason ?? (item.suggestedRedirect ? "A live destination candidate was found; human approval is required." : "manual_mapping_required: no eligible live destination candidate was found."),
+        ...(item.linkHealth ? { link_health_json: item.linkHealth } : {}),
+        ...(item.waybackSnapshot ? { wayback_snapshot_json: item.waybackSnapshot } : {}),
       }))).select("id,cited_url");
       if (linkError || !savedLinks) throw new Error("Link insert failed.");
       const groups = groupRecoverySignals(broken.map(item => ({ url: item.url, kind: "citation", citationSnapshots: report.observationEvidence?.filter(observation => observation.urls.some(url => { try { return new URL(url).pathname.toLowerCase() === new URL(item.url).pathname.toLowerCase(); } catch { return false; } })).length ?? 0 })));

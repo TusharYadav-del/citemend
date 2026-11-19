@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, mock, test } from "node:test";
-import { AuditInputError, extractCitationUrls, runAudit, validateAuditInput, type AuditReport } from "../lib/audit-pipeline";
+import { AuditInputError, extractCitationUrls, runAudit as runAuditWithDefaults, validateAuditInput, type AuditDependencies, type AuditReport } from "../lib/audit-pipeline";
 import { persistAudit, AuditStorageError } from "../lib/audit-store";
 import { GET } from "../app/api/audit/route";
 import { createAuditPostHandler } from "../lib/audit-handler";
@@ -21,6 +21,7 @@ const probe: CitationProbeResult = {
   citations: [], groundingMetadata: { groundingChunks: [{ web: { uri: "https://example.com/docs/api", title: "API" } }] },
 };
 const save = async () => ({ id: "audit-id", createdAt: "2026-10-30T00:00:00Z" });
+const runAudit = (value: unknown, overrides: Partial<AuditDependencies> = {}, userId?: string) => runAuditWithDefaults(value, { wayback: async () => null, ...overrides }, userId);
 
 test("validates input before any provider call", async () => {
   for (const value of [null, {}, { ...input, buyerPrompt: " " }, { ...input, domain: "127.0.0.1" }, { ...input, domain: "https://example.com/path" }, { ...input, domain: "example.com:8080" }]) assert.throws(() => validateAuditInput(value), AuditInputError);
@@ -183,6 +184,30 @@ test("network failures remain unknown, unavailable sitemaps produce partial repo
   assert.ok(report.warnings.length >= 2);
 });
 
+test("audit health retries temporary failures, keeps 404/410 distinct, and attaches Wayback context", async () => {
+  const missing = "https://example.com/missing-product";
+  const gone = "https://example.com/retired-product";
+  const attempts = new Map<string, number>();
+  const archived: string[] = [];
+  const report = await runAudit(input, {
+    probe: async () => ({ text: `References: ${missing} and ${gone}`, citedUrls: [missing, gone], providerUsed: "fixture", searchGrounding: { status: "available", sources: [] }, warnings: [] }),
+    sitemap: async () => [],
+    check: async url => {
+      const count = (attempts.get(url) ?? 0) + 1;
+      attempts.set(url, count);
+      if (url === missing) return count === 1 ? 503 : 404;
+      return 410;
+    },
+    wayback: async url => { archived.push(url); return { url: `https://web.archive.org/web/20240102030405/${url}`, capturedAt: "2024-01-02T03:04:05Z", originalStatus: 200 }; },
+    save,
+  });
+  assert.equal(report.findings.find(item => item.url === missing)?.linkHealth?.classification, "permanent_dead");
+  assert.equal(report.findings.find(item => item.url === missing)?.linkHealth?.attempts, 2);
+  assert.equal(report.findings.find(item => item.url === gone)?.httpStatus, 410);
+  assert.deepEqual(archived.sort(), [gone, missing].sort());
+  assert.equal(report.findings.find(item => item.url === missing)?.waybackSnapshot?.originalStatus, 200);
+});
+
 test("never suggests an unchecked, failed, or missing URL", async () => {
   const report = await runAudit(input, { probe: async () => probe, sitemap: async () => ["https://example.com/docs/setup"], check: async () => 404, save });
   assert.ok(report.findings.every((item) => item.suggestedRedirect === null));
@@ -217,7 +242,7 @@ test("GET remains compatible; POST rejects malformed input and supports authenti
 
 test("POST runs real SDK/parser/checker/store code against controlled HTTP fixtures", async () => {
   let insertCount = 0;
-  let persistedLinks: unknown;
+  let persistedLinks: Record<string, unknown>[] | undefined;
   let persistedAudit: Record<string, unknown> | undefined;
   const id = "00000000-0000-4000-8000-000000000005";
   mock.method(globalThis, "fetch", async (value: string | URL, options?: RequestInit) => {
@@ -225,15 +250,19 @@ test("POST runs real SDK/parser/checker/store code against controlled HTTP fixtu
     if (url.includes("api.tavily.com")) return Response.json({ results: [{ url: "https://example.com/docs/api", title: "API", content: "Official API docs" }] });
     if (url.includes("api.groq.com")) {
       const body = JSON.parse(String(options?.body));
-      return Response.json({ choices: [{ message: { content: body.model === "openai/gpt-oss-20b" ? JSON.stringify({ citations: ["https://example.com/docs/api"] }) : probe.text } }] });
+      return Response.json({ choices: [{ message: { content: body.model === "openai/gpt-oss-20b" ? JSON.stringify({ citations: ["https://example.com/docs/api"] }) : `${probe.text} Also https://example.com/docs/retired` } }] });
+    }
+    if (url.startsWith("https://archive.org/wayback/available")) {
+      const source = new URL(url).searchParams.get("url") ?? "https://example.com/docs/setup-old";
+      return Response.json({ archived_snapshots: { closest: { available: true, url: `https://web.archive.org/web/20200102030405/${source}`, timestamp: "20200102030405", statuscode: "200" } } });
     }
     if (url === "https://example.com/sitemap.xml") return new Response('<urlset><url><loc>https://example.com/docs/setup</loc></url></urlset>');
-    if (url.startsWith("https://example.com/")) return new Response(null, { status: url.endsWith("setup-old") ? 404 : 200 });
+    if (url.startsWith("https://example.com/")) return new Response(null, { status: url.endsWith("setup-old") ? 404 : url.endsWith("retired") ? 410 : 200 });
     if (url.startsWith("https://db.example.com/rest/v1/audits") && method === "POST") { persistedAudit = JSON.parse(String(options?.body)); insertCount++; return Response.json({ id, created_at: "2026-10-30T00:00:00Z" }); }
-    if (url.startsWith("https://db.example.com/rest/v1/broken_links")) { persistedLinks = JSON.parse(String(options?.body)); return Response.json([{ id: "child-id", cited_url: "https://example.com/docs/setup-old" }], { status: 201 }); }
+    if (url.startsWith("https://db.example.com/rest/v1/broken_links")) { const rows = JSON.parse(String(options?.body)) as typeof persistedLinks; persistedLinks = rows; return Response.json((rows ?? []).map((row, index) => ({ id: `child-${index}`, cited_url: row.cited_url })), { status: 201 }); }
     if (url.startsWith("https://db.example.com/rest/v1/recovery_findings")) return Response.json([], { status: 201 });
     if (url.startsWith("https://db.example.com/rest/v1/ai_observation_evidence")) return new Response(null, { status: 201 });
-    if (url.startsWith("https://db.example.com/rest/v1/audits") && method === "GET") return Response.json({ id, user_id: "user_test_123", status: "completed", broken_links: [{ id: "child-id" }] });
+    if (url.startsWith("https://db.example.com/rest/v1/audits") && method === "GET") return Response.json({ id, user_id: "user_test_123", status: "completed", broken_links: (persistedLinks ?? []).map((row, index) => ({ id: `child-${index}` })) });
     if (url.startsWith("https://db.example.com/rest/v1/audits") && method === "PATCH") return new Response(null, { status: 204 });
     throw new Error(`Unexpected fixture request: ${method} ${url}`);
   });
@@ -242,9 +271,19 @@ test("POST runs real SDK/parser/checker/store code against controlled HTTP fixtu
   const report = await response.json();
   assert.equal(report.auditId, id);
   assert.equal(report.findings[0].suggestedRedirect, null);
+  assert.deepEqual(report.findings.filter((item: { httpStatus: number | null }) => item.httpStatus === 404 || item.httpStatus === 410).map((item: { httpStatus: number | null }) => item.httpStatus), [404, 410]);
   assert.equal(insertCount, 1);
   assert.equal(persistedAudit?.user_id, "user_test_123");
-  assert.deepEqual(persistedLinks, [{ audit_id: id, cited_url: "https://example.com/docs/setup-old", http_status: 404, url_state: "404", approval_status: "pending_review", suggested_redirect: null, match_confidence: null, match_evidence_reason: "The live candidate does not meet the semantic and commercial equivalence threshold; preserve the source 404/410." }]);
+  assert.equal(persistedLinks?.length, 2);
+  assert.deepEqual(persistedLinks?.map(row => row.http_status), [404, 410]);
+  const persisted404 = persistedLinks?.find(row => row.http_status === 404);
+  const persisted410 = persistedLinks?.find(row => row.http_status === 410);
+  assert.equal(persisted404?.url_state, "404");
+  assert.equal(persisted404?.link_health_json && (persisted404.link_health_json as Record<string, unknown>).classification, "permanent_dead");
+  assert.match(String((persisted404?.wayback_snapshot_json as Record<string, unknown> | undefined)?.url), /web\.archive\.org\/web\//);
+  assert.equal(persisted410?.url_state, "410");
+  assert.equal(persisted410?.suggested_redirect, null);
+  assert.match(String((persisted410?.wayback_snapshot_json as Record<string, unknown> | undefined)?.url), /retired/);
 });
 
 test("POST returns a safe Groq 429 without writing to Supabase", async () => {

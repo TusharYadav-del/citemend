@@ -2,6 +2,7 @@ import "server-only";
 import { createServerDatabase } from "./supabase-server";
 import { readAgencyProfile } from "./agency-whitelabel";
 import { buildBeforeAfterReport, type RecoverySnapshot } from "./before-after-report";
+import { failedDestinationKey } from "./link-health";
 
 export async function getPublicAudit(id: string) {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return null;
@@ -10,7 +11,7 @@ export async function getPublicAudit(id: string) {
   const db = createServerDatabase();
   const { data, error } = await db
     .from("audits")
-    .select("id,domain,status,created_at,share_of_model_score,engine_matrix_json,agency_brand_name,agency_logo_url,agency_primary_color,agency_cta_text,agency_cta_url,broken_links(id,cited_url,http_status,suggested_redirect,approval_status)")
+    .select("id,domain,status,created_at,share_of_model_score,engine_matrix_json,agency_brand_name,agency_logo_url,agency_primary_color,agency_cta_text,agency_cta_url,broken_links(id,cited_url,http_status,suggested_redirect,approval_status,link_health_json,wayback_snapshot_json)")
     .eq("id", id)
     .in("status", ["completed", "partial", "mock_completed"])
     .maybeSingle();
@@ -18,11 +19,18 @@ export async function getPublicAudit(id: string) {
   if (error) throw new Error("Could not load this audit report.");
   if (!data) return null;
   const agency = readAgencyProfile(data);
-  let opportunities: { dead_competitor_url: string | null; target_url: string; competitor_domain: string | null; matched_user_live_url: string | null; http_status: number | null }[] = [];
-  let query = db.from("citation_hijack_opportunities").select("opportunity_type,dead_competitor_url,target_url,competitor_domain,matched_user_live_url,http_status").eq("audit_id", id).order("created_at", { ascending: true }).order("id", { ascending: true });
+  let allOpportunities: { opportunity_type: string; dead_competitor_url: string | null; target_url: string; competitor_domain: string | null; matched_user_live_url: string | null; http_status: number | null; source_page_url?: string | null; failed_destination_url_key?: string | null; replacement_snippet?: string | null; wayback_snapshot_json?: { url?: string; capturedAt?: string; originalStatus?: number } | null }[] = [];
+  let query = db.from("citation_hijack_opportunities").select("opportunity_type,dead_competitor_url,target_url,competitor_domain,matched_user_live_url,http_status,source_page_url,failed_destination_url_key,replacement_snippet,wayback_snapshot_json").eq("audit_id", id).order("created_at", { ascending: true }).order("id", { ascending: true });
   if (agency) query = query.eq("opportunity_type", "competitor_direct_404");
-  const result = await query.limit(agency ? 100 : 2);
-  if (!result.error) opportunities = (result.data ?? []).filter(item => item.opportunity_type === "competitor_direct_404");
+  const result = await query.limit(1000);
+  if (!result.error) allOpportunities = (result.data ?? []).filter(item => item.opportunity_type === "competitor_direct_404" || item.opportunity_type === "listicle_outbound_404");
+  const opportunities = allOpportunities.slice(0, agency ? 100 : 2);
+  const pageLevelBrokenLinkCount = new Set(allOpportunities.filter(item => item.opportunity_type === "listicle_outbound_404" && item.source_page_url && item.dead_competitor_url)
+    .map(item => `${failedDestinationKey(item.source_page_url!) ?? item.source_page_url}|${item.failed_destination_url_key ?? failedDestinationKey(item.dead_competitor_url!) ?? item.dead_competitor_url}`)).size;
+  const uniqueFailedDestinationCount = new Set([
+    ...data.broken_links.filter(link => link.http_status === 404 || link.http_status === 410).map(link => failedDestinationKey(link.cited_url)),
+    ...allOpportunities.filter(item => item.http_status === 404 || item.http_status === 410).map(item => item.failed_destination_url_key ?? failedDestinationKey(item.dead_competitor_url ?? "")),
+  ].filter((value): value is string => !!value)).size;
   let beforeAfterReports: { destination: string; technicalDeploymentVerified: boolean; subsequentCitationObserved: boolean; diff: ReturnType<typeof buildBeforeAfterReport> | null }[] = [];
   try {
     const [outcomes, evidence] = await Promise.all([
@@ -42,5 +50,5 @@ export async function getPublicAudit(id: string) {
       return { destination: outcome.canonical_destination_url, technicalDeploymentVerified: true, subsequentCitationObserved: !!after?.citedUrls.includes(outcome.canonical_destination_url), diff: before && after ? buildBeforeAfterReport(before, after) : null };
     });
   } catch { /* Older hosted projects can render the saved snapshot while additive migrations are pending. */ }
-  return { ...data, agency, opportunities, beforeAfterReports, broken_links: data.broken_links.filter((link) => link.http_status === 404) };
+  return { ...data, agency, opportunities, linkCounts: { pageLevelBrokenLinkCount, uniqueFailedDestinationCount }, beforeAfterReports, broken_links: data.broken_links.filter((link) => link.http_status === 404 || link.http_status === 410) };
 }

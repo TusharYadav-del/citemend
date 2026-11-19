@@ -14,9 +14,10 @@ import { buildEngineMatrix, type EngineCitation, type EngineName, type EnginePro
 import { synthesizeEngineProfiles, type SynthesizedProfile } from "./engine-synthesis";
 import { normalizeRecoveryUrl } from "./recovery/normalize";
 import { evaluateRecoveryCandidate, hasCommercialTopicEquivalence, type RecoveryGuardrailResult } from "./recovery/guardrails";
+import { checkLinkHealth, lookupWaybackSnapshot, type LinkHealthResult, type WaybackSnapshot } from "./link-health";
 
 export class AuditInputError extends Error {}
-export type AuditFinding = { url: string; httpStatus: number | null; urlState: UrlState; error: string | null; suggestedRedirect: string | null; matchConfidence?: number; matchEvidenceReason?: string; normalizedPath?: string; recoveryGuardrail?: RecoveryGuardrailResult };
+export type AuditFinding = { url: string; httpStatus: number | null; urlState: UrlState; error: string | null; suggestedRedirect: string | null; linkHealth?: LinkHealthResult; waybackSnapshot?: WaybackSnapshot | null; matchConfidence?: number; matchEvidenceReason?: string; normalizedPath?: string; recoveryGuardrail?: RecoveryGuardrailResult };
 export type AuditReport = {
   domain: string; buyerPrompt: string; buyerPrompts?: string[]; competitorDomains?: string[]; groundTruthPricing?: string; visibilityScore?: number; generatedText: string;
   groundingMetadata: GeminiProbeResult["groundingMetadata"];
@@ -34,6 +35,7 @@ export type AuditDependencies = {
   synthesize: typeof synthesizeEngineProfiles | null;
   saveGap: typeof saveAuditCitationGap;
   resolve: (url: string) => Promise<string | null>;
+  wayback?: typeof lookupWaybackSnapshot;
   save: (report: AuditReport, userId?: string) => Promise<{ id: string; createdAt: string }>;
   sitemapPageLimit?: number;
   onProgress?: (progress: number, label: string) => Promise<void> | void;
@@ -201,14 +203,27 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
   let sitemap: string[] = [];
   if (sitemapResult.status === "fulfilled") sitemap = [...new Set(sitemapResult.value.map(normalizedUrl).filter((url): url is string => !!url && inDomain(url, domain)))];
   else warnings.push("Sitemap discovery failed; redirect suggestions may be unavailable.");
-  const statusCache = new Map<string, Promise<UrlVerification>>();
+  const statusCache = new Map<string, Promise<UrlVerification & { linkHealth: LinkHealthResult }>>();
   let checkDeadline = Date.now() + 30_000;
   function verification(url: string) {
     if (!statusCache.has(url)) statusCache.set(url, Date.now() >= checkDeadline
-      ? Promise.resolve({ state: "unknown", httpStatus: null, error: "Status check budget exceeded." })
-      : (overrides.check && !overrides.verify
-        ? deps.check(url).then(httpStatus => ({ state: httpStatus === 404 ? "404" as const : httpStatus === 410 ? "410" as const : httpStatus === 301 ? "301" as const : httpStatus === 200 ? "200" as const : "unknown" as const, httpStatus })).catch(error => ({ state: /timeout/i.test(String(error)) ? "timeout" as const : /private|blocked|unsafe/i.test(String(error)) ? "blocked" as const : "unknown" as const, httpStatus: null, error: String(error) }))
-        : (deps.verify ?? verifyUrl)(url)));
+      ? Promise.resolve({ state: "unknown", httpStatus: null, error: "Status check budget exceeded.", linkHealth: { classification: "unknown", httpStatus: null, attempts: 0, retryable: false, error: "Status check budget exceeded." } })
+      : (async () => {
+        let latest: UrlVerification = { state: "unknown", httpStatus: null };
+        const linkHealth = await checkLinkHealth(async () => {
+          if (overrides.check && !overrides.verify) {
+            try {
+              const httpStatus = await deps.check(url);
+              latest = { state: httpStatus === 404 ? "404" : httpStatus === 410 ? "410" : httpStatus === 301 ? "301" : httpStatus === 200 ? "200" : "unknown", httpStatus };
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              latest = { state: /timeout/i.test(message) ? "timeout" : /private|blocked|unsafe/i.test(message) ? "blocked" : "unknown", httpStatus: null, error: message };
+            }
+          } else latest = await (deps.verify ?? verifyUrl)(url);
+          return { httpStatus: latest.httpStatus, state: latest.state, error: latest.error };
+        });
+        return { ...latest, linkHealth };
+      })());
     return statusCache.get(url)!;
   }
   function status(url: string) {
@@ -216,10 +231,16 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
   }
   const findings: AuditFinding[] = await mapLimited(targetUrls, async (url) => {
     const result = await verification(url);
-    return { url, httpStatus: result.httpStatus, urlState: result.state, error: result.error ?? (result.httpStatus === null ? "HTTP status check failed or timed out." : null), suggestedRedirect: null };
+    return { url, httpStatus: result.httpStatus, urlState: result.state, error: result.error ?? (result.httpStatus === null ? "HTTP status check failed or timed out." : null), suggestedRedirect: null, linkHealth: result.linkHealth };
   });
   await deps.onProgress?.(70, `Verified ${findings.length} cited destination URLs`);
   const broken = findings.filter(item => item.httpStatus === 404);
+  const permanentlyDead = findings.filter(item => item.httpStatus === 404 || item.httpStatus === 410);
+  const waybackCandidates = permanentlyDead.slice(0, 12);
+  await mapLimited(waybackCandidates, async finding => {
+    finding.waybackSnapshot = await (deps.wayback ?? lookupWaybackSnapshot)(finding.url);
+  });
+  if (permanentlyDead.length > waybackCandidates.length) warnings.push("Wayback snapshot lookup was limited to the first 12 confirmed 404/410 destinations in this audit.");
   let semanticMatches = new Map<string, { url: string; similarity: number }[]>();
   if (broken.length && sitemap.length && deps.semantic) {
     try { semanticMatches = await deps.semantic(domain, broken.map(item => item.url), sitemap); }
@@ -228,7 +249,7 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
     checkDeadline = Date.now() + 30_000;
   }
   // Semantic candidates are suggestions only until a live 2xx response is verified.
-  for (const finding of broken) {
+  for (const finding of permanentlyDead) {
     for (const candidate of semanticMatches.get(finding.url) ?? []) {
       const url = normalizedUrl(candidate.url);
       if (!url || !sitemap.includes(url) || new URL(url).hostname !== new URL(finding.url).hostname
@@ -273,6 +294,7 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
     }
   }
   if (findings.some((item) => item.error)) warnings.push("Some citation statuses are unknown; these are not classified as 404s.");
+  if (findings.some(item => item.linkHealth?.classification === "temporary_failure")) warnings.push("Some destination checks ended in temporary HTTP or network failures after retries; they are unresolved, not permanent link rot.");
   const groundingMetadata = "groundingMetadata" in probe ? probe.groundingMetadata : null;
   if (!("searchGrounding" in probe) && !groundingMetadata) warnings.push("The probe returned no grounding metadata; only response text URLs could be inspected.");
   const verifiedFindings = findings.filter((finding) => finding.httpStatus !== null);

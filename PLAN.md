@@ -1099,3 +1099,23 @@ No new database migration is needed; S1.7 uses the existing workspace ownership,
 - [x] Verify `npx tsc --noEmit`, lint with zero errors (two existing `app/layout.tsx` warnings), all 316 tests, and optimized production build with `CITEMEND_BUILD_DIR=.next-s1-8-verified`.
 
 The user confirmed `supabase/migrations/041_outreach_founder_workbench.sql` applied successfully to hosted Supabase. Persistent checklist and founder review controls are ready. No prospect email was sent. Year 1 implementation is complete; Year 2 remains locked until its customer validation gate is met.
+
+## CiteMend Year 2 Stage-2 Step 1: Two-Sided Link-Health Waterfall (COMPLETED IN CODE)
+
+- [x] Add Migration 042 and typed persistence for retry-classified link health, Wayback snapshots, canonical failed destinations, publisher source pages, and replacement snippets.
+- [x] Retry timeout, network, 408/425/429, and 5xx results with bounded backoff; preserve 404/410 as permanent evidence and keep transient outcomes out of permanent dead-link findings.
+- [x] Add bounded Internet Archive Availability lookups for confirmed dead URLs and expose saved history in recovery, opportunity, and public report views.
+- [x] Scan AI-cited third-party publisher pages for broken outbound `.com` links, verify same-domain HTTP 200 replacements, and persist review-ready snippet drafts with separate page-level and unique-destination counts.
+- [x] Verify `npx tsc --noEmit`, lint (zero errors; two pre-existing `app/layout.tsx` warnings), all 325 tests, and optimized production build with `CITEMEND_BUILD_DIR=.next-s2-1-verified`.
+
+The user confirmed Migration 042 (`supabase/migrations/042_two_sided_link_health.sql`) applied successfully to hosted Supabase. No redirects are auto-approved; 410 findings remain review-only. Next unlocked segment: S2.2 Empirical GEO, Freshness Decay & Agent-Extractability Auditor.
+
+## CiteMend Year 2 Stage-2 Step 2: GEO Extractability & Freshness Auditor (COMPLETED IN CODE)
+
+- [x] Add an authenticated, owner-scoped deterministic scanner for the homepage and up to 11 same-domain sitemap URLs, with bounded public HTTP fetches.
+- [x] Evaluate robots.txt permissions separately for GPTBot, PerplexityBot, ClaudeBot, and Google-Extended; report `/llms.txt` availability as a discovery convention, not as a permission file.
+- [x] Measure initial-HTML readable text, navigation links, a 40–60 word capsule in the first 30% of visible content, quotation/statistic density, repeated keyword signals, and visible update dates older than 90 days.
+- [x] Rank remediation cards deterministically by impact-to-effort score and display page-level evidence and measurements in the dashboard.
+- [x] Verify `npx tsc --noEmit`, lint (zero errors; two existing `app/layout.tsx` warnings), all 328 tests, and optimized production build with `CITEMEND_BUILD_DIR=.next-s2-2-verified`.
+
+No database migration is required; results are computed on demand from public pages. The scan samples at most 12 pages and uses content heuristics as observable signals, not a prediction of model behavior. Next unlocked segment: S2.3 Stage-1 Atomic Claim Decomposition, Stale-Fact Diff Panel & Catalog Truth Monitor.

@@ -27,18 +27,18 @@ test("daily Vercel jobs and the every-minute Supabase worker use protected cron 
   assert.match(outreachSetup, /\/api\/cron\/outreach\/daily/);
 });
 
-test("migrations 001 through 041 apply in order and expose the columns used by the application", async () => {
+test("migrations 001 through 042 apply in order and expose the columns used by the application", async () => {
   const db = new PGlite({ extensions: { vector } });
   try {
     await db.exec("create role anon; create role authenticated; create role service_role bypassrls;");
     await db.exec("create schema auth; create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$; grant usage on schema auth to authenticated, service_role; grant execute on function auth.jwt() to authenticated, service_role;");
     const directory = new URL("../supabase/migrations/", import.meta.url);
     const files = (await readdir(directory)).filter(name => /^\d{3}_.+\.sql$/.test(name)).sort();
-  assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 41 }, (_, index) => String(index + 1).padStart(3, "0")));
+  assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 42 }, (_, index) => String(index + 1).padStart(3, "0")));
     for (const file of files) await db.exec(await readFile(new URL(file, directory), "utf8"));
     const expected: Record<string, string[]> = {
       audits: ["id", "user_id", "domain", "buyer_prompt", "status", "created_at", "completed_at", "competitor_domains", "ground_truth_pricing", "indexnow_key", "share_of_model_score", "engine_matrix_json", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text", "llms_txt_content", "webhook_url", "sitemap_url_count"],
-      broken_links: ["id", "audit_id", "cited_url", "http_status", "suggested_redirect", "url_state", "approval_status", "approved_by", "approved_at", "previous_destination_url", "deployed_at", "rolled_back_at", "match_evidence_reason", "match_confidence", "created_at"],
+      broken_links: ["id", "audit_id", "cited_url", "http_status", "suggested_redirect", "url_state", "approval_status", "approved_by", "approved_at", "previous_destination_url", "deployed_at", "rolled_back_at", "match_evidence_reason", "match_confidence", "link_health_json", "wayback_snapshot_json", "created_at"],
       recovery_findings: ["id", "audit_id", "broken_link_id", "domain", "finding_type", "normalized_path", "signal_evidence", "guardrail_classification", "approval_status", "suggested_target_url", "confidence_score", "match_reason", "rejected_soft_404_count", "blocked_loop_count", "qa_checked_at", "qa_status", "qa_old_url_status", "qa_destination_status", "qa_detail", "created_at"],
       subscriptions: ["id", "user_id", "store_id", "product_id", "variant_id", "billing_provider", "status", "plan", "plan_name", "test_mode", "lemonsqueezy_customer_id", "lemonsqueezy_subscription_id", "lemonsqueezy_order_id", "customer_portal_url", "update_payment_method_url", "trial_ends_at", "current_period_end", "ends_at", "cancelled", "provider_updated_at"],
       billing_webhook_events: ["id", "event_hash", "event_name", "payload", "processed_at"],
@@ -49,7 +49,7 @@ test("migrations 001 through 041 apply in order and expose the columns used by t
       sitemap_pages: ["id", "domain", "url", "page_title", "embedding", "embedding_model", "updated_at"],
       audit_citation_gaps: ["audit_id", "user_id", "domain", "buyer_prompt", "provider", "competitor_urls"],
       ai_404_events: ["id", "domain", "broken_path", "ai_referrer", "redirected_to", "user_agent", "referrer_host", "created_at"],
-      citation_hijack_opportunities: ["id", "audit_id", "domain", "opportunity_type", "target_url", "dead_competitor_url", "matched_user_live_url", "verification_status", "lifecycle_stage", "relevance_score", "buyer_intent_score", "citation_evidence_score", "replacement_quality_score", "composite_priority_score", "stage_history_json"],
+      citation_hijack_opportunities: ["id", "audit_id", "domain", "opportunity_type", "target_url", "dead_competitor_url", "matched_user_live_url", "source_page_url", "failed_destination_url_key", "replacement_snippet", "wayback_snapshot_json", "verification_status", "lifecycle_stage", "relevance_score", "buyer_intent_score", "citation_evidence_score", "replacement_quality_score", "composite_priority_score", "stage_history_json"],
       action_audit_logs: ["id", "workspace_domain", "actor_user_id", "action_type", "target_url", "previous_state_json", "new_state_json", "safety_check_passed", "created_at"],
       cms_connections: ["id", "user_id", "domain", "platform", "shop_subdomain", "access_token"],
       rescued_ai_visits: ["id", "user_id", "domain", "broken_path", "rescued_target_url", "ai_referrer", "similarity_score", "latency_ms", "created_at"],

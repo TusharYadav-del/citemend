@@ -92,7 +92,7 @@ async function auditEnrichment(db: ReturnType<typeof createServerDatabase>, job:
   const entityPrompt = prompts.find(prompt => /(price|pricing|cost|plan|tier|free|feature|compare|comparison|alternative)/i.test(prompt)) ?? buyerPrompt;
   await reportBackgroundJobProgress(db, job, 65, "Comparing saved answers with public product facts");
   await detectEntityPricingTruth({ auditId, domain, prompt: entityPrompt, answer: generatedText }).catch(() => null);
-  return { auditId, competitorOpportunities: hijack.opportunities.length, thirdPartySourcesQueued: thirdPartyUrls.length, entityTruthAnalyzed: !!entityPrompt, warning: hijack.warning ?? null };
+  return { auditId, competitorOpportunities: hijack.opportunities.length, competitorTemporaryFailureCount: hijack.temporaryFailureCount, thirdPartySourcesQueued: thirdPartyUrls.length, entityTruthAnalyzed: !!entityPrompt, warning: hijack.warning ?? null };
 }
 
 async function listicleCrawl(job: BackgroundJobRow) {
@@ -104,7 +104,7 @@ async function listicleCrawl(job: BackgroundJobRow) {
     thirdPartyUrls, prompt: typeof payload.prompt === "string" ? payload.prompt : "",
     citedEngine: typeof payload.citedEngine === "string" ? payload.citedEngine : "unknown",
   });
-  return { auditId: String(payload.auditId ?? ""), opportunityCount: result.opportunities.length, warning: result.warning ?? null };
+  return { auditId: String(payload.auditId ?? ""), opportunityCount: result.opportunities.length, ...result.linkCounts, warning: result.warning ?? null };
 }
 
 export async function processNextBackgroundJob() {

@@ -43,6 +43,20 @@ export function parseDashboardReport(value: unknown): DashboardReport {
     const finding = entry as Record<string, unknown>;
     if (!httpUrl(finding.url) || !(finding.httpStatus === null || typeof finding.httpStatus === "number" && Number.isInteger(finding.httpStatus) && finding.httpStatus >= 100 && finding.httpStatus <= 599) || !urlStates.includes(String(finding.urlState)) || !(finding.suggestedRedirect === null || httpUrl(finding.suggestedRedirect)) || !(finding.error === null || typeof finding.error === "string") || !(finding.matchEvidenceReason === undefined || typeof finding.matchEvidenceReason === "string")) return fail();
     if (finding.normalizedPath !== undefined && typeof finding.normalizedPath !== "string") return fail();
+    if (finding.linkHealth !== undefined) {
+      const health = finding.linkHealth as Record<string, unknown> | null;
+      if (!health || !["healthy", "redirect", "permanent_dead", "temporary_failure", "blocked", "unknown"].includes(String(health.classification))
+        || !(health.httpStatus === null || typeof health.httpStatus === "number" && Number.isInteger(health.httpStatus) && health.httpStatus >= 100 && health.httpStatus <= 599)
+        || typeof health.attempts !== "number" || !Number.isInteger(health.attempts) || health.attempts < 0 || health.attempts > 3
+        || typeof health.retryable !== "boolean" || !(health.error === null || typeof health.error === "string")) return fail();
+    }
+    if (finding.waybackSnapshot !== undefined && finding.waybackSnapshot !== null) {
+      const snapshot = finding.waybackSnapshot as Record<string, unknown>;
+      if (finding.httpStatus !== 404 && finding.httpStatus !== 410 || !snapshot || !httpUrl(snapshot.url)
+        || new URL(String(snapshot.url)).hostname !== "web.archive.org" || typeof snapshot.capturedAt !== "string"
+        || !Number.isFinite(Date.parse(snapshot.capturedAt)) || typeof snapshot.originalStatus !== "number"
+        || !Number.isInteger(snapshot.originalStatus) || snapshot.originalStatus < 100 || snapshot.originalStatus > 599) return fail();
+    }
     if (finding.recoveryGuardrail !== undefined && (!finding.recoveryGuardrail || typeof finding.recoveryGuardrail !== "object" || !["recoverable_equivalent", "leave_as_404_or_410", "chain_or_loop_risk"].includes(String((finding.recoveryGuardrail as Record<string, unknown>).classification)))) return fail();
     if (finding.httpStatus === 404 && finding.urlState !== "404" || finding.httpStatus === 410 && finding.urlState !== "410" || finding.httpStatus === 301 && finding.urlState !== "301" || finding.httpStatus === 200 && finding.urlState !== "200") return fail();
   }

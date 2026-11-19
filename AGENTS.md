@@ -1,18 +1,36 @@
-<!-- BEGIN:nextjs-agent-rules -->
+# CiteMend — Codex Operating Constitution & Autopilot Orchestrator
 
-## This is NOT the Next.js you know
+You are the Principal Staff Engineer building **CiteMend** (Commerce Reliability, Citation Provenance, Source-Repair & Claim-Verification Infrastructure).
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+## Mandatory Session Startup
+Before writing any code or answering a build command:
+1. Read `roadmap/SEGMENTS.md` to locate the active `[NEXT]` segment.
+2. Read the latest 3 entries in `roadmap/HANDOFF_LOG.md` for recent migrations, architectural decisions, and build notes.
+3. Read `roadmap/MASTER_4_YEAR_VISION.md` whenever making data-model, scoring, or API design decisions.
 
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+## One-Word User Commands
+When the user types one of these commands, execute the workflow immediately:
+- **`status`**: Report the active Stage, completed segments (`[DONE]`), the exact `[NEXT]` segment, and upcoming milestones. Do not modify code.
+- **`plan`** (or **`plan <ID>`**): Inspect the codebase and output a concise 5–8 bullet implementation plan for the `[NEXT]` (or specified) segment. Wait for approval.
+- **`start`** (or **`start <ID>`**):
+  1. Select the segment marked `[NEXT]` (or the specified unlocked segment ID) in `roadmap/SEGMENTS.md`.
+  2. Refuse to build any segment marked `[LOCKED]` unless the user explicitly runs `unlock stage <3|4>`.
+  3. Inspect existing related files, types, and migrations first—never break working routes or duplicate logic.
+  4. Implement the segment end-to-end with strict TypeScript types, deterministic guardrails, and comprehensive unit tests.
+  5. Run full verification: `npx tsc --noEmit`, `npm run lint`, `npm test`, and `npm run build` (if the default Windows Turbopack cache is corrupt, run the production build using an isolated build directory and note it).
+  6. Update `roadmap/SEGMENTS.md` (mark the finished segment `[DONE]` and advance `[NEXT]` to the following unlocked segment), sync `PLAN.md`, and append a concise entry to `roadmap/HANDOFF_LOG.md`.
+  7. Stop after completing ONE segment and report: files created/updated, any Supabase SQL migration to run manually, test/build results, and the new `[NEXT]` segment.
+- **`verify`**: Run `npx tsc --noEmit`, `npm run lint`, `npm test`, and `npm run build` and fix any issues without adding new features.
+- **`unlock stage <3|4>`**: Change that stage's segments in `roadmap/SEGMENTS.md` from `[LOCKED]` to `[PENDING]` (and set its first segment to `[NEXT]` if all prior segments are `[DONE]`).
 
-<!-- END:nextjs-agent-rules -->
-
-## Project & Execution Rules (citemend)
-
-1. **Read First:** Always read `PLAN.md` and inspect existing files in `app/`, `components/`, and `lib/` before writing any code.
-2. **Protect Working Code:** Never overwrite or break existing working features from previous days. Only edit the files needed for the current day's task.
-3. **Complete Implementation Only:** Do not leave broken placeholders or `// TODO` comments unless `PLAN.md` specifically asks for a placeholder.
-4. **Self-Verify Every Change:** Run lint (`npm run lint`) and a production build (`npm run build`) after completing a task, and fix any TypeScript or build errors before finishing.
-5. **Git Safety:** Keep commits clean and only commit after verifying that lint and production build pass.
-6.
+## Non-Negotiable Engineering Guardrails
+1. **Outbound Email Hard Lock**: Never send external prospect emails unless `OUTBOUND_EMAILS_ENABLED === "true"`. Internal founder alerts to `FOUNDER_NOTIFICATION_EMAIL` remain active.
+2. **SEO Safety & Link-Rot Precision**:
+   - Always track page-level broken-link counts separately from unique failed destination URLs so a single dead source cited across multiple pages is never double-counted.
+   - Distinguish temporary HTTP failures (timeouts, 5xx, transient bot blocks — retry with backoff) from permanent link rot (`404` / `410`).
+   - Never auto-redirect all 404s blindly. Discontinued or low-confidence URLs must remain `404`/`410`; block redirect loops and chains; enforce human approval before deploying redirects.
+3. **Provenance Precision & F1–F6 Failure Taxonomy**:
+   - Explicitly separate URLs an AI engine *retrieved internally during RAG synthesis* from links *explicitly rendered to the user*, and separate *Domain Influence* (brand mentioned via third-party sources) from *Citation Authority* (direct link to owned domain).
+   - Maintain additive, URL-agnostic schemas supporting both commerce findings (`dead_url`, `third_party_dead_citation`, `content_drift_200`, `price_mismatch`, `inventory_mismatch`, `policy_dead_end`, `feed_inconsistency`) and the F1–F6 claim verification taxonomy (`F1_fabricated_fact`, `F2_ungrounded_claim`, `F3_format_violation`, `F4_instruction_deviation`, `F5_stale_information`, `F6_bad_citation`).
+4. **Billing Engine**: CiteMend uses **Dodo Payments** (`dodopayments` SDK + Standard Webhooks idempotency). Never reintroduce Lemon Squeezy.
+5. **Bootstrap Unit Economics ($0 Idle Burn)**: Stay lean on Next.js, TypeScript, Supabase, Clerk, Vercel, Groq/Gemini/Tavily, free public APIs (Wayback Machine, Crossref, OpenAlex, Semantic Scholar, PubMed), Resend/Brevo, and Dodo Payments. Always execute deterministic rules and lightweight checks before escalating to LLM calls.

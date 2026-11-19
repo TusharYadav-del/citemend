@@ -106,6 +106,7 @@ const input = {domain: "example.com", buyerPrompt: "Find enterprise pricing"};
 const auditOptions = {
   probe: async () => ({text: broken, citedUrls: [broken], providerUsed: "groq-test", searchGrounding: {status: "available" as const, sources: []}, warnings: []}),
   sitemap: async () => [destination], check: async (url: string) => url === broken ? 404 : 200,
+  wayback: async () => null,
   save: async () => ({id: "saved", createdAt: new Date().toISOString()}),
 };
 

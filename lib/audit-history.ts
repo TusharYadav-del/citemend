@@ -19,6 +19,8 @@ export type UserAuditHistoryItem = {
     approved_by?: string | null;
     match_confidence: number | null;
     match_evidence_reason: string | null;
+    link_health_json?: Record<string, unknown> | null;
+    wayback_snapshot_json?: { url?: string; capturedAt?: string; originalStatus?: number } | null;
   }[];
 };
 
@@ -30,7 +32,7 @@ export async function getUserAuditHistory(userId: string, ownerUserIds: string[]
   const db = createServerDatabase();
   const { data, error } = await db
     .from("audits")
-    .select("id,domain,status,created_at,share_of_model_score,engine_matrix_json,broken_links(id,cited_url,http_status,suggested_redirect,url_state,approval_status,approved_by,match_confidence,match_evidence_reason,deployed_at)")
+    .select("id,domain,status,created_at,share_of_model_score,engine_matrix_json,broken_links(id,cited_url,http_status,suggested_redirect,url_state,approval_status,approved_by,match_confidence,match_evidence_reason,deployed_at,link_health_json,wayback_snapshot_json)")
     .in("user_id", owners)
     .not("status", "in", "(free_pending,free_saving)")
     .order("created_at", { ascending: false });

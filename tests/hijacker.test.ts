@@ -25,16 +25,17 @@ test("checks competitor citations and stores semantic own-domain match for 404 a
     citationUrls: ["https://acme.com/docs", "https://rival.com/old-pricing", "https://rival.com/retired-feature", "https://reddit.com/r/example"],
     prompt: "Compare pricing", citedEngine: "Groq+Tavily", responseText: "Acme provides documentation.",
   }, {
-    check: async url => { checked.push(url); return url.endsWith("old-pricing") ? 404 : 410; },
+    check: async url => { checked.push(url); if (new URL(url).hostname === "acme.com") return 200; return url.endsWith("old-pricing") ? 404 : 410; },
     index: async () => { indexed++; return { indexed: 0, cached: 1, urls: ["https://acme.com/pricing"] }; },
     embed: async () => [1, ...Array(767).fill(0)],
     search: async domain => {
       assert.equal(domain, "acme.com");
       return [{ url: "https://acme.com/pricing", similarity: 0.91 }];
     },
+    wayback: async () => null,
     save: async rows => { stored = rows; },
   });
-  assert.deepEqual(checked, ["https://rival.com/old-pricing", "https://rival.com/retired-feature"]);
+  assert.deepEqual(checked.filter(url => new URL(url).hostname === "rival.com"), ["https://rival.com/old-pricing", "https://rival.com/retired-feature"]);
   assert.equal(indexed, 1);
   assert.equal(result.classifications.length, 4);
   assert.equal(result.opportunities.length, 2);
