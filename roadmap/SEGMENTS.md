@@ -24,11 +24,11 @@ Status Legend: `[DONE]` | `[NEXT]` | `[PENDING]` | `[LOCKED]`
   - Implement FActScore-style sentence-level atomic claim decomposition and deterministic-first citation metadata normalization (`title`, `authors`, `year`, `venue`, `url`, `doi`, `arxiv_id`, `pmid`).
   - Classify claim-level issues using the `F1`–`F6` taxonomy (`F1_fabricated_fact`, `F2_ungrounded_claim`, `F3_format_violation`, `F4_instruction_deviation`, `F5_stale_information`, `F6_bad_citation`).
   - Build the **Stale-Fact & Misattribution Diff Panel** categorizing discrepancies into: (1) Stale Owned Pages (`>90` days or Shopify price/inventory/policy mismatch), (2) Stale Third-Party Sources, and (3) Model Misreads (where the cited page is accurate or HTTP 200 OK, but the LLM misattributed or distorted the claim).
-- **[S2.4] [NEXT]** Server-Side AI Crawler Log Matcher, Retrieved-vs-Rendered Provenance & Multi-Run Consistency Index:
+- **[S2.4] [DONE]** Server-Side AI Crawler Log Matcher, Retrieved-vs-Rendered Provenance & Multi-Run Consistency Index:
   - Build a lightweight Next.js/Cloudflare/Shopify-compatible edge log ingestion endpoint that matches real `GPTBot`, `PerplexityBot`, `ClaudeBot`, and `Google-Extended` crawler hits and AI referral headers (`chatgpt.com`, `perplexity.ai`, `gemini.google.com`, `claude.ai`) to cited URLs and downstream Shopify orders (without trusting spoofable user-agents alone).
   - Separate internal RAG-retrieved sources from explicitly rendered user links, and separate **Domain Influence** (third-party brand mentions) from **Citation Authority** (direct domain links).
   - Compute the **Retrieval Consistency & Confidence Index** across repeated prompt/URL checks so users see statistical stability rather than noisy single-run scores.
-- **[S2.5] [PENDING]** Agency Multi-Workspace Hub, White-Label 4-Metric Reports & Free Provenance Auditor Lead Magnet:
+- **[S2.5] [NEXT]** Agency Multi-Workspace Hub, White-Label 4-Metric Reports & Free Provenance Auditor Lead Magnet:
   - Build the multi-client Agency Workspace Switcher and 1-click **White-Label Monthly ROI & Provenance Report** (HTML/print-PDF ready) displaying the 4-Metric Retention Gate + Retrieved-vs-Rendered breakdown.
   - Ship a rate-limited, $0-API-cost **"Free CiteMend Provenance & Broken-Citation Auditor"** widget on the public homepage (checking live HTTP status, Wayback snapshot, crawler access, 60-link bloat, and metadata validity) to capture inbound B2B leads organically.
   - Wire the internal Draft-Locked **"1-Verified-Example" Outreach Workbench** (strictly gated behind `OUTBOUND_EMAILS_ENABLED === "true"`).

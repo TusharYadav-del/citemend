@@ -6,6 +6,8 @@ import { getModelDefinition } from "./model-registry";
 export interface CitationProbeResult {
   text: string;
   citedUrls: string[];
+  retrievedUrls?: string[];
+  renderedUrls?: string[];
   providerUsed: string;
   searchGrounding: {
     status: "available" | "unavailable" | "not_configured";
@@ -89,6 +91,7 @@ export async function runCitationProbe(domain: string, buyerPrompt: string): Pro
     throw new CitationProviderError(status === 429 ? "The AI provider is rate limiting requests. Wait before trying another audit." : "Groq could not complete the citation probe. Check provider access and availability.", status);
   }
   if (!text.trim()) throw new CitationProviderError("Groq returned no generated text.");
-  extractTextUrls(text).forEach((url) => discoveredUrls.add(url));
-  return { text, citedUrls: [...discoveredUrls], providerUsed: `groq-${model}`, searchGrounding: { status, sources }, warnings };
+  const renderedUrls = extractTextUrls(text);
+  renderedUrls.forEach((url) => discoveredUrls.add(url));
+  return { text, citedUrls: [...discoveredUrls], retrievedUrls: [...new Set(sources.map(source => source.url))], renderedUrls, providerUsed: `groq-${model}`, searchGrounding: { status, sources }, warnings };
 }

@@ -27,14 +27,14 @@ test("daily Vercel jobs and the every-minute Supabase worker use protected cron 
   assert.match(outreachSetup, /\/api\/cron\/outreach\/daily/);
 });
 
-test("migrations 001 through 042 apply in order and expose the columns used by the application", async () => {
+test("migrations 001 through 043 apply in order and expose the columns used by the application", async () => {
   const db = new PGlite({ extensions: { vector } });
   try {
     await db.exec("create role anon; create role authenticated; create role service_role bypassrls;");
     await db.exec("create schema auth; create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$; grant usage on schema auth to authenticated, service_role; grant execute on function auth.jwt() to authenticated, service_role;");
     const directory = new URL("../supabase/migrations/", import.meta.url);
     const files = (await readdir(directory)).filter(name => /^\d{3}_.+\.sql$/.test(name)).sort();
-  assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 42 }, (_, index) => String(index + 1).padStart(3, "0")));
+  assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 43 }, (_, index) => String(index + 1).padStart(3, "0")));
     for (const file of files) await db.exec(await readFile(new URL(file, directory), "utf8"));
     const expected: Record<string, string[]> = {
       audits: ["id", "user_id", "domain", "buyer_prompt", "status", "created_at", "completed_at", "competitor_domains", "ground_truth_pricing", "indexnow_key", "share_of_model_score", "engine_matrix_json", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text", "llms_txt_content", "webhook_url", "sitemap_url_count"],
@@ -55,7 +55,8 @@ test("migrations 001 through 042 apply in order and expose the columns used by t
       rescued_ai_visits: ["id", "user_id", "domain", "broken_path", "rescued_target_url", "ai_referrer", "similarity_score", "latency_ms", "created_at"],
       workspace_integrations: ["id", "user_id", "domain", "slack_webhook_url", "discord_webhook_url", "shopify_store_domain", "shopify_admin_token", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text"],
       pixel_intercept_quotas: ["domain", "window_started_at", "request_count"],
-      ai_observation_evidence: ["id", "audit_id", "domain", "prompt_query", "prompt_version", "provider", "model_name", "search_method", "locale", "raw_answer", "extracted_urls_json", "url_status_json", "sample_size", "observation_confidence", "job_status", "retry_count", "error_message", "observed_at"],
+      ai_observation_evidence: ["id", "audit_id", "domain", "prompt_query", "prompt_version", "provider", "model_name", "search_method", "locale", "raw_answer", "extracted_urls_json", "retrieved_urls_json", "rendered_urls_json", "url_status_json", "sample_size", "observation_confidence", "job_status", "retry_count", "error_message", "observed_at"],
+      ai_provenance_events: ["id", "user_id", "workspace_domain", "source_kind", "event_type", "page_url", "crawler_name", "crawler_verified", "referral_host", "journey_hash", "order_ref_hash", "occurred_at", "ingested_at"],
       recovery_outcomes: ["id", "audit_id", "domain", "broken_link_id", "canonical_destination_url", "technical_deployment_verified_at", "ai_citation_observed_at", "evidence_id", "created_at"],
       webhook_events_log: ["id", "event_id", "provider", "event_type", "delivery_status", "retry_count", "last_error", "received_at", "completed_at"],
       workspace_api_keys: ["id", "user_id", "workspace_domain", "key_hash", "key_prefix", "permissions_json", "rate_limit_per_minute", "last_used_at", "created_at", "revoked_at"],
@@ -111,7 +112,7 @@ test("migrations 001 through 042 apply in order and expose the columns used by t
     assert.equal((await db.query<{ status: string }>("select status from public.outreach_emails where recipient='founder@locked.example'")).rows[0].status, "unsubscribed");
     await db.exec("insert into public.outreach_emails(prospect_id,recipient,subject,body_text,body_html,status,founder_review_decision,founder_reviewed_at,founder_reviewed_by) select id,'rejected@locked.example','Rejected','Draft only','<p>Draft only</p>','draft_rejected','rejected',now(),'founder-test' from public.outreach_prospects where domain='locked.example'");
     assert.equal((await db.query<{ status: string }>("select status from public.outreach_emails where recipient='rejected@locked.example'")).rows[0].status, "draft_rejected");
-    assert.deepEqual((await db.query<{ table_name: string }>("select table_name from public.citemend_readiness_schema_status() order by table_name")).rows.length, 46);
+    assert.deepEqual((await db.query<{ table_name: string }>("select table_name from public.citemend_readiness_schema_status() order by table_name")).rows.length, 47);
     const firstOutreachRun = (await db.query<{ claimed: boolean; run_id: string }>("select * from public.outreach_begin_daily_run('2026-11-08')")).rows[0];
     assert.equal(firstOutreachRun.claimed, true);
     const duplicateOutreachRun = (await db.query<{ claimed: boolean; run_id: string }>("select * from public.outreach_begin_daily_run('2026-11-08')")).rows[0];
@@ -213,7 +214,7 @@ test("migrations 001 through 042 apply in order and expose the columns used by t
     await assert.rejects(db.query("select * from pixel_intercept_quotas"), /permission denied/);
     await assert.rejects(db.query("select * from action_audit_logs"), /permission denied/);
     await assert.rejects(db.query("select public.claim_pixel_intercept_quota('example.com')"), /permission denied/);
-    for (const table of ["ai_observation_evidence", "recovery_outcomes", "webhook_events_log", "workspace_api_keys", "autonomous_agent_runs", "ecommerce_catalog_items", "organization_members", "workspace_governance_policies", "scheduled_reports", "citation_change_events", "background_jobs", "founder_weekly_scorecards"]) await assert.rejects(db.query(`select * from ${table}`), /permission denied/);
+    for (const table of ["ai_observation_evidence", "ai_provenance_events", "recovery_outcomes", "webhook_events_log", "workspace_api_keys", "autonomous_agent_runs", "ecommerce_catalog_items", "organization_members", "workspace_governance_policies", "scheduled_reports", "citation_change_events", "background_jobs", "founder_weekly_scorecards"]) await assert.rejects(db.query(`select * from ${table}`), /permission denied/);
     await assert.rejects(db.query("select public.reserve_workspace_agent_scan('user_test','example.com')"), /permission denied/);
     assert.equal((await db.query<{ relrowsecurity: boolean }>("select relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname='audits'")).rows[0].relrowsecurity, true);
 

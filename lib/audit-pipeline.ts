@@ -27,7 +27,7 @@ export type AuditReport = {
   engineMatrixJson?: ReturnType<typeof buildEngineMatrix>["rows"];
   shareOfModelScore?: number | null;
   findings: AuditFinding[]; warnings: string[]; status: "completed" | "partial";
-  observationEvidence?: { prompt: string; answer: string; urls: string[]; provider: string; model: string }[];
+  observationEvidence?: { prompt: string; answer: string; urls: string[]; retrievedUrls: string[]; renderedUrls: string[]; provider: string; model: string }[];
 };
 export type AuditDependencies = {
   probe: (domain: string, buyerPrompt: string) => Promise<ProbeResult>; sitemap: typeof fetchSitemapUrls; check: typeof checkUrlStatus; verify?: typeof verifyUrl;
@@ -319,7 +319,7 @@ export async function runAudit(input: unknown, overrides: Partial<AuditDependenc
     }),
   });
   const providerName = "providerUsed" in probe ? probe.providerUsed : "gemini";
-  const report: AuditReport = { domain, buyerPrompt, ...(buyerPrompts.length > 1 ? { buyerPrompts } : {}), competitorDomains, ...(groundTruthPricing ? { groundTruthPricing } : {}), visibilityScore, shareOfModelScore: engineMatrix.shareOfModelScore, engineMatrixJson: engineMatrix.rows, generatedText: probe.text, groundingMetadata, providerUsed: providerName, ...("searchGrounding" in probe ? { searchGrounding: probe.searchGrounding } : {}), extractedUrls: allUrls, sitemapUrlCount: sitemap.length, findings, warnings: [...new Set(warnings)], status: warnings.length ? "partial" : "completed", observationEvidence: probeResults.flatMap((result, index) => result.status === "fulfilled" ? [{ prompt: buyerPrompts[index], answer: result.value.text, urls: extractCitationUrls(result.value), provider: "providerUsed" in result.value ? result.value.providerUsed : "gemini", model: "modelName" in result.value && typeof result.value.modelName === "string" ? result.value.modelName : "provider-default" }] : []) };
+  const report: AuditReport = { domain, buyerPrompt, ...(buyerPrompts.length > 1 ? { buyerPrompts } : {}), competitorDomains, ...(groundTruthPricing ? { groundTruthPricing } : {}), visibilityScore, shareOfModelScore: engineMatrix.shareOfModelScore, engineMatrixJson: engineMatrix.rows, generatedText: probe.text, groundingMetadata, providerUsed: providerName, ...( "searchGrounding" in probe ? { searchGrounding: probe.searchGrounding } : {}), extractedUrls: allUrls, sitemapUrlCount: sitemap.length, findings, warnings: [...new Set(warnings)], status: warnings.length ? "partial" : "completed", observationEvidence: probeResults.flatMap((result, index) => result.status === "fulfilled" ? [{ prompt: buyerPrompts[index], answer: result.value.text, urls: extractCitationUrls(result.value), retrievedUrls: "searchGrounding" in result.value ? result.value.retrievedUrls ?? result.value.searchGrounding.sources.map(source => source.url) : result.value.sources.map(source => source.url), renderedUrls: "searchGrounding" in result.value ? result.value.renderedUrls ?? extractTextUrls(result.value.text) : extractTextUrls(result.value.text), provider: "providerUsed" in result.value ? result.value.providerUsed : "gemini", model: "modelName" in result.value && typeof result.value.modelName === "string" ? result.value.modelName : "provider-default" }] : []) };
   const gap = detectCitationGap(domain, buyerPrompt, probe.text, report.providerUsed ?? "unknown");
   if (gap) report.citationGap = gap;
   if (process.env.AUDIT_PERSISTENCE_MODE === "local") {

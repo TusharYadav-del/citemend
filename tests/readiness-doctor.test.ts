@@ -64,8 +64,9 @@ test("readiness doctor requires all Dodo billing credentials and product IDs", a
   assert.equal(result.checks.find(check => check.id === "dodo-payments")?.status, "MISSING");
 });
 
-test("readiness doctor checks all expected tables through migration 040", () => {
-  assert.equal(REQUIRED_READINESS_TABLES.length, 45);
+test("readiness doctor checks all expected tables through migration 043", () => {
+  assert.equal(REQUIRED_READINESS_TABLES.length, 46);
+  assert.ok(REQUIRED_READINESS_TABLES.includes("ai_provenance_events"));
   assert.ok(REQUIRED_READINESS_TABLES.includes("billing_webhook_events"));
   assert.ok(REQUIRED_READINESS_TABLES.includes("workspace_api_rate_windows"));
   assert.ok(REQUIRED_READINESS_TABLES.includes("workspace_operating_metrics"));

@@ -1129,3 +1129,13 @@ No database migration is required; results are computed on demand from public pa
 - [x] Verify `npx tsc --noEmit`, lint (zero errors; two existing `app/layout.tsx` warnings), all 331 tests, and optimized production build with `CITEMEND_BUILD_DIR=.next-s2-3-verified`.
 
 No database migration is required; the analysis uses saved answer observations and bounded live page checks already available to the workspace. The existing catalog panel continues to surface stored SKU price/stock conflicts. Next unlocked segment: S2.4 Server-Side AI Crawler Log Matcher, Retrieved-vs-Rendered Provenance & Multi-Run Consistency Index.
+
+## CiteMend Year 2 Stage-2 Step 4: Crawler Logs & Retrieval Provenance (COMPLETED IN CODE)
+
+- [x] Add Migration 043 for separate retrieved/rendered URL arrays and owner-scoped crawler/referral/order provenance events; include the table in schema readiness diagnostics.
+- [x] Add a bounded signed ingestion endpoint for Cloudflare Logpush, trusted server logs, and Shopify webhook adapters. User-agent names remain claims; crawler verification requires trusted Cloudflare metadata plus a valid client IP. Session and order references are keyed-hashed before persistence.
+- [x] Store retrieval sources separately from URLs rendered in model answers; show third-party sources separately from owned-domain citation authority and only surface domain-influence mention as a potential signal when an answer also mentions the workspace name.
+- [x] Compute mean pairwise Jaccard retrieval-set consistency and URL-level Wilson confidence intervals across repeated prompt/provider/model observations; flag fewer than five runs.
+- [x] Verify `npx tsc --noEmit`, lint (zero errors; two existing `app/layout.tsx` warnings), all 338 tests, and optimized production build with `CITEMEND_BUILD_DIR=.next-s2-4-verified`.
+
+Migration 043 must be applied to hosted Supabase before ingestion and provenance analytics are available; it has not yet been confirmed applied. Configure `PROVENANCE_LOG_INGEST_SECRET` and follow `docs/provenance-log-ingestion.md` for the signed adapter contract. Next unlocked segment: S2.5 Agency Multi-Workspace Hub, White-Label Reports & Free Provenance Auditor Lead Magnet.

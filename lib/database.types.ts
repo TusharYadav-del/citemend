@@ -27,9 +27,9 @@ export type Database = {
         Relationships: [];
       };
       ai_observation_evidence: {
-        Row: { id: string; audit_id: string; domain: string; prompt_query: string; prompt_version: string; provider: string; model_name: string; search_method: string; locale: string; raw_answer: string; extracted_urls_json: string[]; url_status_json: Record<string, number | string>; sample_size: number; observation_confidence: number | null; job_status: string; retry_count: number; error_message: string | null; observed_at: string };
-        Insert: { id?: string; audit_id: string; domain: string; prompt_query: string; prompt_version?: string; provider: string; model_name: string; search_method: string; locale?: string; raw_answer: string; extracted_urls_json?: string[]; url_status_json?: Record<string, number | string>; sample_size?: number; observation_confidence?: number | null; job_status?: string; retry_count?: number; error_message?: string | null; observed_at?: string };
-        Update: { id?: string; audit_id?: string; domain?: string; prompt_query?: string; prompt_version?: string; provider?: string; model_name?: string; search_method?: string; locale?: string; raw_answer?: string; extracted_urls_json?: string[]; url_status_json?: Record<string, number | string>; sample_size?: number; observation_confidence?: number | null; job_status?: string; retry_count?: number; error_message?: string | null; observed_at?: string };
+        Row: { id: string; audit_id: string; domain: string; prompt_query: string; prompt_version: string; provider: string; model_name: string; search_method: string; locale: string; raw_answer: string; extracted_urls_json: string[]; retrieved_urls_json: string[]; rendered_urls_json: string[]; url_status_json: Record<string, number | string>; sample_size: number; observation_confidence: number | null; job_status: string; retry_count: number; error_message: string | null; observed_at: string };
+        Insert: { id?: string; audit_id: string; domain: string; prompt_query: string; prompt_version?: string; provider: string; model_name: string; search_method: string; locale?: string; raw_answer: string; extracted_urls_json?: string[]; retrieved_urls_json?: string[]; rendered_urls_json?: string[]; url_status_json?: Record<string, number | string>; sample_size?: number; observation_confidence?: number | null; job_status?: string; retry_count?: number; error_message?: string | null; observed_at?: string };
+        Update: { id?: string; audit_id?: string; domain?: string; prompt_query?: string; prompt_version?: string; provider?: string; model_name?: string; search_method?: string; locale?: string; raw_answer?: string; extracted_urls_json?: string[]; retrieved_urls_json?: string[]; rendered_urls_json?: string[]; url_status_json?: Record<string, number | string>; sample_size?: number; observation_confidence?: number | null; job_status?: string; retry_count?: number; error_message?: string | null; observed_at?: string };
         Relationships: [];
       };
       recovery_outcomes: {
@@ -174,6 +174,12 @@ export type Database = {
         Row: { id: string; domain: string; broken_path: string; ai_referrer: string; redirected_to: string | null; user_agent: string; referrer_host: string; created_at: string };
         Insert: { id?: string; domain: string; broken_path: string; ai_referrer?: string; redirected_to?: string | null; user_agent?: string; referrer_host?: string; created_at?: string };
         Update: { id?: string; domain?: string; broken_path?: string; ai_referrer?: string; redirected_to?: string | null; user_agent?: string; referrer_host?: string; created_at?: string };
+        Relationships: [];
+      };
+      ai_provenance_events: {
+        Row: { id: string; user_id: string; workspace_domain: string; source_kind: string; event_type: string; page_url: string | null; crawler_name: string | null; crawler_verified: boolean; referral_host: string | null; journey_hash: string | null; order_ref_hash: string | null; occurred_at: string; ingested_at: string };
+        Insert: { id?: string; user_id: string; workspace_domain: string; source_kind: string; event_type: string; page_url?: string | null; crawler_name?: string | null; crawler_verified?: boolean; referral_host?: string | null; journey_hash?: string | null; order_ref_hash?: string | null; occurred_at: string; ingested_at?: string };
+        Update: { id?: string; user_id?: string; workspace_domain?: string; source_kind?: string; event_type?: string; page_url?: string | null; crawler_name?: string | null; crawler_verified?: boolean; referral_host?: string | null; journey_hash?: string | null; order_ref_hash?: string | null; occurred_at?: string; ingested_at?: string };
         Relationships: [];
       };
       weekly_scan_runs: {

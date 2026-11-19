@@ -72,8 +72,8 @@ export async function persistAudit(report: AuditReport, userId?: string, reserva
     }
     if (report.observationEvidence?.length) {
       const observedStatus = Object.fromEntries(report.findings.filter(item => item.httpStatus !== null).map(item => [item.url, item.httpStatus! as number]));
-      const observations = report.observationEvidence.map(item => ({ audit_id: audit.id, domain: report.domain, prompt_query: item.prompt, prompt_version: "v1", provider: item.provider, model_name: item.model, search_method: "live-citation-probe", locale: "en-US", raw_answer: item.answer, extracted_urls_json: item.urls, url_status_json: observedStatus, sample_size: 1, observation_confidence: null, job_status: "completed", retry_count: 0 }));
-      const { data: savedObservations, error: evidenceError } = await db.from("ai_observation_evidence").insert(observations).select("id,audit_id,domain,prompt_query,model_name,extracted_urls_json,url_status_json,observed_at");
+      const observations = report.observationEvidence.map(item => ({ audit_id: audit.id, domain: report.domain, prompt_query: item.prompt, prompt_version: "v1", provider: item.provider, model_name: item.model, search_method: "live-citation-probe", locale: "en-US", raw_answer: item.answer, extracted_urls_json: item.urls, retrieved_urls_json: item.retrievedUrls, rendered_urls_json: item.renderedUrls, url_status_json: observedStatus, sample_size: 1, observation_confidence: null, job_status: "completed", retry_count: 0 }));
+      const { data: savedObservations, error: evidenceError } = await db.from("ai_observation_evidence").insert(observations).select("id,audit_id,domain,prompt_query,model_name,extracted_urls_json,retrieved_urls_json,rendered_urls_json,url_status_json,observed_at");
       if (evidenceError) throw new Error("Observation evidence insert failed.");
       // Event logging is best-effort: analytics must not invalidate a saved audit.
       try {
