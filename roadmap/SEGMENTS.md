@@ -20,11 +20,11 @@ Status Legend: `[DONE]` | `[NEXT]` | `[PENDING]` | `[LOCKED]`
   - Build the deterministic page extractability scanner that checks `robots.txt` and `/llms.txt` permissions for `GPTBot`, `PerplexityBot`, `ClaudeBot`, and `Google-Extended`, verifies SSR html delivery, and counts navigation links (flagging pages with `>= 60` links where agent extraction drops from 78% to 33%).
   - Audit the first 30% of page content for a 40–60 word self-contained **Answer Capsule**, measure quotation density (+40.9% driver) and statistic density (+30.6% driver), detect keyword stuffing (-8.3%), and flag pages un-updated for `> 90` days (3x citation-loss risk).
   - Rank all discovered fixes using the calibrated **Priority Tier 1 & Tier 2 Impact x Effort Formula** and display actionable remediation cards in the dashboard.
-- **[S2.3] [NEXT]** Stage-1 Atomic Claim Decomposition, Stale-Fact Diff Panel & Catalog Truth Monitor (`F1`–`F6` Taxonomy):
+- **[S2.3] [DONE]** Stage-1 Atomic Claim Decomposition, Stale-Fact Diff Panel & Catalog Truth Monitor (`F1`–`F6` Taxonomy):
   - Implement FActScore-style sentence-level atomic claim decomposition and deterministic-first citation metadata normalization (`title`, `authors`, `year`, `venue`, `url`, `doi`, `arxiv_id`, `pmid`).
   - Classify claim-level issues using the `F1`–`F6` taxonomy (`F1_fabricated_fact`, `F2_ungrounded_claim`, `F3_format_violation`, `F4_instruction_deviation`, `F5_stale_information`, `F6_bad_citation`).
   - Build the **Stale-Fact & Misattribution Diff Panel** categorizing discrepancies into: (1) Stale Owned Pages (`>90` days or Shopify price/inventory/policy mismatch), (2) Stale Third-Party Sources, and (3) Model Misreads (where the cited page is accurate or HTTP 200 OK, but the LLM misattributed or distorted the claim).
-- **[S2.4] [PENDING]** Server-Side AI Crawler Log Matcher, Retrieved-vs-Rendered Provenance & Multi-Run Consistency Index:
+- **[S2.4] [NEXT]** Server-Side AI Crawler Log Matcher, Retrieved-vs-Rendered Provenance & Multi-Run Consistency Index:
   - Build a lightweight Next.js/Cloudflare/Shopify-compatible edge log ingestion endpoint that matches real `GPTBot`, `PerplexityBot`, `ClaudeBot`, and `Google-Extended` crawler hits and AI referral headers (`chatgpt.com`, `perplexity.ai`, `gemini.google.com`, `claude.ai`) to cited URLs and downstream Shopify orders (without trusting spoofable user-agents alone).
   - Separate internal RAG-retrieved sources from explicitly rendered user links, and separate **Domain Influence** (third-party brand mentions) from **Citation Authority** (direct domain links).
   - Compute the **Retrieval Consistency & Confidence Index** across repeated prompt/URL checks so users see statistical stability rather than noisy single-run scores.

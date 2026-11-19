@@ -1119,3 +1119,13 @@ The user confirmed Migration 042 (`supabase/migrations/042_two_sided_link_health
 - [x] Verify `npx tsc --noEmit`, lint (zero errors; two existing `app/layout.tsx` warnings), all 328 tests, and optimized production build with `CITEMEND_BUILD_DIR=.next-s2-2-verified`.
 
 No database migration is required; results are computed on demand from public pages. The scan samples at most 12 pages and uses content heuristics as observable signals, not a prediction of model behavior. Next unlocked segment: S2.3 Stage-1 Atomic Claim Decomposition, Stale-Fact Diff Panel & Catalog Truth Monitor.
+
+## CiteMend Year 2 Stage-2 Step 3: Atomic Claim & Stale-Fact Review (COMPLETED IN CODE)
+
+- [x] Decompose up to 10 recent saved answer observations into bounded sentence/list claims and normalize scholarly citation metadata deterministically (`title`, `authors`, `year`, `venue`, `url`, `doi`, `arxiv_id`, `pmid`).
+- [x] Add evidence-based F1–F6 review taxonomy signals for ungrounded sentences, incomplete scholarly formatting, explicit count-instruction deviations, stale cited timestamps, and confirmed 404/410 citations. Fabrication remains a human-review candidate and is never asserted as established from lexical mismatch alone.
+- [x] Add stale owned-page and stale third-party-source records, plus a 200-OK page-fact comparison queue for human model-misread review; preserve the difference between observed mismatch and causal attribution.
+- [x] Present claim-level flags, normalized reference metadata, and stale/misattribution review cards in the authenticated citation-forensics panel; retain full evidence payload for inspection.
+- [x] Verify `npx tsc --noEmit`, lint (zero errors; two existing `app/layout.tsx` warnings), all 331 tests, and optimized production build with `CITEMEND_BUILD_DIR=.next-s2-3-verified`.
+
+No database migration is required; the analysis uses saved answer observations and bounded live page checks already available to the workspace. The existing catalog panel continues to surface stored SKU price/stock conflicts. Next unlocked segment: S2.4 Server-Side AI Crawler Log Matcher, Retrieved-vs-Rendered Provenance & Multi-Run Consistency Index.
