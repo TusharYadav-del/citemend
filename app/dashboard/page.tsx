@@ -4,7 +4,7 @@ import { UserButton } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { getUserAuditHistory, type UserAuditHistoryItem } from "@/lib/audit-history";
-import CheckoutButton from "@/components/CheckoutButton";
+import { BillingCheckoutButton } from "@/components/billing-checkout-button";
 import WeeklyMonitoring from "@/components/weekly-monitoring";
 import { hasProSubscription } from "@/lib/subscription";
 import { historyMetrics } from "@/lib/history-metrics";
@@ -53,7 +53,6 @@ import { CommandPalette } from "@/components/ui/CommandPalette";
 import { WorkspaceModeSwitcher } from "@/components/ui/workspace-mode-switcher";
 import { HelpSupportDrawer } from "@/components/help-support-drawer";
 import { BillingPanel } from "@/components/billing-panel";
-import { isBillingEnabled } from "@/lib/billing-checkout";
 import { RecoveryCenter, type RecoveryEvidence, type RecoveryOutcome } from "@/components/recovery-center";
 import { CitationEvidenceImport } from "@/components/citation-evidence-import";
 import { EvidenceCategoryBadge } from "@/components/evidence-category-badge";
@@ -246,7 +245,7 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
           <RedirectExportDrawer rules={exportRules} />
           {access.organizationId === null && <Link href="/dashboard/pixel" className="rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-emerald-300 hover:bg-white/5">Pixel &amp; traffic</Link>}
           {canWorkspace(access.role, "scan") && <Link href="/#audit" className="rounded-lg bg-emerald-300 px-3 py-2 text-xs font-semibold text-[#07110d]">Run live audit</Link>}
-          {access.role === "owner" && <CheckoutButton />}
+          {access.role === "owner" && <BillingCheckoutButton tier="growth" label="Upgrade to Growth" />}
           <Link href="/" className="px-3 py-2 text-xs text-slate-400 hover:text-white">Public site</Link>
         </div>
       </div>
@@ -275,7 +274,7 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
       <p id="redirect-export" className="mb-6 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-xs leading-5 text-slate-400">Pro users can publish or disable verified 301 suggestions below. Rules become active when the Cloudflare Worker is attached to the domain; edge lookups can retain a change for up to five seconds.</p>
       <RecoveryDeploymentTools domain={selectedDomain || latestReport?.domain || allDomains[0] || ""} findings={recoveryFindings.filter(row => !selectedDomain || row.domain === selectedDomain)} />
       <div id="workspaces"><AgencyReferralConversionTracker domain={selectedDomain||allDomains[0]||""} /><WorkspaceSettingsTabs settings={<><section className="mb-5 rounded-xl border border-white/10 bg-white/[0.03] p-4"><h2 className="text-sm font-semibold">Security Overview</h2><p className="mt-1 text-xs text-slate-400">Architecture, tenant isolation, SSRF, webhook, encryption, retention and incident response notes.</p><a href="/security-overview.md" download className="mt-3 inline-flex rounded-lg border border-emerald-300/30 px-3 py-2 text-xs font-semibold text-emerald-300">Download Security Overview</a>{access.role==="owner"&&<a href={`/api/workspaces/governance?domain=${encodeURIComponent(selectedDomain||allDomains[0]||"")}&action=export`} className="ml-3 inline-flex rounded-lg border border-white/10 px-3 py-2 text-xs">Export workspace data</a>}</section>{canManageSettings&&<ProductionReadinessPanel />}{canManageSettings&&<WorkspaceGovernanceSettings domain={selectedDomain||allDomains[0]||""} />}{canManageSettings&&<ScheduledReportSettings domain={selectedDomain||allDomains[0]||""} />}{canManageSettings&&<WorkspaceIntegrations key={`workspace-${selectedDomain}`} domains={[...new Set(audits.map(audit => audit.domain))]} />}{canManageOwnerSettings&&<WorkspaceApiKeys domains={[...new Set(audits.map(audit => audit.domain))]} />}{access.organizationId===null&&<AgencyProfileSettings key={`agency-${selectedDomain}`} domains={[...new Set(audits.map(audit => audit.domain))]} isPro={isPro} />}</>} partner={canManageSettings?<AgencyPartnerPanel key={selectedDomain || allDomains[0] || ""} domain={selectedDomain||allDomains[0]||""} domains={allDomains} />:<section id="agency-partner" className="rounded-xl border border-white/10 bg-white/[.03] p-5"><h2 className="text-sm font-semibold">Agency Partner Program</h2><p className="mt-2 text-xs leading-5 text-slate-400">Workspace owner or admin access is required to create and manage partner referrals.</p></section>} /></div>
-      {access.role==="owner" && (isBillingEnabled() ? <BillingPanel available={{ pilot: !!process.env.DODO_PRODUCT_PILOT_ID, growth: !!process.env.DODO_PRODUCT_GROWTH_ID, agency: !!process.env.DODO_PRODUCT_AGENCY_ID }} /> : <div id="billing" className="mb-5 rounded-xl border border-white/10 bg-white/[0.02] p-4"><h2 className="text-sm font-semibold">Billing</h2><p className="mt-1 text-xs text-slate-400">Request beta access while billing is deferred.</p><CheckoutButton /></div>)}
+      {access.role === "owner" && <BillingPanel />}
       <section id="audit-history" className="mb-6 scroll-mt-8"><div className="mb-4"><p className="font-mono text-[10px] uppercase tracking-[.16em] text-emerald-300">4 · Prove</p><h2 className="mt-1 text-xl font-semibold text-white">Reports</h2></div>{latestReport && canWorkspace(access.role, "draft") && <CaseStudyGenerator auditId={latestReport.id} />}{audits.length ? <div className="space-y-4">{audits.map(audit => <AuditCard key={audit.id} audit={audit} gap={gaps.get(audit.id)} />)}</div> : <EmptyState title="No audits saved yet" description="Run an audit and it will appear here." action={<Link href="/#audit" className="inline-flex rounded-full bg-emerald-300 px-5 py-3 text-sm font-semibold text-[#07110d]">Run an audit</Link>} />}</section>
       </div></div></div>
     </main>

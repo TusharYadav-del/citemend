@@ -81,6 +81,6 @@ export default function CitationCapsuleModal(input: CapsuleInput) {
         </>}
       </DialogContent>
     </Dialog>
-    {upgrade && <UpgradeModal signedIn={upgrade === "signed-in"} onClose={() => setUpgrade(null)} />}
+    {upgrade && <UpgradeModal onClose={() => setUpgrade(null)} />}
   </>;
 }

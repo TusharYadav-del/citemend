@@ -64,7 +64,7 @@ export default function CopyRedirects({
       </div>
       <p role="status" aria-live="polite" className="mt-3 min-h-5 text-xs text-emerald-300">{message}</p>
       <p className="text-xs leading-5 text-slate-400">One-click export is included with Pro. Only human-approved or deployed HTTP 404 mappings with same-domain destinations can be exported.</p>
-      {upgrade && <UpgradeModal signedIn={upgrade === "signed-in"} onClose={() => setUpgrade(null)} />}
+      {upgrade && <UpgradeModal onClose={() => setUpgrade(null)} />}
     </div>
   );
 }

@@ -12,6 +12,7 @@ test("Pro access respects subscription status and cancellation grace period", ()
   assert.equal(grantsProAccess({ status: "cancelled", cancelled: true, ends_at: "2026-10-31T00:00:00Z" }, now), false);
   assert.equal(grantsProAccess({ status: "active", cancelled: true, ends_at: null }, now), false);
   assert.equal(grantsProAccess({ status: "expired", cancelled: true, ends_at: "2026-11-02T00:00:00Z" }, now), false);
+  assert.equal(grantsProAccess({ plan: "pro_beta", status: "active", cancelled: false, ends_at: null, current_period_end: "2026-12-01T00:00:00Z" }, now), false);
 });
 
 test("production paid access excludes test subscriptions when test mode is disabled", () => {

@@ -21,7 +21,7 @@ async function mount(page: Page, pro: boolean, fail = false, exportStatus = pro 
       if(data.action==="export-jsonld") return route.fulfill({status:exportStatus,contentType:"application/json",body:JSON.stringify(exportStatus===200?{jsonLdSchema:schema}:{error:"Access required",code:exportStatus===401?"SIGN_IN_REQUIRED":"PRO_REQUIRED"})});
       return route.fulfill({status:fail?502:200,contentType:"application/json",body:JSON.stringify(fail?{error:"Provider temporarily unavailable"}:capsule(pro))});
     }
-    if(url.pathname.startsWith("/api/")) return route.fulfill({contentType:"application/json",body:JSON.stringify(url.pathname.includes("checkout")?{mode:"beta"}:{state:"free"})});
+    if(url.pathname.startsWith("/api/")) return route.fulfill({contentType:"application/json",body:JSON.stringify(url.pathname.includes("checkout")?{enabled:true}:{state:"free"})});
     return route.fulfill({contentType:"text/html",body:'<!doctype html><style>*{box-sizing:border-box}body{margin:0;font:16px system-ui}button{padding:10px} [data-slot="dialog-content"]{position:fixed;inset:5vh 5vw;max-height:90vh;overflow:auto;background:white;padding:24px}textarea,iframe{max-width:100%;width:100%}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style><div id="root"></div><script src="/bundle.js"></script>'});
   });
   await page.goto("http://capsule.test/");

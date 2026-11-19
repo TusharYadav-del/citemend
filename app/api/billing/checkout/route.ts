@@ -8,7 +8,7 @@ import { canWorkspace } from "@/lib/rbac";
 const headers = { "Cache-Control": "private, no-store" };
 
 export async function GET() {
-  return Response.json({ mode: isBillingEnabled() ? "billing" : "beta" }, { headers });
+  return Response.json({ error: "Use POST /api/billing/checkout to start a paid checkout." }, { status: 405, headers: { ...headers, Allow: "POST" } });
 }
 
 export async function POST(request: Request) {
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     const { data: subscriptions, error: lookupError } = await db.from("subscriptions")
       .select("workspace_id,plan,status,cancelled,ends_at,test_mode").eq("user_id", ownerUserId).limit(100);
     if (lookupError) return Response.json({ error: "Could not verify your current subscription." }, { status: 503, headers });
-    if ((subscriptions ?? []).some(item => item.plan === "pro_beta" ? grantsProAccess(item) : item.workspace_id === workspaceId && grantsProAccess(item))) {
+    if ((subscriptions ?? []).some(item => item.plan !== "pro_beta" && item.workspace_id === workspaceId && grantsProAccess(item))) {
       return Response.json({ error: "Manage your current paid subscription before starting another checkout." }, { status: 409, headers });
     }
     const checkoutUrl = await createBillingCheckout(tier, ownerUserId, email, workspaceId);

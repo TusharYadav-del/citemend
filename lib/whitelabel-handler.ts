@@ -34,7 +34,7 @@ export function createWhiteLabelHandler(overrides: Partial<Dependencies> = {}) {
       if (!userId) return json({ error: "Sign in to manage white-label settings." }, 401);
       const origin = request.headers.get("origin");
       if (origin && origin !== new URL(request.url).origin) return json({ error: "Cross-origin requests are not allowed." }, 403);
-      if (!await deps.eligible(userId)) return json({ error: "White-label profiles require Pro, VIP Beta, or Agency access.", code: "PRO_REQUIRED" }, 403);
+      if (!await deps.eligible(userId)) return json({ error: "White-label profiles require an active paid Pro or Agency plan.", code: "PRO_REQUIRED" }, 403);
       let domainInput: unknown;
       let profileInput: unknown;
       if (request.method === "GET") domainInput = new URL(request.url).searchParams.get("domain");

@@ -22,16 +22,15 @@ export async function GET() {
     const paid = rows.filter(row => row.plan !== "pro_beta");
     const active = paid.find(row => grantsProAccess(row));
     const selected = active ?? paid[0] ?? null;
-    const beta = rows.find(row => row.plan === "pro_beta" && grantsProAccess(row));
-    const current = active ?? beta ?? selected;
-    const tier = active ? planTier(active.plan_name ?? active.plan, true) : beta ? planTier(beta.plan, true) : "free_audit";
+    const current = active ?? selected;
+    const tier = active ? planTier(active.plan_name ?? active.plan, true) : "free_audit";
     return Response.json({
-      plan: active ? (active.plan_name ?? (active.plan === "agency" ? "agency" : active.plan === "growth" ? "growth" : "starter")) : beta ? "starter" : "free",
+      plan: active ? (active.plan_name ?? (active.plan === "agency" ? "agency" : active.plan === "growth" ? "growth" : "starter")) : "free",
       status: current?.status ?? "free",
-      active: !!active || !!beta,
+      active: !!active,
       hasSubscription: !!selected,
       renewsAt: active?.renews_at ?? null,
-      endsAt: current?.ends_at ?? (beta?.current_period_end ?? null),
+      endsAt: current?.ends_at ?? null,
       testMode: active?.test_mode === true,
       customerPortalUrl: null,
       updatePaymentMethodUrl: null,
