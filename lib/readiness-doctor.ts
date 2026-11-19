@@ -40,6 +40,26 @@ function requiredCheck(id: string, label: string, names: string[], env: Readines
   };
 }
 
+function dodoBillingCheck(env: ReadinessEnvironment): ReadinessCheck {
+  const required = ["DODO_PAYMENTS_ENABLED", "DODO_PAYMENTS_API_KEY", "DODO_PAYMENTS_WEBHOOK_KEY"];
+  const missing = required.filter(name => !configured(env[name]));
+  const productIdNames = [
+    ["DODO_PRODUCT_PILOT_ID", "DODO_PAYMENTS_PILOT_ID"],
+    ["DODO_PRODUCT_GROWTH_ID", "DODO_PAYMENTS_GROWTH_ID"],
+    ["DODO_PRODUCT_AGENCY_ID", "DODO_PAYMENTS_AGENCY_ID"],
+  ] as const;
+  for (const names of productIdNames) {
+    if (!names.some(name => configured(env[name]))) missing.push(`${names[0]} or ${names[1]}`);
+  }
+  return {
+    id: "dodo-payments",
+    label: "Dodo Payments billing",
+    status: missing.length ? "MISSING" : "PASS",
+    summary: missing.length ? `${missing.length} required setting${missing.length === 1 ? "" : "s"} missing.` : "Required settings are present.",
+    details: missing.length ? [`Missing: ${missing.join(", ")}`] : ["Values are configured; secret values are never returned."],
+  };
+}
+
 export async function runReadinessDoctor({ env = process.env, inspectDatabase, now = () => new Date() }: ReadinessInput): Promise<ReadinessReport> {
   let database: Awaited<ReturnType<ReadinessInput["inspectDatabase"]>>;
   try {
@@ -79,7 +99,7 @@ export async function runReadinessDoctor({ env = process.env, inspectDatabase, n
       details: configured(env.GEMINI_API_KEY) ? ["Secret value is not returned."] : ["Missing: GEMINI_API_KEY"],
     },
     requiredCheck("email-cron", "Email and cron", ["RESEND_API_KEY", "CRON_SECRET"], env),
-    requiredCheck("dodo-payments", "Dodo Payments billing", ["DODO_PAYMENTS_ENABLED", "DODO_PAYMENTS_API_KEY", "DODO_PAYMENTS_WEBHOOK_KEY", "DODO_PRODUCT_PILOT_ID", "DODO_PRODUCT_GROWTH_ID", "DODO_PRODUCT_AGENCY_ID"], env),
+    dodoBillingCheck(env),
   ];
   const status: ReadinessStatus = checks.some((check) => check.status === "MISSING") ? "MISSING" : checks.some((check) => check.status === "WARN") ? "WARN" : "PASS";
   return { checkedAt: now().toISOString(), status, checks, databaseSetupPending: databaseCheck.status !== "PASS" };

@@ -64,6 +64,13 @@ test("readiness doctor requires all Dodo billing credentials and product IDs", a
   assert.equal(result.checks.find(check => check.id === "dodo-payments")?.status, "MISSING");
 });
 
+test("readiness doctor accepts existing Dodo product ID variable names", async () => {
+  const env = { ...completeEnvironment, DODO_PRODUCT_PILOT_ID: undefined, DODO_PRODUCT_GROWTH_ID: undefined, DODO_PRODUCT_AGENCY_ID: undefined,
+    DODO_PAYMENTS_PILOT_ID: "pilot-product", DODO_PAYMENTS_GROWTH_ID: "growth-product", DODO_PAYMENTS_AGENCY_ID: "agency-product" };
+  const report = await runReadinessDoctor({ env, inspectDatabase: async () => ({ connected: true, tables: allTables() }) });
+  assert.equal(report.checks.find(check => check.id === "dodo-payments")?.status, "PASS");
+});
+
 test("readiness doctor checks all expected tables through migration 044", () => {
   assert.equal(REQUIRED_READINESS_TABLES.length, 47);
   assert.ok(REQUIRED_READINESS_TABLES.includes("ai_provenance_events"));

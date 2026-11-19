@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import type { BillingTier } from "./billing-checkout";
+import { configuredProductId, type BillingTier } from "./billing-checkout";
 
 export type DodoWebhook = { type?: unknown; timestamp?: unknown; business_id?: unknown; data?: Record<string, unknown> };
 const validDate = (value: unknown): string | null => typeof value === "string" && Number.isFinite(Date.parse(value)) ? new Date(value).toISOString() : null;
@@ -13,9 +13,9 @@ export function dodoEventHash(webhookId: string): string {
 
 function tierForProduct(productId: string): BillingTier | null {
   const matches: BillingTier[] = [];
-  if (productId === process.env.DODO_PRODUCT_PILOT_ID?.trim()) matches.push("pilot");
-  if (productId === process.env.DODO_PRODUCT_GROWTH_ID?.trim()) matches.push("growth");
-  if (productId === process.env.DODO_PRODUCT_AGENCY_ID?.trim()) matches.push("agency");
+  if (productId === configuredProductId("pilot")) matches.push("pilot");
+  if (productId === configuredProductId("growth")) matches.push("growth");
+  if (productId === configuredProductId("agency")) matches.push("agency");
   return matches.length === 1 ? matches[0] : null;
 }
 function validOwner(data: Record<string, unknown>, allowPlanChange = false): { userId: string; workspaceId: string; email: string | null; tier: BillingTier } {
@@ -54,7 +54,7 @@ export function dodoSubscriptionRecord(event: DodoWebhook) {
 export function dodoPilotPaymentRecord(event: DodoWebhook) {
   const data = event.data;
   if (!data || !Array.isArray(data.product_cart) || !data.product_cart.length) return null;
-  const pilotProductId = process.env.DODO_PRODUCT_PILOT_ID?.trim();
+  const pilotProductId = configuredProductId("pilot");
   const cart = data.product_cart as Array<Record<string, unknown>>;
   if (!pilotProductId || cart.length !== 1 || cart[0].product_id !== pilotProductId || (Array.isArray(data.subscription_ids) && data.subscription_ids.length > 0)) return null;
   const { userId, workspaceId, email, tier } = validOwner({ ...data, product_id: pilotProductId });

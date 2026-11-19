@@ -51,3 +51,14 @@ test("Dodo checkout stays disabled until the explicit environment gate is enable
   process.env.DODO_PAYMENTS_ENABLED = "true";
   assert.equal(isBillingEnabled(), true);
 });
+
+test("Dodo checkout accepts existing server-side product ID names without a public flag", () => {
+  process.env = { ...oldEnv, DODO_PAYMENTS_ENABLED: "true", DODO_PAYMENTS_API_KEY: "test-api-key",
+    DODO_PAYMENTS_PILOT_ID: "pdt_legacy_pilot", DODO_PAYMENTS_GROWTH_ID: "pdt_legacy_growth", DODO_PAYMENTS_AGENCY_ID: "pdt_legacy_agency" };
+  delete process.env.DODO_PRODUCT_PILOT_ID;
+  delete process.env.DODO_PRODUCT_GROWTH_ID;
+  delete process.env.DODO_PRODUCT_AGENCY_ID;
+  delete process.env.NEXT_PUBLIC_DODO_PAYMENTS_ENABLED;
+  assert.equal(isBillingEnabled(), true);
+  assert.deepEqual([productForTier("pilot"), productForTier("growth"), productForTier("agency")], ["pdt_legacy_pilot", "pdt_legacy_growth", "pdt_legacy_agency"]);
+});

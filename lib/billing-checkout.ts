@@ -5,18 +5,29 @@ export type BillingTier = "pilot" | "growth" | "agency";
 export class BillingConfigError extends Error {}
 export class BillingProviderError extends Error {}
 
+const productEnvironmentNames: Record<BillingTier, readonly [string, string]> = {
+  pilot: ["DODO_PRODUCT_PILOT_ID", "DODO_PAYMENTS_PILOT_ID"],
+  growth: ["DODO_PRODUCT_GROWTH_ID", "DODO_PAYMENTS_GROWTH_ID"],
+  agency: ["DODO_PRODUCT_AGENCY_ID", "DODO_PAYMENTS_AGENCY_ID"],
+};
+
+export function configuredProductId(tier: BillingTier): string | undefined {
+  return productEnvironmentNames[tier].map(name => process.env[name]?.trim()).find(Boolean);
+}
+
 export function isBillingEnabled(): boolean {
   return process.env.DODO_PAYMENTS_ENABLED === "true"
     && !!process.env.DODO_PAYMENTS_API_KEY?.trim()
-    && !!process.env.DODO_PRODUCT_PILOT_ID?.trim()
-    && !!process.env.DODO_PRODUCT_GROWTH_ID?.trim()
-    && !!process.env.DODO_PRODUCT_AGENCY_ID?.trim();
+    && (["pilot", "growth", "agency"] as const).every(tier => {
+      const productId = configuredProductId(tier);
+      return !!productId && /^[A-Za-z0-9_-]{3,100}$/.test(productId);
+    });
 }
 
 export function productForTier(tier: BillingTier): string {
-  const envName = tier === "pilot" ? "DODO_PRODUCT_PILOT_ID" : tier === "growth" ? "DODO_PRODUCT_GROWTH_ID" : "DODO_PRODUCT_AGENCY_ID";
-  const id = process.env[envName]?.trim();
-  if (!id || !/^[A-Za-z0-9_-]{3,100}$/.test(id)) throw new BillingConfigError(`${envName} must be configured with a Dodo product ID.`);
+  const [preferredName, legacyName] = productEnvironmentNames[tier];
+  const id = configuredProductId(tier);
+  if (!id || !/^[A-Za-z0-9_-]{3,100}$/.test(id)) throw new BillingConfigError(`${preferredName} (or ${legacyName}) must be configured with a Dodo product ID.`);
   return id;
 }
 
