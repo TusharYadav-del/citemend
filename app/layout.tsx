@@ -1,10 +1,8 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
-const inter = Inter();
-const jetbrainsMono = JetBrains_Mono();
 
 export const metadata: Metadata = {
   title: "CiteMend | Commerce Reliability & Revenue Infrastructure",
@@ -17,7 +15,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const clerkConfigured = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY);
   return (
-    <html lang="en" className={`h-full antialiased ${inter.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en" className="h-full antialiased">
       <body className="flex min-h-full flex-col">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({ "@context": "https://schema.org", "@type": "SoftwareApplication", name: "CiteMend", applicationCategory: "BusinessApplication", operatingSystem: "Web", url: process.env.NEXT_PUBLIC_APP_URL || "https://citemend.vercel.app", description: "Commerce Reliability & Revenue Infrastructure for accurate, accessible, and measurable interactions across Search, AI Assistants, and Autonomous Agents.", offers: [{ "@type": "Offer", price: "149", priceCurrency: "USD", name: "Pilot (30-day one-time)" }, { "@type": "Offer", price: "99", priceCurrency: "USD", name: "Growth (monthly)" }, { "@type": "Offer", price: "249", priceCurrency: "USD", name: "Agency (monthly)" }] }).replace(/</g, "\\u003c") }} />
         {clerkConfigured ? <ClerkProvider>{children}</ClerkProvider> : children}
@@ -27,10 +25,3 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   );
 }
 
-function Inter() {
-  return { variable: "font-inter-local" };
-}
-
-function JetBrains_Mono() {
-  return { variable: "font-mono-local" };
-}
