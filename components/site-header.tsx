@@ -2,8 +2,8 @@ import Link from "next/link";
 import { ArrowUpRight, Link2 } from "lucide-react";
 
 const navigation = [
-  ["Architecture", "/#architecture"],
-  ["Workflow", "/#how-it-works"],
+  ["Platform", "/#workflow"],
+  ["Live Auditor", "/#free-provenance-auditor"],
   ["Pricing", "/pricing"],
   ["FAQ", "/#faq"],
 ] as const;
@@ -21,8 +21,8 @@ export function SiteHeader() {
         </nav>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <Link href="/dashboard" className="hidden min-h-10 items-center rounded-md px-3 text-sm font-medium text-text-secondary transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent sm:inline-flex">Sign in</Link>
-          <Link href="/#free-provenance-auditor" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-accent px-3.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-accent-strong focus-visible:outline-2 focus-visible:outline-accent sm:px-4">
-            <span className="hidden sm:inline">Run a free page check</span><span className="sm:hidden">Free page check</span><ArrowUpRight aria-hidden="true" className="size-4" />
+          <Link href="/pricing" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-accent px-3.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-accent-strong focus-visible:outline-2 focus-visible:outline-accent sm:px-4">
+            <span className="hidden sm:inline">Start $149 Pilot</span><span className="sm:hidden">Start pilot</span><ArrowUpRight aria-hidden="true" className="size-4" />
           </Link>
         </div>
       </div>

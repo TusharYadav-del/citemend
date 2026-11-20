@@ -1,13 +1,11 @@
-import { Suspense } from "react";
+﻿import { Suspense } from "react";
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { getUserAuditHistory, type UserAuditHistoryItem } from "@/lib/audit-history";
-import { BillingCheckoutButton } from "@/components/billing-checkout-button";
 import WeeklyMonitoring from "@/components/weekly-monitoring";
 import { hasProSubscription } from "@/lib/subscription";
-import { historyMetrics } from "@/lib/history-metrics";
 import { createServerDatabase } from "@/lib/supabase-server";
 import { getAuditCitationGaps } from "@/lib/citation-gap-store";
 import type { CitationGap } from "@/lib/citation-gap";
@@ -16,18 +14,16 @@ import RedirectExportDrawer from "@/components/RedirectExportDrawer";
 import LlmsTxtGenerator from "@/components/LlmsTxtGenerator";
 import OnboardingChecklist, { type OnboardingProgress } from "@/components/OnboardingChecklist";
 import OpportunityCommandCenter from "@/components/OpportunityCommandCenter";
-import { ENGINE_PROFILES, compareCategoryCitationRanks, describeEngineStatus, hasVerifiedMatrix, type EngineMatrixRow } from "@/lib/engine-matrix";
+import { ENGINE_PROFILES, describeEngineStatus, type EngineMatrixRow } from "@/lib/engine-matrix";
 import RedirectSyncButton from "@/components/redirect-sync-button";
 import WorkspaceIntegrations from "@/components/workspace-integrations";
 import AgencyProfileSettings from "@/components/agency-profile-settings";
 import DomainSwitcher from "@/components/domain-switcher";
-import { MetricCard } from "@/components/ui/metric-card";
 import { PageHeader } from "@/components/ui/page-header";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AlertBanner } from "@/components/ui/alert-banner";
 import { RetryButton } from "@/components/ui/retry-button";
-import { SparklineChart } from "@/components/ui/sparkline-chart";
 import AuditTemplates from "@/components/AuditTemplates";
 import { getOnboardingProgress } from "@/lib/onboarding";
 import WorkspaceApiKeys from "@/components/WorkspaceApiKeys";
@@ -62,36 +58,29 @@ import { RecoveryDeploymentTools } from "@/components/recovery-deployment-tools"
 import ProvenanceAnalyticsPanel from "@/components/ProvenanceAnalyticsPanel";
 import { AgencyWorkspaceHub } from "@/components/agency-workspace-hub";
 
-function MetricCards({ audits, rescued, deployments, citations, activeWorkspaces }: { audits: UserAuditHistoryItem[]; rescued: number | null; deployments: number | null; citations: number | null; activeWorkspaces: number }) {
-  if (!audits.length) return <div className="mb-6"><EmptyState title="Your first audit starts here" description="Connect a website and run one buyer prompt to establish your baseline." action={<Link href="/#audit" className="inline-flex min-h-10 items-center rounded-lg bg-accent px-4 text-xs font-semibold text-background">Run first audit</Link>} /></div>;
-  const metrics = historyMetrics(audits);
-  const health = audits.length ? Math.max(0, 100 - metrics.active404s) : null;
-  const verifiedScores = audits.filter(audit => hasVerifiedMatrix(audit.engine_matrix_json) && typeof audit.share_of_model_score === "number");
-  const comparison = verifiedScores.length ? compareCategoryCitationRanks(verifiedScores[0].engine_matrix_json) : null;
-  const singleDomain = new Set(audits.map(audit => audit.domain)).size === 1;
-  const confirmed404Trend = singleDomain ? [...audits].reverse().slice(-8).map(audit => (audit.broken_links ?? []).filter(link => link.http_status === 404).length) : [];
+function MetricCards({ rescued, deployments, citations, estimatedHours, findingsAvailable }: { rescued: number | null; deployments: number | null; citations: number | null; estimatedHours: number | null; findingsAvailable: boolean }) {
   const cards = [
-    { label: "AI Citation Health Score", value: health === null ? "—" : `${health}%`, detail: "100 minus unresolved saved 404s; citations are not stored" },
-    { label: "Own-Domain 404s Caught", value: metrics.active404s, detail: "Confirmed in latest audit per domain", icon: confirmed404Trend.length > 1 ? <SparklineChart label="404 findings across saved audits" values={confirmed404Trend} /> : undefined },
-    { label: "AI VISITORS RESCUED (30D)", value: rescued ?? "—", detail: rescued === null ? "Rescue telemetry unavailable" : `$${(rescued * 15).toLocaleString()} estimated pipeline at $15 per click` },
-    { label: "SHARE OF MODEL (SoM %)", value: verifiedScores.length ? `${Math.round(verifiedScores.reduce((sum, audit) => sum + (audit.share_of_model_score ?? 0), 0) / verifiedScores.length)}%` : "—", detail: comparison ? `Latest audit: rank #${comparison.rank} of ${comparison.participants}; ${comparison.topCompetitor} cited in ${comparison.topCompetitorSlots} of ${comparison.totalSlots} modeled slots. Competitor URLs are not live-verified.` : "Modeled profiles; older results require a new audit" },
+    { label: "Redirects deployed & verified", value: deployments === null ? "Not measured" : deployments.toLocaleString(), detail: "Technical checks only; separate from later citation evidence.", tone: "verified" },
+    { label: "AI citations re-observed", value: citations === null ? "Not measured" : citations.toLocaleString(), detail: "Saved later observation must include the canonical URL.", tone: "neutral" },
+    { label: "Recovered AI referral visits Â· 30 days", value: rescued === null ? "Not measured" : rescued.toLocaleString(), detail: "Owner-tagged visits from connected rescue telemetry.", tone: "neutral" },
+    { label: "Engineering & SEO hours saved", value: estimatedHours === null ? "Not measured" : `~${estimatedHours.toLocaleString()}h`, detail: "Estimate: 0.25 hours per handled finding; not tracked staff time.", tone: "estimate" },
   ];
-  const northStar = deployments === null ? "—" : (deployments / Math.max(activeWorkspaces, 1)).toFixed(2);
-  return <><section aria-label="Live telemetry" className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map((card) => <MetricCard key={card.label} label={card.label} value={typeof card.value === "number" ? card.value.toLocaleString() : card.value} detail={card.detail} icon={card.icon} />)}</section><section aria-label="Verified AI Search Recoveries per Active Workspace" className="mb-6 rounded-2xl border border-border bg-surface-raised p-5"><h2 className="text-sm font-semibold text-foreground">Verified AI Search Recoveries per Active Workspace</h2><p className="mt-1 text-xs text-text-secondary">Evidence milestones shown separately; an HTTP deployment does not imply an AI citation.</p><div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><MetricCard label="Recoveries / Active Workspace" value={northStar} detail={`${activeWorkspaces} owned domain${activeWorkspaces === 1 ? "" : "s"}; technical deployments divided by workspaces`} /><MetricCard label="Technical Deployments Verified" value={deployments === null ? "—" : deployments.toLocaleString()} detail="Production redirect and destination checks passed" /><MetricCard label="Subsequent AI Citations Observed" value={citations === null ? "—" : citations.toLocaleString()} detail="A later saved observation cited the canonical URL" /><MetricCard label="Rescued Pixel Visits (30D)" value={rescued === null ? "—" : rescued.toLocaleString()} detail="Live rescue telemetry; $15/click pipeline is an estimate" /></div></section></>;
-}
 
-function MonthlyRecoveryValueSummary({ highIntent, recoveredVisits, prevented, hoursSaved }: { highIntent: number; recoveredVisits: number | null; prevented: number; hoursSaved: number }) {
-  return <section aria-label="Monthly Recovery and QA Value Summary" className="mb-6 rounded-2xl border border-emerald-300/20 bg-emerald-300/[.04] p-5">
-    <div><h2 className="text-base font-semibold text-foreground">Monthly Recovery &amp; QA Value Summary</h2><p className="mt-1 text-xs text-text-secondary">Last 30 days · measured events are separated from estimates.</p></div>
-    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <MetricCard label="New Verified High-Intent Errors Caught" value={highIntent.toLocaleString()} detail="Dead URL findings pending human review or approved in the last 30 days." />
-      <MetricCard label="Post-Fix Visits & Orders Recovered" value={recoveredVisits === null ? "Unavailable" : recoveredVisits.toLocaleString()} detail="Observed visits on deployed findings; order attribution is not connected." />
-      <MetricCard label="Bad Recommendations & Soft-404s Prevented" value={prevented.toLocaleString()} detail="Leave-as-404/410 and explicitly rejected bad recommendations." />
-      <MetricCard label="Engineering & SEO Hours Saved" value={`~${hoursSaved.toLocaleString()}h`} detail="Estimate at 0.25 hours per handled finding; replace with team time tracking when available." />
+  return <section aria-labelledby="outcomes-heading" className="mb-6 overflow-hidden rounded-xl border border-border bg-surface">
+    <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border px-5 py-4 sm:px-6">
+      <div><p className="font-mono text-[10px] font-medium uppercase tracking-[.14em] text-accent">Evidence ledger / last 30 days</p><h2 id="outcomes-heading" className="mt-1 text-lg font-semibold text-foreground">Recovery outcomes</h2></div>
+      <p className="max-w-md text-xs leading-5 text-text-tertiary">Deployment, citation observation, visits, and estimated time saved are reported as separate outcomes.</p>
     </div>
+    {deployments === 0 && citations === 0 && <div className="px-5 pt-5"><EmptyState title="Your first audit starts here" description="Run a buyer-question audit to begin collecting URL and citation evidence." action={<Link href="/#audit" className="inline-flex min-h-10 items-center rounded-md bg-accent px-4 text-xs font-semibold text-background">Run first audit</Link>} /></div>}
+    <div className="grid divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-4">
+      {cards.map(card => <article key={card.label} className="min-w-0 px-5 py-5 sm:px-5 sm:py-6">
+        <div className="flex items-center justify-between gap-2"><p className="text-xs font-medium leading-5 text-text-secondary">{card.label}</p>{card.tone === "estimate" && <span className="shrink-0 rounded-sm border border-warning/25 bg-warning/5 px-1.5 py-1 font-mono text-[9px] uppercase tracking-wider text-warning">Estimate</span>}{card.tone === "verified" && <span aria-label="Verified state" className="size-1.5 shrink-0 rounded-full bg-success" />}</div>
+        <p data-metric className="mt-4 break-words font-mono text-2xl font-semibold tracking-tight tabular-nums text-foreground sm:text-3xl">{card.value}</p><p className="mt-2 text-[11px] leading-5 text-text-tertiary">{card.detail}</p>
+      </article>)}
+    </div>
+    <p className="border-t border-border px-5 py-3 text-xs text-text-tertiary sm:px-6">Revenue attribution: not measured in this workspace view.{findingsAvailable ? " Estimate is based on saved recovery findings." : " Recovery-finding data is unavailable; estimate is not calculated."}</p>
   </section>;
 }
-
 function HistoryUnavailable() {
   return <div className="m-6"><AlertBanner tone="danger" title="We couldn't load this workspace"><p>Your saved audits are temporarily unavailable. Try again in a moment.</p><RetryButton /></AlertBanner></div>;
 }
@@ -108,8 +97,8 @@ function AuditCard({ audit, gap }: { gap?: CitationGap; audit: UserAuditHistoryI
         <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-accent">{audit.status}</span>
       </div>
       <p className="mt-4 text-xs text-text-secondary">Anyone with the report link can view its findings.</p><Link href={`/audit/${audit.id}`} className="mt-2 inline-block text-sm font-medium text-accent hover:underline">Open shareable report &rarr;</Link><p className="mt-5 text-sm text-text-secondary">{brokenLinks.filter(link => link.http_status === 404 || link.http_status === 410).length} confirmed broken destination{brokenLinks.filter(link => link.http_status === 404 || link.http_status === 410).length === 1 ? "" : "s"}</p>
-      {brokenLinks.length > 0 && <a href="#recovery-command" className="mt-2 inline-block text-xs font-semibold text-accent hover:underline">Inspect these URLs in Recovery Center →</a>}
-      {Array.isArray(audit.engine_matrix_json) && audit.engine_matrix_json.length > 0 && <section className="mt-5 border-t border-border pt-4" aria-label="Multi-engine citation matrix"><h3 className="text-sm font-semibold text-foreground">Multi-Engine Citation Matrix <span className="text-text-secondary">· Buyer Prompt Breakdown</span></h3><p className="mt-1 text-xs text-text-tertiary">Separate synthesis profiles share Tavily grounding; they do not query the named engines directly.</p><div className="mt-3 space-y-3">{[...new Set((audit.engine_matrix_json as EngineMatrixRow[]).map(row => row.prompt))].map(prompt => <div key={prompt} className="rounded-lg bg-surface-raised p-3"><p className="text-xs font-medium text-foreground">{prompt}</p><div className="mt-2 grid gap-2 sm:grid-cols-2">{ENGINE_PROFILES.map(engine => { const row = (audit.engine_matrix_json as EngineMatrixRow[]).find(item => item.prompt === prompt && item.engine === engine); if (!row) return null; const label = describeEngineStatus(row); return <div key={engine} className="rounded-md border border-border p-2 text-xs"><p className="font-medium text-text-secondary">{engine}</p><p className="mt-1 text-text-secondary">{label}</p><EvidenceCategoryBadge category="estimate" className="mt-1" />{row.provider && <small>{row.provider}</small>}{row.citedUrl && <a className="mt-1 block break-all text-accent hover:underline" href={row.citedUrl} target="_blank" rel="noreferrer">{row.citedUrl}</a>}</div>; })}</div><div className="mt-2 flex flex-wrap gap-2 text-[11px]"><Link href="/#audit" className="rounded border border-emerald-400/20 px-2 py-1 text-accent">⚡ Generate Capsule to Win Engine</Link><Link href="/dashboard/pixel" className="rounded border border-border px-2 py-1 text-text-secondary">🛠️ View Active 301 Recovery</Link><a href="#recovery-command" className="rounded border border-border px-2 py-1 text-text-secondary">🔥 View Reddit Source Thread</a></div></div>)}</div></section>}
+      {brokenLinks.length > 0 && <a href="#recovery-command" className="mt-2 inline-block text-xs font-semibold text-accent hover:underline">Inspect these URLs in Recovery Center â†’</a>}
+      {Array.isArray(audit.engine_matrix_json) && audit.engine_matrix_json.length > 0 && <section className="mt-5 border-t border-border pt-4" aria-label="Multi-engine citation matrix"><h3 className="text-sm font-semibold text-foreground">Multi-Engine Citation Matrix <span className="text-text-secondary">Â· Buyer Prompt Breakdown</span></h3><p className="mt-1 text-xs text-text-tertiary">Separate synthesis profiles share Tavily grounding; they do not query the named engines directly.</p><div className="mt-3 space-y-3">{[...new Set((audit.engine_matrix_json as EngineMatrixRow[]).map(row => row.prompt))].map(prompt => <div key={prompt} className="rounded-lg bg-surface-raised p-3"><p className="text-xs font-medium text-foreground">{prompt}</p><div className="mt-2 grid gap-2 sm:grid-cols-2">{ENGINE_PROFILES.map(engine => { const row = (audit.engine_matrix_json as EngineMatrixRow[]).find(item => item.prompt === prompt && item.engine === engine); if (!row) return null; const label = describeEngineStatus(row); return <div key={engine} className="rounded-md border border-border p-2 text-xs"><p className="font-medium text-text-secondary">{engine}</p><p className="mt-1 text-text-secondary">{label}</p><EvidenceCategoryBadge category="estimate" className="mt-1" />{row.provider && <small>{row.provider}</small>}{row.citedUrl && <a className="mt-1 block break-all text-accent hover:underline" href={row.citedUrl} target="_blank" rel="noreferrer">{row.citedUrl}</a>}</div>; })}</div><div className="mt-2 flex flex-wrap gap-2 text-[11px]"><Link href="/#audit" className="rounded border border-emerald-400/20 px-2 py-1 text-accent">âš¡ Generate Capsule to Win Engine</Link><Link href="/dashboard/pixel" className="rounded border border-border px-2 py-1 text-text-secondary">ðŸ› ï¸ View Active 301 Recovery</Link><a href="#recovery-command" className="rounded border border-border px-2 py-1 text-text-secondary">ðŸ”¥ View Reddit Source Thread</a></div></div>)}</div></section>}
       {gap && <div id="citation-gaps"><CitationGapPanel domain={audit.domain} gap={gap} /></div>}
     </article>
   );
@@ -159,6 +148,7 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
   let recoveryOutcomes: RecoveryOutcome[] = [];
   let recoveryFindings: { id: string; audit_id: string; domain: string; finding_type: string; normalized_path: string; signal_evidence: Record<string, unknown>; guardrail_classification: string; approval_status: string; suggested_target_url: string | null; created_at: string }[] = [];
   let recoveryFindingsAvailable = false;
+  let estimatedHoursSaved: number | null = null;
   let recoveryEvidenceError = false;
   let onboarding: OnboardingProgress = getOnboardingProgress({ ownedDomains: allDomains.length, savedAudit: audits.some((audit) => ["completed", "partial"].includes(audit.status)), approvedRecovery: audits.some(audit => audit.broken_links.some(link => ["approved", "deployed"].includes(link.approval_status))), technicalDeploymentVerified: false });
   try {
@@ -174,7 +164,7 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
       if (!outcomes.error) recoveryOutcomes = outcomes.data ?? [];
       if (!evidenceResult.error) recoveryEvidence = evidenceResult.data ?? [];
       else recoveryEvidenceError = true;
-      if (!findingsResult.error) { recoveryFindings = findingsResult.data ?? []; recoveryFindingsAvailable = true; }
+      if (!findingsResult.error) { recoveryFindings = findingsResult.data ?? []; recoveryFindingsAvailable = true; estimatedHoursSaved = recoveryFindings.filter(row => ["approved", "deployed", "verified", "resolved"].includes(row.approval_status)).length * 0.25; }
       if (!outcomes.error) {
         deploymentCount = (outcomes.data ?? []).filter(row => row.technical_deployment_verified_at).length;
         citationCount = (outcomes.data ?? []).filter(row => row.ai_citation_observed_at).length;
@@ -206,9 +196,9 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
       visibleByAudit.set(auditId, position + 1);
       return position < 2 ? item : {
         ...item,
-        target_url: "🔒 Upgrade to Pro to unlock outreach opportunity",
-        dead_competitor_url: "🔒 Upgrade to Pro to unlock outreach opportunity",
-        contact_email_or_link: "🔒 Upgrade to Pro to unlock outreach opportunity",
+        target_url: "ðŸ”’ Upgrade to Pro to unlock outreach opportunity",
+        dead_competitor_url: "ðŸ”’ Upgrade to Pro to unlock outreach opportunity",
+        contact_email_or_link: "ðŸ”’ Upgrade to Pro to unlock outreach opportunity",
       };
     });
     onboarding = {
@@ -230,43 +220,45 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
     ...(isFounder ? [{ label: "AI Outreach", href: "/dashboard/ai-outreach" }] : []),
   ];
   const recoveryRows = audits.flatMap(audit => audit.broken_links.map(link => ({ ...link, auditId: audit.id, domain: audit.domain, auditCreatedAt: audit.created_at })));
+  const priorityRows = recoveryRows.filter(row => row.approval_status === "pending_review").slice(0, 4);
   return (
     <DashboardShell items={navItems}>
       <main className="min-h-screen bg-background text-foreground">
       <div className="grid min-w-0 grid-cols-12 gap-x-4 px-4 py-6 sm:px-6 sm:py-8">
       <div className="col-span-12">
       <div id="overview" className="scroll-mt-8">
-        <PageHeader eyebrow={`${access.organizationId ? `${access.role} organization member · ` : ""}Live telemetry · ${audits.length} saved scans`} title="Command Center" description="Monitor citations, recover links, and review Replacement Content Opportunities." actions={<><CommandPalette key={selectedDomain} items={navItems} domains={allDomains} selectedDomain={selectedDomain} canScan={canWorkspace(access.role, "scan")} canApprove={canApprove} latestAuditId={latestReport?.id} /><BackgroundJobsPanel domain={selectedDomain || undefined} /><HelpSupportDrawer workspaceDomain={selectedDomain || undefined} latestAuditId={latestReport?.id} /><UserButton /></>} />
-        <div className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface p-3">
-          <DomainSwitcher domains={allDomains} selected={selectedDomain} label={allDomains.length > 1 ? "Client workspace" : "Workspace"} />
-          <WorkspaceModeSwitcher role={access.role} ecommerceAvailable={access.organizationId === null} />
-          {canApprove && <RedirectSyncButton domains={[...new Set(audits.map(audit => audit.domain))]} />}
-          <RedirectExportDrawer rules={exportRules} />
-          {access.organizationId === null && <Link href="/dashboard/pixel" className="rounded-lg border border-border px-3 py-2 text-xs font-medium text-accent hover:bg-surface-soft">Pixel &amp; traffic</Link>}
-          {canWorkspace(access.role, "scan") && <Link href="/#audit" className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-background">Run live audit</Link>}
-          {access.role === "owner" && <div className="flex flex-wrap gap-2" aria-label="Paid plans">{(["pilot", "growth", "agency"] as const).map(tier => <BillingCheckoutButton key={tier} tier={tier} label={tier === "pilot" ? "Pilot · $149 one-time" : tier === "growth" ? "Growth · $99/mo" : "Agency · $249/mo"} />)}</div>}
-          <Link href="/" className="px-3 py-2 text-xs text-text-secondary hover:text-foreground">Public site</Link>
+        <PageHeader eyebrow={`${access.organizationId ? `${access.role} organization member Â· ` : ""}Live telemetry Â· ${audits.length} saved scans`} title="Command Center" description="Monitor citations, recover links, and review Replacement Content Opportunities." actions={<><CommandPalette key={selectedDomain} items={navItems} domains={allDomains} selectedDomain={selectedDomain} canScan={canWorkspace(access.role, "scan")} canApprove={canApprove} latestAuditId={latestReport?.id} /><BackgroundJobsPanel domain={selectedDomain || undefined} /><HelpSupportDrawer workspaceDomain={selectedDomain || undefined} latestAuditId={latestReport?.id} /><UserButton /></>} />
+        <div className="mb-6 grid gap-3 rounded-xl border border-border bg-surface p-3 sm:p-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <div className="flex min-w-0 flex-wrap items-center gap-2"><DomainSwitcher domains={allDomains} selected={selectedDomain} label={allDomains.length > 1 ? "Client workspace" : "Workspace"} /><WorkspaceModeSwitcher role={access.role} ecommerceAvailable={access.organizationId === null} /><span className="hidden h-8 w-px bg-border sm:block" aria-hidden="true" /><span className="min-w-0 truncate font-mono text-[11px] text-text-tertiary">{selectedDomain || allDomains[0] || "No domain connected"}</span></div>
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            {canWorkspace(access.role, "scan") && <Link href="/#audit" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-accent px-4 text-xs font-semibold text-background">Run live audit</Link>}
+            <details className="relative"><summary className="inline-flex min-h-10 cursor-pointer list-none items-center rounded-md border border-border-strong bg-white/[.04] px-3 text-xs font-medium text-foreground hover:bg-white/[.08]">Workspace actions</summary><div className="absolute right-0 z-20 mt-2 grid min-w-56 gap-1 rounded-lg border border-border bg-surface-raised p-2 shadow-panel">
+              {canApprove && <RedirectSyncButton domains={[...new Set(audits.map(audit => audit.domain))]} />}
+              <RedirectExportDrawer rules={exportRules} />
+              {access.organizationId === null && <Link href="/dashboard/pixel" className="rounded-md px-3 py-2 text-xs text-text-secondary hover:bg-surface-soft hover:text-foreground">Pixel &amp; traffic</Link>}
+              {access.role === "owner" && <Link href="#billing" className="rounded-md px-3 py-2 text-xs text-text-secondary hover:bg-surface-soft hover:text-foreground">Plans &amp; billing</Link>}
+              <Link href="/" className="rounded-md px-3 py-2 text-xs text-text-secondary hover:bg-surface-soft hover:text-foreground">Public site</Link>
+            </div></details>
+          </div>
         </div>
       </div>
+      <section aria-labelledby="priority-queue-heading" className="mb-6 overflow-hidden rounded-xl border border-border bg-surface">
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border px-5 py-4 sm:px-6"><div><p className="font-mono text-[10px] uppercase tracking-[.14em] text-warning">Action queue Â· human review</p><h2 id="priority-queue-heading" className="mt-1 text-lg font-semibold">Needs your attention</h2></div><Link href="#recovery-command" className="text-xs font-medium text-accent hover:underline">Open Recovery Center â†’</Link></div>
+        {priorityRows.length ? <ul className="divide-y divide-border">{priorityRows.map(row => <li key={row.id} className="grid min-w-0 gap-2 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-6"><div className="min-w-0"><p className="break-all font-mono text-xs text-foreground">{row.cited_url}</p><p className="mt-1 text-[11px] text-text-tertiary">{row.domain} Â· HTTP {row.http_status ?? "unknown"} Â· awaiting human review</p></div><span className="w-fit rounded-sm border border-warning/25 bg-warning/5 px-2 py-1 font-mono text-[10px] text-warning">PENDING</span></li>)}</ul> : <div className="grid gap-4 px-5 py-5 sm:grid-cols-[1fr_auto] sm:items-center sm:px-6"><div><p className="text-sm font-medium text-foreground">No pending recovery approvals</p><p className="mt-1 text-xs leading-5 text-text-secondary">{recoveryEvidenceError ? "Evidence could not be loaded just now; retry the workspace to refresh the queue." : "New human-review items will appear here when saved audit evidence needs a decision."}</p></div><Link href="/#audit" className="inline-flex min-h-9 items-center justify-center rounded-md border border-border-strong bg-white/[.04] px-3 text-xs font-medium text-foreground hover:bg-white/[.08]">Run an audit</Link></div>}
+      </section>
       <OnboardingChecklist progress={onboarding} />
       <AuditTemplates />
       <AgencyWorkspaceHub audits={workspaceAudits} selectedDomain={selectedDomain} />
-      <MetricCards audits={audits} rescued={access.organizationId?null:rescued} deployments={deploymentCount} citations={citationCount} activeWorkspaces={new Set(audits.map(audit => audit.domain)).size} />
-      <MonthlyRecoveryValueSummary
-        highIntent={recoveryFindingsAvailable ? recoveryFindings.filter(row => row.finding_type === "dead_url" && ["pending_human_review", "approved"].includes(row.approval_status)).length : recoveryRows.filter(link => link.http_status === 404 && link.suggested_redirect && (link.match_confidence ?? 0) >= 85 && /semantic.*commercial|commercial.*semantic/i.test(link.match_evidence_reason ?? "") && Date.now() - Date.parse(link.auditCreatedAt) <= 30 * 86400000).length}
-        recoveredVisits={recoveryFindingsAvailable ? recoveryFindings.filter(row => row.approval_status === "deployed").reduce((sum, row) => sum + (typeof row.signal_evidence.observed_404_visits === "number" && Number.isFinite(row.signal_evidence.observed_404_visits) ? row.signal_evidence.observed_404_visits : 0), 0) : rescued}
-        prevented={recoveryFindingsAvailable ? recoveryFindings.filter(row => row.guardrail_classification === "leave_as_404_or_410" || row.approval_status === "rejected_bad_recommendation").length : actionLogs.filter(log => log.action_type === "redirect_conflict_rejection" && Date.now() - Date.parse(log.created_at) <= 30 * 86400000).length}
-        hoursSaved={recoveryFindingsAvailable ? Math.round(recoveryFindings.filter(row => row.approval_status !== "pending_human_review").length * 0.25 * 100) / 100 : Math.round(recoveryRows.filter(link => link.http_status === 404 && link.suggested_redirect && (link.match_confidence ?? 0) >= 85 && /semantic.*commercial|commercial.*semantic/i.test(link.match_evidence_reason ?? "") && Date.now() - Date.parse(link.auditCreatedAt) <= 30 * 86400000).length * 0.5 * 10) / 10}
-      />
+      <MetricCards rescued={access.organizationId ? null : rescued} deployments={deploymentCount} citations={citationCount} estimatedHours={estimatedHoursSaved} findingsAvailable={recoveryFindingsAvailable} />
       <Suspense fallback={<OperatingMetricsSkeleton />}><WorkspaceOperatingMetrics domain={selectedDomain || allDomains[0] || ""} ownerUserIds={ownerIds} actorUserIds={[...new Set([...ownerIds, userId])]} organizationId={access.organizationId} /></Suspense>
       {(latestReport || selectedDomain || allDomains.length > 0) && <section aria-label="Quick tools" className="mb-6 rounded-xl border border-border bg-surface-raised p-4"><h2 className="text-sm font-semibold text-foreground">Quick Tools</h2>{latestReport && <a href={`/audit/${latestReport.id}?print=1`} target="_blank" rel="noreferrer" className="mt-3 mr-2 inline-flex rounded-lg border border-emerald-400/30 px-3 py-2 text-xs font-semibold text-accent">Export Audit / Save as PDF</a>}<a href={`/dashboard/reports/monthly?domain=${encodeURIComponent(selectedDomain || latestReport?.domain || allDomains[0] || "")}`} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg border border-emerald-400/30 px-3 py-2 text-xs font-semibold text-accent">Monthly Recovery Report / Save as PDF</a><p className="mt-2 text-xs text-text-tertiary">The monthly report follows the selected client workspace and can be saved from the browser print dialog.</p></section>}
       {access.organizationId===null&&<AuditAnalysisTools auditId={latestReport?.id} />}
-      <div id="ai-scanner" className="mb-3 scroll-mt-8 rounded-xl border border-border bg-surface p-4"><h2 className="text-sm font-semibold">AI Scanner</h2><p className="mt-1 text-xs text-text-secondary">Run a saved, search-grounded buyer prompt audit and review its recorded sources.</p>{canWorkspace(access.role,"scan")&&<Link href="/#audit" className="mt-2 inline-block text-xs text-accent">Start an audit →</Link>}<div className="mt-4"><CitationEvidenceImport auditId={latestReport?.id} domain={selectedDomain || latestReport?.domain} /></div></div>
+      <div id="ai-scanner" className="mb-3 scroll-mt-8 rounded-xl border border-border bg-surface p-4"><h2 className="text-sm font-semibold">AI Scanner</h2><p className="mt-1 text-xs text-text-secondary">Run a saved, search-grounded buyer prompt audit and review its recorded sources.</p>{canWorkspace(access.role,"scan")&&<Link href="/#audit" className="mt-2 inline-block text-xs text-accent">Start an audit â†’</Link>}<div className="mt-4"><CitationEvidenceImport auditId={latestReport?.id} domain={selectedDomain || latestReport?.domain} /></div></div>
       <RecoveryCenter rows={recoveryRows} evidence={recoveryEvidence} outcomes={recoveryOutcomes} logs={actionLogs} canApprove={canApprove} isPro={isPro} activeRules={[...activeRules]} syncedLinks={syncedLinks} pendingOnly={params.recovery === "pending"} evidenceError={recoveryEvidenceError} destinationRequestsServed={destinationRequestsServed} auditId={latestReport?.id} workspaceDomain={selectedDomain || latestReport?.domain} />
       {access.organizationId === null && <EcommerceCatalogPanel domain={selectedDomain || allDomains[0] || ""} />}
       <section id="competitor-intelligence" className="scroll-mt-8"><div id="outreach">{access.organizationId === null && <OpportunityCommandCenter opportunities={opportunities} brokenLinks={recoveryRows} syncedLinks={syncedLinks} actionLogs={actionLogs} />}</div></section>
       <div id="automations">{access.organizationId===null&&<><WeeklyMonitoring isPro={isPro} /><AutonomousAgentQueue auditId={latestReport?.id} domain={latestReport?.domain ?? selectedDomain} recoveryLinks={(latestReport?.broken_links ?? []).map(link => ({ id: link.id, cited_url: link.cited_url, suggested_redirect: link.suggested_redirect, approval_status: link.approval_status, http_status: link.http_status }))} opportunities={opportunities.filter(item => item.audit_id === latestReport?.id).map(item => ({ id: item.id, prompt_query: item.prompt_query, opportunity_type: item.opportunity_type }))} /></>}</div>
-      <div id="geo-optimizer"><ExtractabilityAuditPanel auditId={latestReport?.id} /><div id="llms-txt-generator"><LlmsTxtGenerator domains={[...new Set(audits.map((audit) => audit.domain))]} /><p className="mt-3 rounded-xl border border-accent/10 bg-accent/[.035] p-4 text-xs leading-5 text-text-secondary">llms.txt and structured data are machine-readable conventions that clarify your content. They are not guaranteed ranking or citation levers.</p><a href="#ecommerce-catalog" className="mt-3 inline-block text-sm text-accent">Ecommerce Catalog &amp; SKU Recovery ↓</a></div></div>
+      <div id="geo-optimizer"><ExtractabilityAuditPanel auditId={latestReport?.id} /><div id="llms-txt-generator"><LlmsTxtGenerator domains={[...new Set(audits.map((audit) => audit.domain))]} /><p className="mt-3 rounded-xl border border-accent/10 bg-accent/[.035] p-4 text-xs leading-5 text-text-secondary">llms.txt and structured data are machine-readable conventions that clarify your content. They are not guaranteed ranking or citation levers.</p><a href="#ecommerce-catalog" className="mt-3 inline-block text-sm text-accent">Ecommerce Catalog &amp; SKU Recovery â†“</a></div></div>
       <ProvenanceAnalyticsPanel domain={selectedDomain || latestReport?.domain || allDomains[0]} />
       <div id="ai-visibility" className="mb-5 rounded-xl border border-border bg-surface p-4"><h2 className="text-sm font-semibold">AI Visibility</h2><p className="mt-1 text-xs text-text-secondary">Share of Model and engine profiles appear on each saved audit report. Profile results are modeled from shared grounding sources.</p><AiVisibilityInsights domain={selectedDomain || allDomains[0] || ""} /></div>
       {canApprove&&<BulkRedirectManager domain={selectedDomain || allDomains[0] || ""} auditId={latestReport?.id} />}
@@ -274,7 +266,7 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
       <RecoveryDeploymentTools domain={selectedDomain || latestReport?.domain || allDomains[0] || ""} findings={recoveryFindings.filter(row => !selectedDomain || row.domain === selectedDomain)} />
       <div id="workspaces"><AgencyReferralConversionTracker domain={selectedDomain||allDomains[0]||""} /><WorkspaceSettingsTabs settings={<><section className="mb-5 rounded-xl border border-border bg-surface-raised p-4"><h2 className="text-sm font-semibold">Security Overview</h2><p className="mt-1 text-xs text-text-secondary">Architecture, tenant isolation, SSRF, webhook, encryption, retention and incident response notes.</p><a href="/security-overview.md" download className="mt-3 inline-flex rounded-lg border border-emerald-300/30 px-3 py-2 text-xs font-semibold text-accent">Download Security Overview</a>{access.role==="owner"&&<a href={`/api/workspaces/governance?domain=${encodeURIComponent(selectedDomain||allDomains[0]||"")}&action=export`} className="ml-3 inline-flex rounded-lg border border-border px-3 py-2 text-xs">Export workspace data</a>}</section>{canManageSettings&&<ProductionReadinessPanel />}{canManageSettings&&<WorkspaceGovernanceSettings domain={selectedDomain||allDomains[0]||""} />}{canManageSettings&&<ScheduledReportSettings domain={selectedDomain||allDomains[0]||""} />}{canManageSettings&&<WorkspaceIntegrations key={`workspace-${selectedDomain}`} domains={[...new Set(audits.map(audit => audit.domain))]} />}{canManageOwnerSettings&&<WorkspaceApiKeys domains={[...new Set(audits.map(audit => audit.domain))]} />}{access.organizationId===null&&<AgencyProfileSettings key={`agency-${selectedDomain}`} domains={[...new Set(audits.map(audit => audit.domain))]} isPro={isPro} />}</>} partner={canManageSettings?<AgencyPartnerPanel key={selectedDomain || allDomains[0] || ""} domain={selectedDomain||allDomains[0]||""} domains={allDomains} />:<section id="agency-partner" className="rounded-xl border border-border bg-surface-raised p-5"><h2 className="text-sm font-semibold">Agency Partner Program</h2><p className="mt-2 text-xs leading-5 text-text-secondary">Workspace owner or admin access is required to create and manage partner referrals.</p></section>} /></div>
       {access.role === "owner" && <BillingPanel />}
-      <section id="audit-history" className="mb-6 scroll-mt-8"><div className="mb-4"><p className="font-mono text-[10px] uppercase tracking-[.16em] text-accent">4 · Prove</p><h2 className="mt-1 text-xl font-semibold text-foreground">Reports</h2></div>{latestReport && canWorkspace(access.role, "draft") && <CaseStudyGenerator auditId={latestReport.id} />}{audits.length ? <div className="space-y-4">{audits.map(audit => <AuditCard key={audit.id} audit={audit} gap={gaps.get(audit.id)} />)}</div> : <EmptyState title="No audits saved yet" description="Run an audit and it will appear here." action={<Link href="/#audit" className="inline-flex rounded-full bg-accent px-5 py-3 text-sm font-semibold text-background">Run an audit</Link>} />}</section>
+      <section id="audit-history" className="mb-6 scroll-mt-8"><div className="mb-4"><p className="font-mono text-[10px] uppercase tracking-[.16em] text-accent">4 Â· Prove</p><h2 className="mt-1 text-xl font-semibold text-foreground">Reports</h2></div>{latestReport && canWorkspace(access.role, "draft") && <CaseStudyGenerator auditId={latestReport.id} />}{audits.length ? <div className="space-y-4">{audits.map(audit => <AuditCard key={audit.id} audit={audit} gap={gaps.get(audit.id)} />)}</div> : <EmptyState title="No audits saved yet" description="Run an audit and it will appear here." action={<Link href="/#audit" className="inline-flex rounded-full bg-accent px-5 py-3 text-sm font-semibold text-background">Run an audit</Link>} />}</section>
       </div></div>
       </main>
     </DashboardShell>
@@ -284,3 +276,4 @@ async function UserAuditHistory({ searchParams }: { searchParams: Promise<{ doma
 export default function DashboardPage({ searchParams }: { searchParams: Promise<{ domain?: string | string[]; recovery?: string | string[] }> }) {
   return <Suspense fallback={<DashboardLoading />}><UserAuditHistory searchParams={searchParams} /></Suspense>;
 }
+
