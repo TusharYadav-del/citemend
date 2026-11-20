@@ -11,7 +11,7 @@ export async function createBillingPortalSession(customerId: string, userId: str
   if ((origin.protocol !== "https:" && !(local && origin.protocol === "http:")) || origin.username || origin.password || origin.pathname !== "/" || origin.search || origin.hash) {
     throw new Error("NEXT_PUBLIC_APP_URL must be a trusted HTTPS origin.");
   }
-  const result = await createDodoClient(fetcher ? { fetch: fetcher } : {}).customers.customerPortal.create(customerId, { return_url: `${origin.origin}/dashboard#billing` });
+  const result = await createDodoClient(fetcher ? { fetch: fetcher } : {}).customers.customerPortal.create(customerId, { return_url: `${origin.origin}/dashboard/billing` });
   const url = new URL(result.link);
   if (url.protocol !== "https:" || !(url.hostname === "dodopayments.com" || url.hostname.endsWith(".dodopayments.com"))) throw new Error("Dodo Payments returned an untrusted customer portal URL.");
   return url.href;

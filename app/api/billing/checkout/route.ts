@@ -1,5 +1,5 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { BillingConfigError, BillingProviderError, createBillingCheckout, productForTier, type BillingTier, isBillingEnabled } from "@/lib/billing-checkout";
+import { BillingConfigError, BillingProviderError, createBillingCheckout, productForTier, type BillingTier, billingReadiness } from "@/lib/billing-checkout";
 import { createServerDatabase } from "@/lib/supabase-server";
 import { grantsProAccess } from "@/lib/subscription";
 import { resolveWorkspaceAccess } from "@/lib/workspace-access";
@@ -23,7 +23,8 @@ export async function POST(request: Request) {
     return Response.json({ error: "Choose Pilot, Growth, or Agency." }, { status: 400, headers });
   }
   const tier = body.tier as BillingTier;
-  if (!isBillingEnabled()) return Response.json({ error: "Paid checkout is not enabled yet." }, { status: 503, headers });
+  const readiness = billingReadiness();
+  if (!readiness.ready) return Response.json({ error: `Dodo checkout is not ready. Configure: ${readiness.missing.join(", ")}.` }, { status: 503, headers });
   try {
     const db = createServerDatabase();
     const access = await resolveWorkspaceAccess(db, session.userId, session.orgId ?? null, session.orgRole ?? null);

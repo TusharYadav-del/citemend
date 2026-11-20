@@ -18,7 +18,7 @@ test("Dodo portal sessions are customer-scoped and return to the billing panel",
   assert.equal(requestBody, null);
   const parsed = new URL(requestUrl);
   assert.match(parsed.pathname, /\/customers\/cus_123abc\/customer-portal\/session$/);
-  assert.equal(parsed.searchParams.get("return_url"), "https://citemend.vercel.app/dashboard#billing");
+  assert.equal(parsed.searchParams.get("return_url"), "https://citemend.vercel.app/dashboard/billing");
 });
 
 test("Dodo portal rejects invalid customer identifiers and untrusted provider links", async () => {

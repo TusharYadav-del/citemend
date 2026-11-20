@@ -15,13 +15,21 @@ export function configuredProductId(tier: BillingTier): string | undefined {
   return productEnvironmentNames[tier].map(name => process.env[name]?.trim()).find(Boolean);
 }
 
+export function billingReadiness(): { ready: boolean; missing: string[] } {
+  const missing: string[] = [];
+  if (process.env.DODO_PAYMENTS_ENABLED !== "true") missing.push('DODO_PAYMENTS_ENABLED="true"');
+  if (!process.env.DODO_PAYMENTS_API_KEY?.trim()) missing.push("DODO_PAYMENTS_API_KEY");
+  for (const tier of ["pilot", "growth", "agency"] as const) {
+    const [preferred, legacy] = productEnvironmentNames[tier];
+    const value = configuredProductId(tier);
+    if (!value) missing.push(`${preferred} (or ${legacy})`);
+    else if (!/^[A-Za-z0-9_-]{3,100}$/.test(value)) missing.push(`${preferred} (invalid Dodo product ID)`);
+  }
+  return { ready: missing.length === 0, missing };
+}
+
 export function isBillingEnabled(): boolean {
-  return process.env.DODO_PAYMENTS_ENABLED === "true"
-    && !!process.env.DODO_PAYMENTS_API_KEY?.trim()
-    && (["pilot", "growth", "agency"] as const).every(tier => {
-      const productId = configuredProductId(tier);
-      return !!productId && /^[A-Za-z0-9_-]{3,100}$/.test(productId);
-    });
+  return billingReadiness().ready;
 }
 
 export function productForTier(tier: BillingTier): string {

@@ -66,9 +66,9 @@ export function getVerticalSolutionPageModel(value: string) {
   const solution = getVerticalSolution(value);
   if (!solution) return null;
   const ctaHref: Record<VerticalSlug, string> = {
-    agencies: "/dashboard#workspaces",
+    agencies: "/dashboard/settings",
     saas: "/forensic-scan",
-    ecommerce: "/dashboard#ecommerce-catalog",
+    ecommerce: "/dashboard/settings",
     enterprise: "/security-overview.md",
   };
   return { solution, ctaHref: ctaHref[solution.slug], relatedLinks: ["/integrations", "/benchmarks"] as const };

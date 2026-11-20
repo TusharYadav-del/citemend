@@ -2,8 +2,8 @@
 import { useEffect, useState } from "react";
 
 type Status = { slackConfigured: boolean; discordConfigured: boolean; shopifyConfigured: boolean; shopifyStore: string };
-export default function WorkspaceIntegrations({ domains }: { domains: string[] }) {
-  const [domain, setDomain] = useState(domains[0] ?? "");
+export default function WorkspaceIntegrations({ domains, initialDomain }: { domains: string[]; initialDomain?: string }) {
+  const [domain, setDomain] = useState(initialDomain && domains.includes(initialDomain) ? initialDomain : domains[0] ?? "");
   const [status, setStatus] = useState<Status | null>(null);
   const [slack, setSlack] = useState(""); const [discord, setDiscord] = useState("");
   const [store, setStore] = useState(""); const [token, setToken] = useState("");

@@ -8,7 +8,7 @@ test("vertical solution route model renders the expected conversion paths and co
   assert.deepEqual(Object.keys(verticalSolutions).sort(), ["agencies", "ecommerce", "enterprise", "saas"]);
   const route = getVerticalSolutionPageModel("agencies");
   assert.ok(route);
-  assert.equal(route.ctaHref, "/dashboard#workspaces");
+  assert.equal(route.ctaHref, "/dashboard/settings");
   assert.deepEqual(route.relatedLinks, ["/integrations", "/benchmarks"]);
   assert.match(verticalSolutions.agencies.eyebrow, /5–50 clients/);
   assert.match(verticalSolutions.saas.highlights.map((item) => item.title).join(" "), /buyer-intent prompt monitoring/i);

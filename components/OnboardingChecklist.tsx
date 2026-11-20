@@ -12,10 +12,10 @@ export type OnboardingProgress = {
 };
 
 const steps = [
-  { key: "domainConnected", title: "1. Connect a domain", detail: "A domain is connected when an audit is saved to this workspace.", href: "/#audit", action: "Connect domain" },
-  { key: "firstAudit", title: "2. Run first audit (<15m target)", detail: "Review buyer-prompt observations and checked URLs.", href: "#audit-history", action: "View audit" },
-  { key: "recoveryApproved", title: "3. Preview & approve first recovery (<30m target)", detail: "Review the destination and explicitly approve it.", href: "#recovery-command", action: "Review recovery" },
-  { key: "resultVerified", title: "4. Verify two-stage outcome", detail: "Technical deployment and later AI citation are reported separately.", href: "#overview", action: "View verification" },
+  { key: "domainConnected", title: "1. Connect a domain", detail: "A domain is connected when an audit is saved to this workspace.", href: "/dashboard/scanner", action: "Connect domain" },
+  { key: "firstAudit", title: "2. Run first audit (<15m target)", detail: "Review buyer-prompt observations and checked URLs.", href: "/dashboard/reports", action: "View audit" },
+  { key: "recoveryApproved", title: "3. Preview & approve first recovery (<30m target)", detail: "Review the destination and explicitly approve it.", href: "/dashboard/recovery", action: "Review recovery" },
+  { key: "resultVerified", title: "4. Verify two-stage outcome", detail: "Technical deployment and later AI citation are reported separately.", href: "/dashboard/analytics", action: "View verification" },
 ] as const;
 
 export default function OnboardingChecklist({ progress }: { progress: OnboardingProgress }) {

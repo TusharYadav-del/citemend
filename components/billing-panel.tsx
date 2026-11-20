@@ -17,7 +17,7 @@ type BillingStatus = {
   quotaUsage: { auditsThisMonth: number; monthlyAuditLimit: number };
 };
 
-export function BillingPanel() {
+export function BillingPanel({ checkoutReady = true, checkoutMissing = [] }: { checkoutReady?: boolean; checkoutMissing?: string[] }) {
   const [billing, setBilling] = useState<BillingStatus | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<"manage" | "payment" | null>(null);
@@ -51,9 +51,10 @@ export function BillingPanel() {
         <button type="button" onClick={() => void openPortal("manage")} disabled={!!busy} className="rounded-md border border-success/30 px-3 py-2 text-xs font-semibold text-success hover:bg-success/5 focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-60">{busy === "manage" ? "Opening…" : "Manage Subscription / Download Invoices"}</button>
         <button type="button" onClick={() => void openPortal("payment")} disabled={!!busy} className="rounded-md border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-surface-soft focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-60">{busy === "payment" ? "Opening…" : "Update Payment Method"}</button>
       </div>}
-      {!billing.active && <div className="mt-4 flex flex-wrap gap-3">{(["pilot", "growth", "agency"] as const).map(tier => <BillingCheckoutButton key={tier} tier={tier} label={tier === "pilot" ? "Start $149 Pilot" : `Choose ${tier[0].toUpperCase() + tier.slice(1)}`} />)}</div>}
+      {!billing.active && <div className="mt-4 grid gap-2 sm:grid-cols-3">{(["pilot", "growth", "agency"] as const).map(tier => <BillingCheckoutButton key={tier} tier={tier} ready={checkoutReady} label={tier === "pilot" ? "Start $149 Pilot" : tier === "growth" ? "Choose Growth · $99/mo" : "Choose Agency · $249/mo"} />)}</div>}
     </>}
     {error && <p role="alert" className="mt-3 text-xs text-warning">{error}</p>}
-    {!billing && <div className="mt-4 flex flex-wrap gap-3">{(["pilot", "growth", "agency"] as const).map(tier => <BillingCheckoutButton key={tier} tier={tier} label={tier === "pilot" ? "Start $149 Pilot" : `Choose ${tier[0].toUpperCase() + tier.slice(1)}`} />)}</div>}
+    {!billing && <div className="mt-4 grid gap-2 sm:grid-cols-3">{(["pilot", "growth", "agency"] as const).map(tier => <BillingCheckoutButton key={tier} tier={tier} ready={checkoutReady} label={tier === "pilot" ? "Start $149 Pilot" : tier === "growth" ? "Choose Growth · $99/mo" : "Choose Agency · $249/mo"} />)}</div>}
+    {!checkoutReady && <p role="status" className="mt-3 text-xs text-warning">Dodo checkout setup is incomplete. Configure {checkoutMissing.join(", ") || "the billing environment"} on the server.</p>}
   </section>;
 }

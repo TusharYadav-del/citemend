@@ -2,16 +2,15 @@ import type { SidebarItem } from "@/components/ui/sidebar";
 
 export const DEFAULT_DASHBOARD_NAV: SidebarItem[] = [
   { label: "Overview", href: "/dashboard" },
-  { label: "AI Scanner", href: "/dashboard#ai-scanner" },
-  { label: "Recovery Center", href: "/dashboard#recovery-command" },
+  { label: "AI Scanner", href: "/dashboard/scanner" },
+  { label: "Recovery Center", href: "/dashboard/recovery" },
+  { label: "GEO Optimizer", href: "/dashboard/geo" },
+  { label: "AI Visibility", href: "/dashboard/analytics" },
+  { label: "Reports", href: "/dashboard/reports" },
+  { label: "Outreach", href: "/dashboard/outreach" },
+  { label: "Workspaces", href: "/dashboard/settings" },
+  { label: "Billing", href: "/dashboard/billing" },
   { label: "Traffic Interceptor", href: "/dashboard/pixel" },
-  { label: "Competitor Intelligence", href: "/dashboard#competitor-intelligence" },
-  { label: "Outreach", href: "/dashboard#outreach" },
-  { label: "GEO Optimizer", href: "/dashboard#geo-optimizer" },
-  { label: "AI Visibility", href: "/dashboard#ai-visibility" },
-  { label: "Reports", href: "/dashboard#audit-history" },
-  { label: "Automations", href: "/dashboard#automations" },
-  { label: "Workspaces", href: "/dashboard#workspaces" },
 ];
 
 export const FOUNDER_DASHBOARD_NAV: SidebarItem[] = [

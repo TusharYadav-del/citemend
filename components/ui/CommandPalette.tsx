@@ -44,15 +44,15 @@ export function CommandPalette({ items, domains, selectedDomain, canScan, canApp
   }, []);
   useEffect(() => { if (open) inputRef.current?.focus(); else openerRef.current?.focus(); }, [open]);
   const navigate = useCallback((href: string) => { setOpen(false); router.push(href); }, [router]);
-  const base = selectedDomain ? `/dashboard?domain=${encodeURIComponent(selectedDomain)}` : "/dashboard";
+  const scopedRecovery = `/dashboard/recovery${selectedDomain ? `?domain=${encodeURIComponent(selectedDomain)}` : ""}`;
   const commands = useMemo<Command[]>(() => [
     ...items.map(item => ({ id: `screen:${item.label}`, label: item.label, detail: "Dashboard screen", keywords: item.href, action: () => navigate(item.href) })),
-    ...domains.map(value => ({ id: `domain:${value}`, label: value, detail: "Switch workspace", keywords: "client domain workspace", action: () => navigate(`/dashboard?domain=${encodeURIComponent(value)}#overview`) })),
+    ...domains.map(value => ({ id: `domain:${value}`, label: value, detail: "Switch workspace", keywords: "client domain workspace", action: () => navigate(`/dashboard?domain=${encodeURIComponent(value)}`) })),
     ...(canScan ? [{ id: "scan", label: "New background scan", detail: "Run two buyer prompts in the job queue", keywords: "audit model probe", action: () => { setForm("scan"); setQuery(""); setMessage(null); } }] : []),
     { id: "forensic", label: "Run forensic check", detail: "Check one buyer prompt and public evidence", keywords: "forensics diagnosis", action: () => { setForm("forensic"); setQuery(""); setMessage(null); } },
-    ...(canApprove ? [{ id: "approvals", label: "URLs awaiting approval", detail: "Filter Recovery Center to pending URLs", keywords: "broken redirect review", action: () => navigate(`${base}${base.includes("?") ? "&" : "?"}recovery=pending#recovery-command`) }] : []),
+    ...(canApprove ? [{ id: "approvals", label: "URLs awaiting approval", detail: "Open the pending Recovery Center queue", keywords: "broken redirect review", action: () => navigate(`${scopedRecovery}${scopedRecovery.includes("?") ? "&" : "?"}recovery=pending`) }] : []),
     ...(latestAuditId ? [{ id: "export", label: "Export before and after report", detail: "Open print view; save as PDF with configured branding", keywords: "white label pdf", action: () => navigate(`/audit/${latestAuditId}?print=1`) }] : []),
-  ], [items, domains, canScan, canApprove, latestAuditId, base, navigate]);
+  ], [items, domains, canScan, canApprove, latestAuditId, scopedRecovery, navigate]);
   const filtered = commands.filter(command => matches(query, command)).slice(0, 18);
   function handleSearchKey(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === "ArrowDown") { event.preventDefault(); setActiveIndex(index => (index + 1) % Math.max(filtered.length, 1)); }

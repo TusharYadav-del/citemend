@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { BillingTier } from "@/lib/billing-checkout";
 
-export function BillingCheckoutButton({ tier, label }: { tier: BillingTier; label: string }) {
+export function BillingCheckoutButton({ tier, label, ready = true }: { tier: BillingTier; label: string; ready?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
@@ -38,7 +38,7 @@ export function BillingCheckoutButton({ tier, label }: { tier: BillingTier; labe
   }
 
   return <div>
-    <button type="button" onClick={() => void checkout()} disabled={busy} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-accent-strong focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60">
+    <button type="button" onClick={() => void checkout()} disabled={busy || !ready} title={!ready ? "Dodo Payments checkout configuration is incomplete." : undefined} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-accent-strong focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60">
       {busy && <span aria-hidden="true" className="size-4 animate-spin rounded-full border-2 border-[#07110d]/30 border-t-[#07110d]" />}
       {busy ? "Opening checkout…" : label}
     </button>
