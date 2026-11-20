@@ -1,132 +1,60 @@
 import type { Metadata } from "next";
-import { Activity, ArrowDownRight, ArrowRight, Check, CircleHelp, FileSearch, Link2, Radar, ShieldCheck, Waypoints } from "lucide-react";
-import AuditDashboard from "@/components/audit-dashboard";
-import { MarketingRecoveryPreview } from "@/components/marketing-recovery-preview";
+import Link from "next/link";
+import { ArrowRight, ArrowUpRight, Check, Database, FileSearch, Radar, ShieldCheck, Waypoints } from "lucide-react";
+import { FreeProvenanceAuditor } from "@/components/free-provenance-auditor";
+import { PipelineShowcase } from "@/components/pipeline-showcase";
+import { PublicPricingPlans } from "@/components/public-pricing-plans";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import { FreeProvenanceAuditor } from "@/components/free-provenance-auditor";
-import { PublicPricingPlans } from "@/components/public-pricing-plans";
+import { SectionHeading } from "@/components/ui/section-heading";
 
 export const metadata: Metadata = {
-  title: "CiteMend | AI Search Recovery Infrastructure",
-  description: "Find broken URLs in AI search answers, verify the evidence, and review recovery actions before deployment.",
+  title: "CiteMend | Recover broken AI citations",
+  description: "Find broken AI citations and inspect cited URLs. Review stale facts and safe replacements, then verify approved fixes across Shopify and Cloudflare.",
   alternates: { canonical: "/" },
-  openGraph: { type: "website", url: "/", title: "CiteMend | AI Search Recovery Infrastructure", description: "Find broken URLs in AI search answers, verify the evidence, and review recovery actions before deployment." },
-  twitter: { card: "summary_large_image", title: "CiteMend | AI Search Recovery Infrastructure", description: "Find broken URLs in AI search answers, verify the evidence, and review recovery actions before deployment." },
+  openGraph: { type: "website", url: "/", title: "CiteMend | Recover broken AI citations", description: "Find broken AI citations and inspect cited URLs. Review stale facts and safe replacements, then verify approved fixes across Shopify and Cloudflare." },
+  twitter: { card: "summary_large_image", title: "CiteMend | Recover broken AI citations", description: "Find broken AI citations and inspect cited URLs. Review stale facts and safe replacements, then verify approved fixes." },
 };
 
-const workflow = [
-  { number: "01", title: "Detect", icon: Radar, description: "Run a saved, search-grounded audit against buyer questions and review the sources it returned." },
-  { number: "02", title: "Prove", icon: FileSearch, description: "Inspect URL status, source evidence, and the reason a finding needs attention." },
-  { number: "03", title: "Recover", icon: Link2, description: "Review a destination suggestion. A person approves any redirect before it is published." },
-  { number: "04", title: "Verify", icon: ShieldCheck, description: "Check the deployed redirect and destination response as separate technical outcomes." },
-  { number: "05", title: "Measure", icon: Activity, description: "Record later citation, referral, and attribution evidence only when it is actually observed." },
+const pillars = [
+  { id: "01", title: "Recovery", icon: Radar, description: "Trace broken citation URLs, compare replacement context, then review an approval-ready redirect diff.", visual: <div className="mt-6 space-y-2 rounded-lg border border-border bg-[#0B0D10] p-3 font-mono text-xs"><div className="flex justify-between gap-3"><span className="truncate text-danger">/products/classic-pack-v2</span><span className="text-danger">404</span></div><div className="flex justify-between gap-3"><span className="truncate text-text-tertiary">→ /products/classic-pack</span><span className="text-warning">review</span></div></div> },
+  { id: "02", title: "Intelligence", icon: ShieldCheck, description: "Inspect crawler access, page freshness, navigation weight, and source extractability in one evidence view.", visual: <div className="mt-6 overflow-hidden rounded-lg border border-border bg-[#0B0D10] font-mono text-[10px]"><div className="grid grid-cols-[1fr_auto] gap-3 border-b border-border px-3 py-2 text-text-tertiary"><span>CRAWLER</span><span>ROBOTS</span></div>{["GPTBot", "PerplexityBot", "ClaudeBot", "Google-Extended"].map((bot, i) => <div key={bot} className="grid grid-cols-[1fr_auto] gap-3 px-3 py-1.5 text-text-secondary"><span>{bot}</span><span className={i === 2 ? "text-danger" : "text-success"}>{i === 2 ? "BLOCKED" : "ALLOWED"}</span></div>)}</div> },
+  { id: "03", title: "AI analytics", icon: FileSearch, description: "Separate retrieved sources from rendered citations and review claim-level freshness or attribution drift.", visual: <div className="mt-6 space-y-2 rounded-lg border border-border bg-[#0B0D10] p-3 font-mono text-[10px]"><p className="text-text-tertiary">CLAIM DIFF · F1–F6 REVIEW</p><p><span className="text-danger">−</span> Winter price: $42</p><p><span className="text-success">+</span> Current price: $38</p><p className="text-warning">F5 · stale information · human review</p></div> },
 ];
 
-const evidence = [
-  { label: "URL response", value: "HTTP check required", note: "Status and transient failures stay distinct." },
-  { label: "Recovery action", value: "Approval required", note: "Suggestions do not publish themselves." },
-  { label: "AI citation", value: "Re-observation required", note: "A deployed redirect is not proof of a new citation." },
-  { label: "Outcome record", value: "Unknown until observed", note: "Traffic and attribution require recorded evidence." },
-];
-
-const questions = [
-  { q: "Can CiteMend control what AI systems say?", a: "No. CiteMend reviews search-grounded results and their URLs. Engine comparison profiles are modeled from shared search sources; they do not query each named engine directly." },
-  { q: "Will CiteMend publish a redirect automatically?", a: "No. A person reviews the destination and approves a redirect before it can be published or synced." },
-  { q: "What does the free page check do?", a: "It checks one public HTTP(S) page for its response, crawler access, navigation links, and basic metadata. Archive context is checked only for confirmed 404 or 410 responses." },
-  { q: "Does a verified redirect mean an AI citation was recovered?", a: "No. Redirect deployment, destination response, later AI citation, referral traffic, and revenue attribution are separate evidence milestones." },
+const benchmarks = [
+  ["58%", "commercial .com links decay", "Link rot baseline"],
+  ["82–85%", "AI citations come from earned media", "Source mix"],
+  ["3.2×", "citation lift associated with freshness", "30-day freshness"],
+  ["78% → 33%", "agent extraction as navigation exceeds 60 links", "Navigation load"],
 ];
 
 export default function Home() {
-  const clerkConfigured = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY);
-
-  return <>
-    <SiteHeader />
-    <main className="overflow-hidden bg-background text-foreground">
-      <section id="top" className="relative border-b border-border">
-        <div aria-hidden="true" className="cm-grid pointer-events-none absolute inset-0 opacity-70" />
-        <div className="cm-container relative grid min-w-0 gap-9 py-10 sm:py-14 lg:grid-cols-[.86fr_1.14fr] lg:items-center lg:gap-12 lg:py-20">
-          <div className="max-w-2xl">
-            <p className="cm-kicker flex items-center gap-2"><span aria-hidden="true" className="size-1.5 rounded-full bg-accent" /> COMMERCE RELIABILITY & CITATION PROVENANCE</p>
-            <h1 className="mt-5 max-w-[11ch] text-[clamp(3rem,7vw,5.5rem)] font-semibold leading-[.93] tracking-[-.065em]">Stop losing AI citations and revenue to broken links and stale facts.</h1>
-            <p className="mt-6 max-w-xl text-base leading-7 text-text-secondary sm:text-lg sm:leading-8">Find broken AI citations and inspect cited URLs: CiteMend detects dead destinations and stale AI claims, blocks SEO-harming soft-404 redirects, and helps teams review fixes before Shopify or Cloudflare deployment.</p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <a href="/pricing" className="cm-button-primary cm-focus-ring">Start $149 Pilot <ArrowRight aria-hidden="true" className="size-4" /></a>
-              <a href="#workflow" className="cm-button-secondary cm-focus-ring">Explore the workflow <ArrowDownRight aria-hidden="true" className="size-4" /></a>
-            </div>
-            <div className="mt-7 grid max-w-xl gap-2 border-t border-border pt-5 text-xs text-text-tertiary sm:grid-cols-3">
-              <p className="flex items-center gap-2"><Check aria-hidden="true" className="size-3.5 shrink-0 text-success" />Evidence before action</p>
-              <p className="flex items-center gap-2"><Check aria-hidden="true" className="size-3.5 shrink-0 text-success" />Human-approved redirects</p>
-              <p className="flex items-center gap-2"><Check aria-hidden="true" className="size-3.5 shrink-0 text-success" />Outcomes tracked separately</p>
-            </div>
-          </div>
-          <div className="min-w-0 lg:pl-2">
-            <MarketingRecoveryPreview embedded />
-            <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-[.12em] text-text-tertiary">Illustrative workflow · no live customer data</p>
-          </div>
+  return <><SiteHeader /><main className="overflow-hidden bg-background text-foreground">
+    <section id="top" className="relative border-b border-border">
+      <div aria-hidden="true" className="cm-grid pointer-events-none absolute inset-0 opacity-60"/><div aria-hidden="true" className="cm-hero-glow pointer-events-none absolute inset-x-0 top-0 h-[38rem]"/>
+      <div className="cm-container relative grid gap-9 py-12 sm:py-16 lg:grid-cols-[.84fr_1.16fr] lg:items-center lg:gap-12 lg:py-20">
+        <div className="max-w-2xl"><p className="cm-status-pill"><span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-accent opacity-40 motion-reduce:animate-none"/><span className="relative inline-flex size-2 rounded-full bg-accent"/></span>Commerce reliability & citation provenance</p>
+          <h1 className="mt-6 max-w-[12ch] text-[clamp(3.1rem,7vw,5.75rem)] font-semibold leading-[.94] tracking-[-.065em]">Recover lost AI citations before broken links cost revenue.</h1>
+          <p className="mt-6 max-w-xl text-base leading-7 text-text-secondary sm:text-lg sm:leading-8">Find broken AI citations and inspect cited URLs: detect dead destinations and stale facts, prevent SEO-harming soft-404 redirects, then review and deploy approved fixes to Shopify or Cloudflare.</p>
+          <div className="mt-7 flex flex-wrap gap-3"><Link href="/pricing" className="cm-button-primary">Start $149 Pilot <ArrowUpRight className="size-4"/></Link><Link href="#workflow" className="cm-button-secondary">Explore the workflow <ArrowRight className="size-4"/></Link></div>
+          <p className="mt-5 flex items-center gap-2 text-xs text-text-tertiary"><Check className="size-3.5 text-accent"/> Human approval before deployment <span aria-hidden="true">·</span> No guaranteed AI visibility claims</p>
         </div>
-        <div className="cm-container pb-8 sm:pb-10">
-          <div className="grid overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-5 sm:gap-px">
-            {workflow.map(({ number, title }) => <a key={number} href="#workflow" className="flex items-center gap-3 bg-surface px-4 py-3 transition-colors hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-accent sm:block sm:px-4 sm:py-4"><span className="font-mono text-[10px] text-accent">{number}</span><span className="text-sm font-medium text-foreground sm:mt-1 sm:block">{title}</span></a>)}
-          </div>
-        </div>
-      </section>
+        <div className="relative min-w-0 rounded-2xl border border-border bg-surface p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_30px_100px_-56px_rgba(16,185,129,.35)]"><div className="absolute inset-x-8 top-0 h-px bg-white/[.06]"/><div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5"><div className="flex items-center gap-2"><span className="grid size-7 place-items-center rounded-md border border-border bg-background"><Waypoints className="size-3.5 text-accent"/></span><span className="text-xs font-semibold">Free provenance auditor</span></div><span className="rounded-full border border-border px-2 py-1 font-mono text-[9px] uppercase tracking-wider text-text-tertiary">Live · one public page</span></div><div className="rounded-xl border border-border bg-background"><FreeProvenanceAuditor compact/></div></div>
+      </div>
+      <div className="border-t border-border bg-surface/55"><div className="cm-container grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">{benchmarks.map(([metric, label, caption])=><div key={metric} className="bg-background/90 px-5 py-5 sm:px-6"><p className="font-mono text-2xl font-semibold tracking-tight tabular-nums text-foreground sm:text-[1.75rem]">{metric}</p><p className="mt-2 text-xs leading-5 text-text-secondary">{label}</p><p className="mt-2 font-mono text-[9px] uppercase tracking-[.12em] text-text-tertiary">{caption}</p></div>)}</div></div>
+    </section>
 
-      <FreeProvenanceAuditor />
+    <PipelineShowcase/>
 
-      <section id="architecture" className="border-y border-border bg-surface py-[var(--space-section)]" aria-labelledby="architecture-title">
-        <div className="cm-container"><div className="grid gap-6 lg:grid-cols-[.7fr_1.3fr] lg:items-end"><div><p className="cm-kicker">Platform architecture</p><h2 id="architecture-title" className="mt-4 max-w-xl text-3xl font-semibold tracking-[-.05em] sm:text-5xl">A recovery system built around source evidence.</h2></div><p className="max-w-2xl text-sm leading-7 text-text-secondary">Find broken AI citations and inspect cited URLs in a focused recovery workflow, with roadmap items called out separately from capabilities available today.</p></div>
-          <div className="mt-8 grid overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2 xl:grid-cols-3 sm:gap-px">
-            {[
-              ["01", "CiteMend Recovery", "LIVE", "Defensive URL recovery, human review, and supported redirect deployment."],
-              ["02", "CiteMend Intelligence", "LIVE", "Claim differences, freshness signals, and extractability evidence."],
-              ["03", "CiteMend AI Analytics", "LIVE", "Retrieved and rendered URL provenance where recorded."],
-              ["04", "CiteMend Catalog", "ROADMAP", "Product catalog reliability workflows."],
-              ["05", "CiteMend Agent Reliability", "ROADMAP", "Expanded agent-facing reliability controls."],
-              ["06", "CiteMend Enterprise", "ROADMAP", "Enterprise administration and governance."],
-            ].map(([number,title,status,description]) => <article key={number} className="min-w-0 bg-background p-5 sm:p-6"><div className="flex items-center justify-between gap-3"><span className="font-mono text-[10px] text-text-tertiary">{number} / PLATFORM</span><span className={`rounded-sm border px-2 py-1 font-mono text-[9px] tracking-wider ${status === "LIVE" ? "border-success/25 bg-success/5 text-success" : "border-border-strong bg-surface text-text-tertiary"}`}>{status}</span></div><h3 className="mt-5 text-base font-semibold">{title}</h3><p className="mt-2 text-xs leading-5 text-text-secondary">{description}</p></article>)}
-          </div>
-        </div>
-      </section>
-      <section id="workflow" className="cm-container scroll-mt-24 py-[var(--space-section)]" aria-labelledby="workflow-title">
-        <div className="grid gap-6 lg:grid-cols-[.7fr_1.3fr] lg:items-end">
-          <div><p className="cm-kicker">The recovery lifecycle</p><h2 id="workflow-title" className="mt-4 max-w-xl text-3xl font-semibold tracking-[-.05em] sm:text-5xl">Every step leaves evidence your team can inspect.</h2></div>
-          <p className="max-w-2xl text-sm leading-7 text-text-secondary sm:text-base">Move from a cited URL to a reviewed action with a clear record of what was checked, what changed, and what still needs observation.</p>
-        </div>
-        <div className="mt-10 overflow-hidden rounded-xl border border-border bg-surface">
-          {workflow.map(({ number, title, icon: Icon, description }) => <article key={number} className="grid gap-3 border-b border-border p-5 last:border-b-0 sm:grid-cols-[5rem_13rem_1fr] sm:items-center sm:gap-5 sm:px-6 sm:py-5">
-            <div className="flex items-center gap-3 sm:block"><span className="font-mono text-xs text-accent">{number}</span><span className="grid size-9 place-items-center rounded-md border border-border bg-surface-raised text-accent sm:mt-3"><Icon aria-hidden="true" className="size-4" /></span></div>
-            <h3 className="text-base font-semibold tracking-tight">{title}</h3>
-            <p className="max-w-2xl text-sm leading-6 text-text-secondary">{description}</p>
-          </article>)}
-        </div>
-      </section>
+    <section id="platform" className="scroll-mt-20 border-y border-border bg-surface/35"><div className="cm-container py-[var(--space-section)]"><SectionHeading eyebrow="Built around evidence" title="Three live pillars. One reviewable operating loop." description="Start with URL recovery, expand into page intelligence, and keep observed AI provenance tied to its source."/><div className="mt-9 grid gap-4 lg:grid-cols-3">{pillars.map(({id,title,icon:Icon,description,visual})=><article key={id} className="cm-panel group min-w-0 p-5 sm:p-6"><div className="flex items-center justify-between"><span className="font-mono text-xs text-text-tertiary">{id} / LIVE</span><Icon className="size-4 text-text-secondary transition-colors group-hover:text-accent"/></div><h3 className="mt-5 text-xl font-semibold tracking-tight">{title}</h3><p className="mt-2 min-h-12 text-sm leading-6 text-text-secondary">{description}</p>{visual}</article>)}</div><div className="mt-5 flex flex-col gap-3 rounded-xl border border-border bg-background px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><Database className="size-4 text-text-tertiary"/><p className="text-sm font-medium">Built to scale</p></div><p className="text-xs leading-5 text-text-secondary">04 Catalog <span className="px-2 text-text-tertiary">·</span> 05 Agent reliability <span className="px-2 text-text-tertiary">·</span> 06 Enterprise</p><span className="w-fit rounded-full border border-border px-2.5 py-1 font-mono text-[9px] uppercase tracking-wider text-text-tertiary">Roadmap</span></div></div></section>
 
-      <section className="border-y border-border bg-surface py-[var(--space-section)]" aria-labelledby="evidence-title">
-        <div className="cm-container grid gap-10 lg:grid-cols-[.8fr_1.2fr] lg:items-center">
-          <div><p className="cm-kicker">A measured recovery</p><h2 id="evidence-title" className="mt-4 max-w-xl text-3xl font-semibold tracking-[-.05em] sm:text-5xl">A redirect is one checkpoint. Recovery takes evidence.</h2><p className="mt-4 max-w-xl text-sm leading-7 text-text-secondary sm:text-base">CiteMend keeps technical deployment, destination health, citation re-observation, referral traffic, and revenue attribution distinct. Unknown stays unknown.</p><a href="/security" className="cm-focus-ring mt-6 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-accent hover:underline">Review product safeguards <ArrowRight aria-hidden="true" className="size-4" /></a></div>
-          <div className="overflow-hidden rounded-xl border border-border bg-background">
-            <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-5"><div className="flex items-center gap-2"><Waypoints aria-hidden="true" className="size-4 text-accent" /><h3 className="text-sm font-semibold">Evidence ledger</h3></div><span className="font-mono text-[10px] uppercase tracking-wider text-text-tertiary">Illustrative states · no live data</span></div>
-            <div className="divide-y divide-border">{evidence.map((row, index) => <div key={row.label} className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-4 sm:px-5"><div><p className="text-sm font-medium">{row.label}</p><p className="mt-1 text-xs leading-5 text-text-tertiary">{row.note}</p></div><span className={`rounded-sm border px-2 py-1 font-mono text-[10px] ${index === 1 ? "border-warning/25 bg-warning/5 text-warning" : "border-border-strong bg-surface text-text-secondary"}`}>{row.value}</span></div>)}</div>
-          </div>
-        </div>
-      </section>
-
-
-
-      <section id="audit" className="cm-surface-light scroll-mt-12 border-y border-border px-5 py-16 sm:px-8 sm:py-20">
-        <div className="mx-auto max-w-7xl"><div className="mx-auto mb-9 max-w-2xl text-center"><p className="font-mono text-xs font-medium uppercase tracking-[.12em] text-foreground/70">Workspace audit</p><h2 className="mt-3 text-3xl font-semibold tracking-[-.045em] text-foreground sm:text-5xl">Start with the questions your buyers ask.</h2><p className="mt-4 text-base leading-7 text-muted-foreground">Sign in to review saved search-grounded sources, URL states, and findings for your domain.</p></div><AuditDashboard liveEnabled={clerkConfigured} clerkConfigured={clerkConfigured} embedded /></div>
-      </section>
-
-      <PublicPricingPlans />
-
-      <section id="faq" className="cm-container scroll-mt-24 py-[var(--space-section)]" aria-labelledby="faq-heading">
-        <div className="grid gap-8 lg:grid-cols-[.7fr_1.3fr] lg:gap-12">
-          <div><p className="cm-kicker">Clarity before you connect</p><h2 id="faq-heading" className="mt-4 text-3xl font-semibold tracking-[-.045em] sm:text-4xl">Evidence over promises.</h2><p className="mt-4 text-base leading-7 text-text-secondary">Inspect every finding, preserve human approval, and report only outcomes supported by an observation.</p></div>
-          <div className="space-y-2">{questions.map(({ q, a }) => <details key={q} className="group rounded-md border border-border bg-surface px-4 py-4 sm:px-5"><summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-5 text-sm font-semibold text-foreground marker:content-none focus-visible:outline-2 focus-visible:outline-accent"><span>{q}</span><CircleHelp aria-hidden="true" className="size-4 shrink-0 text-accent transition-transform group-open:rotate-12" /></summary><p className="mt-3 max-w-2xl text-sm leading-6 text-text-secondary">{a}</p></details>)}</div>
-        </div>
-      </section>
-    </main>
-    <SiteFooter />
-  </>;
+    <PublicPricingPlans/>
+    <section id="faq" className="cm-container scroll-mt-24 border-t border-border py-[var(--space-section)]"><div className="grid gap-9 lg:grid-cols-[.65fr_1.35fr] lg:gap-16"><SectionHeading eyebrow="Clear safeguards" title="Repair the path. Keep the evidence." description="CiteMend records observed technical states and keeps recommendations reviewable."/><div className="space-y-2">{[
+      ["Can CiteMend control what AI systems say?", "No. CiteMend checks search-grounded results and their URLs. Modeled engine profiles are not direct queries to each named engine."],
+      ["Will CiteMend publish a redirect automatically?", "No. A person reviews and approves every destination before a redirect can be deployed."],
+      ["Does a verified redirect mean an AI citation was recovered?", "No. Deployment, destination health, a later citation observation, referral traffic, and revenue attribution are separate evidence milestones."],
+      ["What does the free auditor check?", "One public HTTP(S) page: response status, archive context for confirmed 404/410, crawler access, navigation links, SSR text, and basic metadata."],
+    ].map(([q,a])=><details key={q} className="group rounded-lg border border-border bg-surface px-4 py-4 sm:px-5"><summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-5 text-sm font-semibold marker:content-none focus-visible:outline-2 focus-visible:outline-accent"><span>{q}</span><span className="font-mono text-text-tertiary transition-transform group-open:rotate-45">+</span></summary><p className="mt-3 max-w-2xl text-sm leading-6 text-text-secondary">{a}</p></details>)}</div></div></section>
+  </main><SiteFooter/></>;
 }

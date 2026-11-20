@@ -12,7 +12,7 @@ type Report = {
   limits: string;
 };
 
-export function FreeProvenanceAuditor() {
+export function FreeProvenanceAuditor({ compact = false }: { compact?: boolean }) {
   const [url, setUrl] = useState("");
   const [email, setEmail] = useState("");
   const [report, setReport] = useState<Report | null>(null);
@@ -45,9 +45,10 @@ export function FreeProvenanceAuditor() {
   }
 
   return (
-    <section id="free-provenance-auditor" aria-labelledby="free-auditor-heading" className="cm-container scroll-mt-24 py-[var(--space-section)]">
-      <div className="grid gap-8 lg:grid-cols-[.72fr_1.28fr] lg:items-start lg:gap-12">
-        <div className="max-w-xl">
+    <section id="free-provenance-auditor" aria-labelledby="free-auditor-heading" className={compact ? "scroll-mt-24" : "cm-container scroll-mt-24 py-[var(--space-section)]"}>
+      {compact && <h2 id="free-auditor-heading" className="sr-only">Free public page auditor</h2>}
+      <div className={compact ? "" : "grid gap-8 lg:grid-cols-[.72fr_1.28fr] lg:items-start lg:gap-12"}>
+        {!compact && <div className="max-w-xl">
           <p className="cm-kicker">Free public page check</p>
           <h2 id="free-auditor-heading" className="mt-4 text-3xl font-semibold tracking-[-.045em] sm:text-4xl">Inspect a page before you make a change.</h2>
           <p className="mt-4 text-base leading-7 text-text-secondary">Check the public response, archived history for confirmed dead pages, crawler access, navigation links, and basic metadata.</p>
@@ -56,9 +57,9 @@ export function FreeProvenanceAuditor() {
             <p className="flex items-center gap-2"><ShieldCheck aria-hidden="true" className="size-4 text-success" />No account or AI API call required</p>
             <p className="flex items-center gap-2"><CircleHelp aria-hidden="true" className="size-4 text-text-tertiary" />Unavailable checks remain unknown</p>
           </div>
-        </div>
+        </div>}
 
-        <div className="min-w-0 rounded-lg border border-border bg-surface p-4 sm:p-6">
+        <div className={`min-w-0 ${compact ? "p-3 sm:p-4" : "rounded-lg border border-border bg-surface p-4 sm:p-6"}`}>
           <form onSubmit={scan} className="flex flex-col gap-3 sm:flex-row">
             <label className="sr-only" htmlFor="free-provenance-url">Public page URL</label>
             <input id="free-provenance-url" aria-label="Public page URL" type="text" inputMode="url" required maxLength={2048} placeholder="https://example.com/old-guide" value={url} onChange={event => setUrl(event.target.value)} className="min-h-11 min-w-0 flex-1 rounded-md border border-input bg-background px-3.5 text-sm text-foreground placeholder:text-text-tertiary focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/30" />

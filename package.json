@@ -29,6 +29,8 @@
     "cn": "^0.5.1",
     "dodopayments": "^2.63.0",
     "fast-xml-parser": "^5.11.2",
+    "framer-motion": "^14.14.0",
+    "framer-motion": "^14.14.0",
     "groq-sdk": "^1.6.0",
     "ipaddr.js": "^2.5.0",
     "lucide-react": "^1.65.0",

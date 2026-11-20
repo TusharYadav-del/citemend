@@ -4,9 +4,9 @@ import { BillingCheckoutButton } from "@/components/billing-checkout-button";
 import { isBillingEnabled } from "@/lib/billing-checkout";
 
 const offers = [
-  { name: "30-Day Recovery Pilot", tier: "pilot" as const, price: "$149", cadence: "one-time", detail: "One workspace · 30 days", description: "A focused first recovery cycle: establish URL evidence, review findings, and verify approved changes.", icon: Clock3, points: ["One-time purchase", "Evidence-led URL review", "Human approval before deployment"] },
-  { name: "Growth Store", tier: "growth" as const, price: "$99", cadence: "/ month", detail: "Continuous monitoring", description: "A steady operating workspace for teams maintaining a single commerce domain.", icon: Repeat2, points: ["Ongoing 404 and citation monitoring", "Soft-404 guardrails", "Monthly recovery report"] },
-  { name: "Agency Multi-Workspace", tier: "agency" as const, price: "$249", cadence: "/ month", detail: "Up to 5 client domains", description: "Keep client evidence and recovery workflows organized across a shared agency workspace.", icon: Repeat2, points: ["Multi-workspace client context", "Client-ready reports", "Reviewed recovery actions"] },
+  { name: "30-Day Recovery Pilot", tier: "pilot" as const, price: "$149", cadence: "one-time", detail: "One workspace · 30 days", description: "For Shopify stores validating live broken-link recovery with an evidence-led first cycle.", icon: Clock3, points: ["One-time purchase", "Live broken-link review", "Human approval before deployment"] },
+  { name: "Growth Store", tier: "growth" as const, price: "$99", cadence: "/ month", detail: "Continuous monitoring · $990/yr annually", description: "For a commerce team maintaining one domain with recurring monitoring and retention proof.", icon: Repeat2, points: ["Continuous 404 and citation monitoring", "GEO extractability checks", "Monthly 4-metric retention report"] },
+  { name: "Agency Multi-Workspace", tier: "agency" as const, price: "$249", cadence: "/ month", detail: "Up to 5 client domains · $2,490/yr annually", description: "For agencies managing separate client workspaces and reporting on recovery outcomes.", icon: Repeat2, points: ["Up to 5 client domains", "Workspace switcher", "White-label client ROI reports"] },
 ];
 
 type PricingTier = (typeof offers)[number]["tier"];
@@ -30,7 +30,7 @@ export function PublicPricingPlans({ mode = "compact", tiers, billingReady: bill
       <div className="mt-8 grid gap-3 lg:grid-cols-[.92fr_1.08fr_.92fr] lg:items-stretch sm:mt-10">
         {visibleOffers.map(({ name, tier, price, cadence, detail, description, icon: Icon, points }) => (
           <article key={tier} className={`relative flex min-w-0 flex-col rounded-xl border p-5 transition-colors sm:p-6 ${tier === "growth" ? "border-accent/35 bg-surface-raised shadow-panel lg:-translate-y-2" : "border-border bg-surface"}`}>
-            {tier === "growth" && <span className="absolute -top-3 left-5 rounded-sm border border-accent/30 bg-background px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-accent">Continuous plan</span>}
+            {tier === "growth" && <span className="absolute -top-3 left-5 rounded-full border border-accent/35 bg-background px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-accent">Most Popular</span>}
             <div className="flex items-start justify-between gap-3"><div><p className="font-mono text-[10px] uppercase tracking-[.12em] text-text-tertiary">{tier === "pilot" ? "01 / Prove" : tier === "growth" ? "02 / Monitor" : "02 / Manage clients"}</p><h3 className="mt-3 text-lg font-semibold leading-6 text-foreground">{name}</h3></div><span className="grid size-9 shrink-0 place-items-center rounded-md border border-border bg-background text-text-secondary"><Icon aria-hidden="true" className="size-4" /></span></div>
             <p className="mt-6 flex flex-wrap items-baseline gap-x-2 gap-y-1"><span className="font-mono text-4xl font-semibold tracking-tight tabular-nums text-foreground">{price}</span><span className="text-sm text-text-secondary">{cadence}</span></p>
             <p className="mt-1 font-mono text-xs text-text-tertiary">{detail}</p>
@@ -43,9 +43,9 @@ export function PublicPricingPlans({ mode = "compact", tiers, billingReady: bill
         ))}
       </div>
       <div className="mt-6 grid gap-4 border-t border-border pt-5 text-xs leading-5 text-text-tertiary sm:grid-cols-3">
-        <p><span className="font-medium text-text-secondary">Billing:</span> Pilot is a one-time 30-day purchase. Growth and Agency are monthly.</p>
+        <p><span className="font-medium text-text-secondary">Billing:</span> Pilot is $149 once. Annual maintenance: Growth $990/yr; Agency $2,490/yr.</p>
         <p><span className="font-medium text-text-secondary">Control:</span> Redirects require review and approval. CiteMend does not promise AI answer visibility.</p>
-        <p><span className="font-medium text-text-secondary">Checkout:</span> Secure checkout and final terms are provided by Dodo Payments.</p>
+        <p><span className="font-medium text-text-secondary">Included:</span> No per-engine add-on fees. Final terms appear in Dodo Payments checkout.</p>
       </div>
       {!isPage && <Link href="/pricing" className="mt-4 inline-flex min-h-10 items-center gap-1.5 text-sm font-medium text-accent hover:underline focus-visible:outline-2 focus-visible:outline-accent">Compare plan terms <ArrowUpRight aria-hidden="true" className="size-4" /></Link>}
     </section>
