@@ -1,4 +1,5 @@
 import { SignIn } from "@clerk/nextjs";
+import { connection } from "next/server";
 import { Suspense } from "react";
 import type { Metadata } from "next";
 
@@ -16,6 +17,7 @@ function safeRedirect(value: string | string[] | undefined): string {
 }
 
 async function SignInContent({ searchParams }: { searchParams: SearchParams }) {
+  await connection();
   if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || !process.env.CLERK_SECRET_KEY) {
     return <p role="alert" className="text-center text-foreground">Sign-in is temporarily unavailable. Please try again later.</p>;
   }
