@@ -1,5 +1,12 @@
 import { SignIn } from "@clerk/nextjs";
 import { Suspense } from "react";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Sign in | CiteMend",
+  description: "Sign in to your CiteMend workspace.",
+  robots: { index: false, follow: false },
+};
 
 type SearchParams = Promise<{ redirect_url?: string | string[] }>;
 
