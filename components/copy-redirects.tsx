@@ -52,18 +52,18 @@ export default function CopyRedirects({
   }
 
   return (
-    <div className="mt-6 rounded-xl border border-white/10 bg-black/20 p-5">
-      <label htmlFor="redirect-format" className="block text-sm font-semibold text-white">Redirect format</label>
+    <div className="mt-6 rounded-xl border border-border bg-surface-raised p-5">
+      <label htmlFor="redirect-format" className="block text-sm font-semibold text-foreground">Redirect format</label>
       <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <select id="redirect-format" value={format} onChange={(event) => { setFormat(event.target.value as RedirectExportFormat); setMessage(""); }} className="min-h-11 rounded-lg border border-white/10 bg-[#0b1015] px-3 text-sm text-white">
+        <select id="redirect-format" value={format} onChange={(event) => { setFormat(event.target.value as RedirectExportFormat); setMessage(""); }} className="min-h-11 rounded-lg border border-border bg-[#0b1015] px-3 text-sm text-foreground">
           {formats.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
         </select>
-        <button type="button" onClick={copyRedirects} disabled={pending} className="min-h-11 rounded-lg bg-emerald-400 px-5 py-3 text-sm font-semibold text-[#07110d] hover:bg-emerald-300 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400">
+        <button type="button" onClick={copyRedirects} disabled={pending} className="min-h-11 rounded-lg bg-emerald-400 px-5 py-3 text-sm font-semibold text-background hover:bg-accent disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400">
           {pending ? "Checking access..." : "Copy All 301 Redirects"}
         </button>
       </div>
-      <p role="status" aria-live="polite" className="mt-3 min-h-5 text-xs text-emerald-300">{message}</p>
-      <p className="text-xs leading-5 text-slate-400">One-click export is included with Pro. Only human-approved or deployed HTTP 404 mappings with same-domain destinations can be exported.</p>
+      <p role="status" aria-live="polite" className="mt-3 min-h-5 text-xs text-accent">{message}</p>
+      <p className="text-xs leading-5 text-text-secondary">One-click export is included with Pro. Only human-approved or deployed HTTP 404 mappings with same-domain destinations can be exported.</p>
       {upgrade && <UpgradeModal onClose={() => setUpgrade(null)} />}
     </div>
   );

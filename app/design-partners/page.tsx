@@ -4,6 +4,8 @@ import { Suspense } from "react";
 import { DesignPartnerApplicationForm } from "@/components/design-partner-application-form";
 import { AgencyReferralVisitTracker } from "@/components/agency-referral-visit-tracker";
 import { normalizeAgencyReferralCode } from "@/lib/referral-code";
+import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
 
 export const metadata: Metadata = {
   title: "Design Partner Program | CiteMend",
@@ -18,17 +20,17 @@ const tracks = [
 async function DesignPartnersContent({ searchParams }: { searchParams: Promise<{ ref?: string | string[] }> }) {
   const params = await searchParams;
   const referralCode = normalizeAgencyReferralCode(Array.isArray(params.ref) ? params.ref[0] : params.ref) ?? undefined;
-  return <main className="min-h-screen bg-[#07090E] px-5 py-10 text-[#F5F7FA] sm:px-8 sm:py-16">
+  return <main className="min-h-screen bg-background px-5 py-10 text-foreground sm:px-8 sm:py-16">
     <div className="mx-auto max-w-6xl">
-      <Link href="/" className="text-xs font-semibold tracking-wide text-emerald-200 hover:text-white">CITEMEND <span className="text-slate-500">/ DESIGN PARTNERS</span></Link>
+      <Link href="/" className="text-xs font-semibold tracking-wide text-accent hover:text-foreground">CITEMEND <span className="text-text-tertiary">/ DESIGN PARTNERS</span></Link>
       <div className="mt-10 grid gap-8 lg:grid-cols-[.8fr_1.2fr] lg:items-start">
-        <div><p className="font-mono text-[10px] uppercase tracking-[.18em] text-[#39D9FF]">Sprint 8 · guided onboarding</p><h1 className="mt-4 text-4xl font-semibold tracking-[-.055em] sm:text-5xl">Design Partner Program</h1><p className="mt-4 text-sm leading-7 text-slate-400">We’re onboarding teams who need clearer evidence about where AI search answers point and what can be safely recovered.</p><div className="mt-7 space-y-3">{tracks.map((track) => <article key={track.number} className="rounded-xl border border-white/10 bg-white/[.025] p-4"><div className="flex items-center justify-between"><h2 className="text-sm font-semibold text-white">{track.title}</h2><span className="font-mono text-[10px] text-slate-500">{track.number}</span></div><p className="mt-1 text-xs font-medium text-emerald-100">{track.audience}</p><p className="mt-2 text-xs leading-5 text-slate-400">{track.description}</p></article>)}</div><p className="mt-4 text-xs leading-5 text-slate-500">Ecommerce teams can also apply. Partnership applications are reviewed; submission does not create a subscription.</p><Link href="/forensic-scan" className="mt-5 inline-flex text-xs font-semibold text-emerald-200 underline decoration-emerald-200/40 underline-offset-4">Try the public scan first</Link></div>
-        <div><div className="mb-4"><h2 className="text-lg font-semibold text-white">Apply for onboarding</h2><p className="mt-1 text-xs leading-5 text-slate-400">Your submission automatically runs a rate-limited forensic teaser for the website and buyer prompt you provide.</p>{referralCode && <p className="mt-2 text-xs text-emerald-200">Agency partner referral applied.</p>}</div><DesignPartnerApplicationForm referralCode={referralCode} /><AgencyReferralVisitTracker code={referralCode} /></div>
+        <div><p className="font-mono text-[10px] uppercase tracking-[.18em] text-accent">Sprint 8 · guided onboarding</p><h1 className="mt-4 text-4xl font-semibold tracking-[-.055em] sm:text-5xl">Design Partner Program</h1><p className="mt-4 text-sm leading-7 text-text-secondary">We’re onboarding teams who need clearer evidence about where AI search answers point and what can be safely recovered.</p><div className="mt-7 space-y-3">{tracks.map((track) => <article key={track.number} className="rounded-xl border border-border bg-surface-raised p-4"><div className="flex items-center justify-between"><h2 className="text-sm font-semibold text-foreground">{track.title}</h2><span className="font-mono text-[10px] text-text-tertiary">{track.number}</span></div><p className="mt-1 text-xs font-medium text-emerald-100">{track.audience}</p><p className="mt-2 text-xs leading-5 text-text-secondary">{track.description}</p></article>)}</div><p className="mt-4 text-xs leading-5 text-text-tertiary">Ecommerce teams can also apply. Partnership applications are reviewed; submission does not create a subscription.</p><Link href="/forensic-scan" className="mt-5 inline-flex text-xs font-semibold text-accent underline decoration-accent/40 underline-offset-4">Try the public scan first</Link></div>
+        <div><div className="mb-4"><h2 className="text-lg font-semibold text-foreground">Apply for onboarding</h2><p className="mt-1 text-xs leading-5 text-text-secondary">Your submission automatically runs a rate-limited forensic teaser for the website and buyer prompt you provide.</p>{referralCode && <p className="mt-2 text-xs text-emerald-200">Agency partner referral applied.</p>}</div><DesignPartnerApplicationForm referralCode={referralCode} /><AgencyReferralVisitTracker code={referralCode} /></div>
       </div>
     </div>
   </main>;
 }
 
 export default function DesignPartnersPage({ searchParams }: { searchParams: Promise<{ ref?: string | string[] }> }) {
-  return <Suspense fallback={<main className="min-h-screen bg-[#07090E] px-5 py-10 text-[#F5F7FA] sm:px-8 sm:py-16"><div className="mx-auto max-w-6xl"><div className="h-8 w-56 animate-pulse rounded bg-white/10" /><div className="mt-10 h-72 animate-pulse rounded-2xl bg-white/[.04]" /><span className="sr-only">Loading partner application…</span></div></main>}><DesignPartnersContent searchParams={searchParams} /></Suspense>;
+  return <><SiteHeader/><Suspense fallback={<main className="min-h-screen bg-background px-5 py-10 text-foreground sm:px-8 sm:py-16"><div className="mx-auto max-w-6xl"><div className="h-8 w-56 animate-pulse rounded bg-surface-soft" /><div className="mt-10 h-72 animate-pulse rounded-2xl bg-surface-raised" /><span className="sr-only">Loading partner application…</span></div></main>}><DesignPartnersContent searchParams={searchParams} /></Suspense><SiteFooter/></>;
 }

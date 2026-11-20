@@ -29,19 +29,19 @@ export function IntegrationDirectory() {
   const filtered = useMemo(() => integrations.filter((item) => (category === "All" || item.category === category) && `${item.name} ${item.description} ${item.category}`.toLowerCase().includes(search.trim().toLowerCase())), [category, search]);
 
   return <>
-    <section aria-label="Directory filters" className="mb-6 rounded-xl border border-white/10 bg-[#0D1119] p-4">
-      <label className="block max-w-xl text-xs font-medium text-slate-300" htmlFor="integration-search">Find an integration</label>
-      <Input id="integration-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search integrations" className="mt-2 border-white/10 bg-black/20 text-white placeholder:text-slate-500" />
+    <section aria-label="Directory filters" className="mb-6 rounded-xl border border-border bg-surface p-4">
+      <label className="block max-w-xl text-xs font-medium text-text-secondary" htmlFor="integration-search">Find an integration</label>
+      <Input id="integration-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search integrations" className="mt-2 border-border bg-surface-raised text-foreground placeholder:text-text-tertiary" />
       <div role="group" aria-label="Filter integrations by category" className="mt-4 flex flex-wrap gap-2">
-        {categories.map((item) => <button type="button" key={item} aria-pressed={category === item} onClick={() => setCategory(item)} className={`${buttonVariants({ size: "sm", variant: category === item ? "default" : "outline" })} ${category === item ? "bg-[#37F5A0] text-[#07110d] hover:bg-emerald-200" : "border-white/15 text-slate-300"}`}>{item}</button>)}
+        {categories.map((item) => <button type="button" key={item} aria-pressed={category === item} onClick={() => setCategory(item)} className={`${buttonVariants({ size: "sm", variant: category === item ? "default" : "outline" })} ${category === item ? "bg-accent text-background hover:bg-accent-strong" : "border-border text-text-secondary"}`}>{item}</button>)}
       </div>
     </section>
     {filtered.length ? <section aria-label="Available integrations" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {filtered.map((item) => <Card key={item.name} className="border-white/10 bg-[#0D1119] text-[#F5F7FA]">
-        <CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-base font-semibold">{item.name}</CardTitle><p className="mt-1 text-xs text-slate-500">{item.category}</p></div><Badge variant="outline" className="border-cyan-300/20 text-cyan-100">{item.availability}</Badge></div><p className="text-sm leading-6 text-slate-400">{item.description}</p></CardHeader>
-        <CardContent><h2 className="text-xs font-semibold text-slate-200">Setup guide</h2><ol className="mt-2 list-decimal space-y-1 pl-4 text-xs leading-5 text-slate-400">{item.guide.map((step) => <li key={step}>{step}</li>)}</ol></CardContent>
-        <CardFooter className="justify-end border-white/10 bg-white/[.025]"><Link href={item.deepLink} className={buttonVariants({ variant: "outline", size: "sm" })}>Open setup</Link></CardFooter>
+      {filtered.map((item) => <Card key={item.name} className="border-border bg-surface text-foreground">
+        <CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-base font-semibold">{item.name}</CardTitle><p className="mt-1 text-xs text-text-tertiary">{item.category}</p></div><Badge variant="outline" className="border-accent/20 text-accent">{item.availability}</Badge></div><p className="text-sm leading-6 text-text-secondary">{item.description}</p></CardHeader>
+        <CardContent><h2 className="text-xs font-semibold text-foreground">Setup guide</h2><ol className="mt-2 list-decimal space-y-1 pl-4 text-xs leading-5 text-text-secondary">{item.guide.map((step) => <li key={step}>{step}</li>)}</ol></CardContent>
+        <CardFooter className="justify-end border-border bg-surface-raised"><Link href={item.deepLink} className={buttonVariants({ variant: "outline", size: "sm" })}>Open setup</Link></CardFooter>
       </Card>)}
-    </section> : <p role="status" className="rounded-xl border border-white/10 bg-[#0D1119] p-6 text-sm text-slate-400">No integrations match this filter.</p>}
+    </section> : <p role="status" className="rounded-xl border border-border bg-surface p-6 text-sm text-text-secondary">No integrations match this filter.</p>}
   </>;
 }

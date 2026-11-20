@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createServerDatabase } from "@/lib/supabase-server";
 import PixelDashboard from "@/components/pixel-dashboard";
+import { DashboardShell } from "@/components/dashboard-shell";
+import { DEFAULT_DASHBOARD_NAV } from "@/components/dashboard-navigation";
 
 async function PixelDashboardPage() {
   const { userId } = await auth();
@@ -46,5 +48,5 @@ async function PixelDashboardPage() {
 }
 
 export default function PixelPage() {
-  return <Suspense fallback={<main className="mx-auto w-full max-w-6xl px-5 py-12 text-sm text-[#68736b]" role="status">Loading pixel dashboard…</main>}><PixelDashboardPage /></Suspense>;
+  return <DashboardShell items={DEFAULT_DASHBOARD_NAV}><Suspense fallback={<main className="mx-auto w-full max-w-6xl px-5 py-12 text-sm text-text-secondary" role="status" aria-live="polite">Loading traffic data…</main>}><PixelDashboardPage /></Suspense></DashboardShell>;
 }

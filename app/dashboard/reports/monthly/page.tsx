@@ -11,11 +11,13 @@ import { currentReportMonth, parseReportMonth, summarizeMonthlyProvenance } from
 import { summarizeProvenanceEvents, type ProvenanceEvent } from "@/lib/provenance-analytics";
 import { resolveWorkspaceAccess } from "@/lib/workspace-access";
 import { createServerDatabase } from "@/lib/supabase-server";
+import { DashboardShell } from "@/components/dashboard-shell";
+import { DEFAULT_DASHBOARD_NAV } from "@/components/dashboard-navigation";
 
 type Props = { searchParams: Promise<{ domain?: string | string[]; month?: string | string[] }> };
 
 function Metric({ label, value, note }: { label: string; value: string; note: string }) {
-  return <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-3 text-3xl font-semibold text-slate-950">{value}</p><p className="mt-2 text-xs leading-5 text-slate-600">{note}</p></article>;
+  return <article className="rounded-xl border border-border bg-surface p-5 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-text-tertiary">{label}</p><p className="mt-3 text-3xl font-semibold text-foreground">{value}</p><p className="mt-2 text-xs leading-5 text-text-secondary">{note}</p></article>;
 }
 
 export default async function MonthlyRoiReportPage({ searchParams }: Props) {
@@ -74,16 +76,16 @@ export default async function MonthlyRoiReportPage({ searchParams }: Props) {
   const brand = agency?.agency_brand_name ?? "CiteMend Recovery Report";
   const reportTitle = `${month.label} Recovery & QA Report`;
 
-  return <main className="roi-report min-h-screen bg-[#07090E] px-4 py-8 text-slate-100 sm:px-8">
+  return <DashboardShell items={DEFAULT_DASHBOARD_NAV}><main className="roi-report min-h-screen bg-background px-4 py-8 text-foreground sm:px-8">
     <div className="roi-report-content mx-auto max-w-5xl">
-      <div className="print-hide mb-5 flex flex-wrap items-center justify-between gap-3"><Link href={`/dashboard?domain=${encodeURIComponent(domain)}`} className="text-sm text-emerald-300">← Back to workspace</Link><PrintReportButton /></div>
+      <div className="print-hide mb-5 flex flex-wrap items-center justify-between gap-3"><Link href={`/dashboard?domain=${encodeURIComponent(domain)}`} className="text-sm text-accent">← Back to workspace</Link><PrintReportButton /></div>
       <MonthlyRoiReportSwitcher domains={domains} selectedDomain={domain} month={month.value} />
-      <header className="rounded-2xl border border-white/10 bg-white/[.03] p-6 sm:p-9" style={{ borderColor: agency?.agency_primary_color ? `${agency.agency_primary_color}66` : undefined }}>
+      <header className="rounded-2xl border border-border bg-surface p-6 sm:p-9" style={{ borderColor: agency?.agency_primary_color ? `${agency.agency_primary_color}66` : undefined }}>
         <div className="flex flex-wrap items-center justify-between gap-5">
-          <div className="flex items-center gap-4">{agency?.agency_logo_url && <Image unoptimized src={agency.agency_logo_url} alt={`${brand} logo`} width={160} height={56} className="h-14 w-auto max-w-40 object-contain" />}<div><p className="text-xs font-semibold uppercase tracking-[.16em] text-emerald-300">{brand}</p><h1 className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl">{reportTitle}</h1></div></div>
-          <div className="text-right text-xs text-slate-400"><p>Client workspace</p><p className="mt-1 break-all font-semibold text-slate-200">{domain}</p></div>
+          <div className="flex items-center gap-4">{agency?.agency_logo_url && <Image unoptimized src={agency.agency_logo_url} alt={`${brand} logo`} width={160} height={56} className="h-14 w-auto max-w-40 object-contain" />}<div><p className="text-xs font-semibold uppercase tracking-[.16em] text-accent">{brand}</p><h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">{reportTitle}</h1></div></div>
+          <div className="text-right text-xs text-text-secondary"><p>Client workspace</p><p className="mt-1 break-all font-semibold text-foreground">{domain}</p></div>
         </div>
-        <p className="mt-5 max-w-3xl text-sm leading-6 text-slate-300">A monthly summary of verified recovery findings, observed visits through active redirects, recommendations held back by safety checks, and estimated operational time saved.</p>
+        <p className="mt-5 max-w-3xl text-sm leading-6 text-text-secondary">A monthly summary of verified recovery findings, observed visits through active redirects, recommendations held back by safety checks, and estimated operational time saved.</p>
       </header>
       <section className="mt-5 grid gap-3 sm:grid-cols-2" aria-label="Monthly Recovery and QA Value Summary">
         <Metric label="New Verified High-Intent Errors Caught" value={metrics.highIntentErrors.toLocaleString()} note="Dead URL findings created this month and still pending review or approved." />
@@ -91,23 +93,23 @@ export default async function MonthlyRoiReportPage({ searchParams }: Props) {
         <Metric label="Bad Recommendations & Soft-404s Prevented" value={metrics.preventedRecommendations.toLocaleString()} note="Findings left as 404/410 or explicitly rejected this month." />
         <Metric label="Engineering & SEO Hours Saved" value={`~${metrics.estimatedHoursSaved.toLocaleString()}h`} note="Estimate: 0.25 hours per finding handled this month; it is not tracked staff time." />
       </section>
-      <section className="mt-5 rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-700" aria-label="Monthly provenance breakdown">
-        <h2 className="font-semibold text-slate-950">Retrieved vs rendered provenance</h2>
-        <p className="mt-1 text-xs text-slate-600">{provenance.observationCount} saved observations this month. Counts are URL appearances across observations; repeated URLs can appear more than once.</p>
+      <section className="mt-5 rounded-xl border border-border bg-surface p-5 text-sm text-text-secondary" aria-label="Monthly provenance breakdown">
+        <h2 className="font-semibold text-foreground">Retrieved vs rendered provenance</h2>
+        <p className="mt-1 text-xs text-text-secondary">{provenance.observationCount} saved observations this month. Counts are URL appearances across observations; repeated URLs can appear more than once.</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Metric label="Retrieved source URLs" value={provenance.retrievedUrls.toLocaleString()} note="Sources recorded as retrieved for answer synthesis." />
           <Metric label="Rendered answer links" value={provenance.renderedUrls.toLocaleString()} note="Links explicitly rendered in saved answers." />
           <Metric label="Owned-domain citation links" value={provenance.ownedRenderedUrls.toLocaleString()} note="Rendered links pointing to this client workspace." />
           <Metric label="Third-party rendered links" value={provenance.thirdPartyRenderedUrls.toLocaleString()} note="Third-party sources; brand influence is not inferred from a link alone." />
         </div>
-        <p className="mt-3 text-xs text-slate-600">Signed log sample: {eventMetrics.verifiedCrawlerFetches} verified crawler fetches, {eventMetrics.aiReferrals} AI referrals, {eventMetrics.shopifyOrders} Shopify orders, and {eventMetrics.matchedReferralOrderJourneys} matched referral-to-order journeys. These are observed events, not attributed revenue.</p>
+        <p className="mt-3 text-xs text-text-secondary">Signed log sample: {eventMetrics.verifiedCrawlerFetches} verified crawler fetches, {eventMetrics.aiReferrals} AI referrals, {eventMetrics.shopifyOrders} Shopify orders, and {eventMetrics.matchedReferralOrderJourneys} matched referral-to-order journeys. These are observed events, not attributed revenue.</p>
       </section>
-      <section className="mt-5 rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-700">
-        <h2 className="font-semibold text-slate-950">Measurement notes</h2>
+      <section className="mt-5 rounded-xl border border-border bg-surface p-5 text-sm text-text-secondary">
+        <h2 className="font-semibold text-foreground">Measurement notes</h2>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5"><li>Findings and answer observations are limited to completed audits for this client domain and the selected calendar month.</li><li>Recovered visits count owner-tagged rescue telemetry; legacy events without an owner are excluded.</li><li>Signed provenance events are bounded to 1,000 rows and observations to 500; counts may be partial above those limits.</li><li>Orders and revenue are not attributed by this report.</li><li>Time saved is an estimate based on handled finding count.</li></ul>
       </section>
       <div className="mt-5"><AgencyReportCTA agency={agency} /></div>
-      <footer className="mt-8 border-t border-white/10 pt-4 text-xs text-slate-500"><p>Prepared for {domain} · {month.label} · {agency?.agency_brand_name ?? "CiteMend Recovery"}</p></footer>
+      <footer className="mt-8 border-t border-border pt-4 text-xs text-text-tertiary"><p>Prepared for {domain} · {month.label} · {agency?.agency_brand_name ?? "CiteMend Recovery"}</p></footer>
     </div>
-  </main>;
+  </main></DashboardShell>;
 }

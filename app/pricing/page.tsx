@@ -1,24 +1,31 @@
-import Link from "next/link";
-import { BillingCheckoutButton } from "@/components/billing-checkout-button";
-import { SiteFooter } from "@/components/site-footer";
-import { isBillingEnabled } from "@/lib/billing-checkout";
 import type { Metadata } from "next";
+import { PublicPricingPlans } from "@/components/public-pricing-plans";
+import { SiteFooter } from "@/components/site-footer";
+import { SiteHeader } from "@/components/site-header";
+import { isBillingEnabled } from "@/lib/billing-checkout";
 
 export const metadata: Metadata = {
   title: "Pricing | CiteMend",
-  description: "Choose a $149 one-time recovery pilot, $99 monthly Growth, or $249 monthly Agency plan.",
-  openGraph: { type: "website", title: "CiteMend Pricing", description: "$149 recovery pilot, $99/month Growth, and $249/month Agency." },
+  description: "Choose a $149 one-time 30-day Pilot, $99/month Growth, or $249/month Agency plan.",
+  openGraph: { type: "website", title: "Pricing | CiteMend", description: "$149 one-time 30-day Pilot, $99/month Growth, and $249/month Agency." },
 };
 
-const offers = [
-  { name: "Pilot", tier: "pilot" as const, price: "$149 one-time", description: "A 30-day paid recovery pilot for one commerce workspace." },
-  { name: "Growth", tier: "growth" as const, price: "$99/month", description: "Recurring recovery monitoring for a commerce team." },
-  { name: "Agency", tier: "agency" as const, price: "$249/month", description: "Multi-client recovery workflows and client-ready reports." },
-];
+const checkoutTiers = [{ tier: "pilot" as const }, { tier: "growth" as const }, { tier: "agency" as const }];
 
 export default function PricingPage() {
   const billingReady = isBillingEnabled();
-  return <><main className="min-h-screen bg-[#05070b] px-5 py-16 text-white sm:px-8"><div className="mx-auto max-w-6xl"><Link href="/" className="text-sm text-emerald-300">← CiteMend</Link><h1 className="mt-8 text-4xl font-semibold">Pricing</h1><p className="mt-3 max-w-2xl text-sm text-slate-400">Choose a one-time recovery pilot or recurring Growth and Agency plans. Dodo Payments displays billing terms before purchase.</p>
-    {!billingReady && <p role="status" className="mt-6 rounded-lg border border-amber-300/20 bg-amber-300/[.05] p-4 text-sm text-amber-100">Paid checkout is temporarily unavailable. Please try again later.</p>}
-    <div className="mt-8 grid gap-4 md:grid-cols-3">{offers.map(offer => <article key={offer.name} className="flex min-h-64 flex-col rounded-xl border border-white/10 bg-white/[.03] p-5"><h2 className="text-xl font-semibold">{offer.name}</h2><p className="mt-2 text-2xl font-semibold text-emerald-200">{offer.price}</p><p className="mt-3 flex-1 text-sm leading-6 text-slate-400">{offer.description}</p><div className="mt-6"><BillingCheckoutButton tier={offer.tier} label={offer.tier === "pilot" ? "Start the Pilot" : `Choose ${offer.name}`} /></div></article>)}</div></div></main><SiteFooter /></>;
+  return <>
+    <SiteHeader />
+    <main className="min-h-[70vh] bg-background text-foreground">
+      {!billingReady && <p role="status" className="mx-auto mt-6 max-w-6xl rounded-md border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-warning">Paid checkout is temporarily unavailable. Please try again later.</p>}
+      <PublicPricingPlans mode="page" tiers={checkoutTiers} billingReady={billingReady} showUnavailableMessage={false} />
+      <section aria-labelledby="pricing-notes-heading" className="mx-auto mb-16 max-w-6xl px-4 sm:px-6 lg:px-8">
+        <div className="grid gap-3 border-t border-border pt-6 sm:grid-cols-2">
+          <div><h2 id="pricing-notes-heading" className="font-mono text-[10px] font-medium uppercase tracking-[.12em] text-text-tertiary">Billing</h2><p className="mt-2 text-sm leading-6 text-text-secondary">Pilot is a one-time 30-day purchase. Growth and Agency are billed monthly. Dodo Payments displays the checkout total before you confirm.</p></div>
+          <div><h2 className="font-mono text-[10px] font-medium uppercase tracking-[.12em] text-text-tertiary">Recovery controls</h2><p className="mt-2 text-sm leading-6 text-text-secondary">CiteMend checks evidence and prepares recovery actions for review. Redirects are not deployed automatically.</p></div>
+        </div>
+      </section>
+    </main>
+    <SiteFooter />
+  </>;
 }

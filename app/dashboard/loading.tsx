@@ -1,5 +1,23 @@
+import { DashboardShell } from "@/components/dashboard-shell";
+import { DEFAULT_DASHBOARD_NAV } from "@/components/dashboard-navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function DashboardLoading() {
-  return <main className="min-h-screen bg-[#07090E] text-white" role="status" aria-label="Loading command center"><div className="mx-auto flex max-w-[1600px] flex-col lg:flex-row"><div className="hidden min-h-screen w-16 shrink-0 border-r border-white/[.08] bg-[#0D1119] p-3 lg:block xl:w-64"><Skeleton className="h-10 w-10" /><div className="mt-8 space-y-3">{Array.from({ length: 11 }, (_, index) => <Skeleton key={index} className="h-10 w-full" />)}</div></div><div className="grid min-w-0 flex-1 grid-cols-12 gap-4 p-5 sm:p-8"><div className="col-span-12 flex items-center justify-between gap-4"><div className="space-y-3"><Skeleton className="h-8 w-52" /><Skeleton className="h-4 w-72 max-w-[60vw]" /></div><Skeleton className="h-10 w-40" /></div><Skeleton className="col-span-12 h-28" /><div className="col-span-12 grid grid-cols-2 gap-4 xl:grid-cols-4">{Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-32" />)}</div><div className="col-span-12 rounded-xl border border-white/[.08] bg-[#0D1119] p-5"><Skeleton className="h-6 w-48" /><div className="mt-5 space-y-3">{Array.from({ length: 5 }, (_, index) => <Skeleton key={index} className="h-12 w-full" />)}</div></div><span className="sr-only">Loading your workspace dashboard…</span></div></div></main>;
+  return (
+    <DashboardShell items={DEFAULT_DASHBOARD_NAV}>
+      <main className="min-h-screen px-4 py-6 sm:px-6 sm:py-8" role="status" aria-label="Loading workspace">
+        <header className="mb-7 border-b border-border pb-5 sm:mb-8 sm:pb-6">
+          <Skeleton className="h-3 w-32" />
+          <Skeleton className="mt-3 h-8 w-56 max-w-full" />
+          <Skeleton className="mt-3 h-4 w-96 max-w-full" />
+        </header>
+        <Skeleton className="mb-6 h-16 w-full rounded-xl" />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-28 rounded-lg" />)}
+        </div>
+        <Skeleton className="mt-6 h-52 w-full rounded-xl" />
+        <span className="sr-only" aria-live="polite">Loading your workspace…</span>
+      </main>
+    </DashboardShell>
+  );
 }

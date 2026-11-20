@@ -11,6 +11,9 @@ export default function proxy(request: NextRequest, event: NextFetchEvent) {
   const pathname = request.nextUrl.pathname;
   if (pathname === "/"
       || pathname === "/pricing"
+      || pathname === "/about"
+      || pathname === "/design-partners"
+      || pathname === "/forensic-scan"
       || pathname === "/robots.txt"
       || pathname === "/sitemap.xml"
       || pathname === "/api/health/status") return NextResponse.next();
