@@ -26,6 +26,8 @@ const runAudit = (value: unknown, overrides: Partial<AuditDependencies> = {}, us
 test("validates input before any provider call", async () => {
   for (const value of [null, {}, { ...input, buyerPrompt: " " }, { ...input, domain: "127.0.0.1" }, { ...input, domain: "https://example.com/path" }, { ...input, domain: "example.com:8080" }]) assert.throws(() => validateAuditInput(value), AuditInputError);
   assert.deepEqual(validateAuditInput({ domain: " Example.COM ", buyerPrompt: " Find docs " }), { domain: "example.com", buyerPrompt: "Find docs" });
+  assert.equal(validateAuditInput({ domain: " mystore.com ", buyerPrompt: "Find products" }).domain, "mystore.com");
+  assert.equal(validateAuditInput({ domain: "www.mystore.com", buyerPrompt: "Find products" }).domain, "www.mystore.com");
 });
 
 test("accepts bounded user-supplied ground truth pricing for the persisted audit", () => {

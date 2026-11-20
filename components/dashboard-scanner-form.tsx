@@ -4,9 +4,10 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useWorkspace } from "@/components/workspace-provider";
 import { useRouter } from "next/navigation";
+import { normalizeDashboardDomain } from "@/lib/audit-dashboard";
 
 export function DashboardScannerForm() {
-  const { domains, activeDomain } = useWorkspace();
+  const { domains, activeDomain, addWorkspaceDomain } = useWorkspace();
   const [domain, setDomain] = useState(activeDomain || domains[0] || "");
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
@@ -15,12 +16,24 @@ export function DashboardScannerForm() {
   const [reportHref, setReportHref] = useState("");
   const router = useRouter();
   async function submit(event: FormEvent) {
-    event.preventDefault(); setBusy(true); setMessage(""); setJobId(""); setReportHref("");
+    event.preventDefault(); if (busy) return;
+    setMessage(""); setJobId(""); setReportHref("");
+    let normalizedDomain: string;
+    try { normalizedDomain = normalizeDashboardDomain(domain); }
+    catch { setMessage("Enter a public domain such as example.com, without a page path or port."); return; }
+    const prompts = prompt.split("\n").map(value => value.trim()).filter(Boolean);
+    if (!prompts.length) { setMessage("Add at least one buyer question."); return; }
+    setBusy(true);
     try {
-      const prompts = prompt.split("\n").map(value => value.trim()).filter(Boolean);
-      const response = await fetch("/api/audit", { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ domain, buyerPrompt: prompts[0], buyerPrompts: prompts }) });
-      const data = await response.json() as { error?: string; jobId?: string; auditId?: string };
-      if (!response.ok) throw new Error(data.error ?? "The audit could not be started.");
+      const connectResponse = await fetch("/api/workspaces/connect", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ domain: normalizedDomain }) });
+      const connected = await connectResponse.json().catch(() => null) as { domain?: unknown; error?: unknown } | null;
+      if (!connectResponse.ok) throw new Error(typeof connected?.error === "string" ? connected.error : "The workspace could not be saved.");
+      if (typeof connected?.domain !== "string") throw new Error("The workspace service returned an unreadable response.");
+      addWorkspaceDomain(connected.domain);
+      const response = await fetch("/api/audit", { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ domain: normalizedDomain, buyerPrompt: prompts[0], buyerPrompts: prompts }) });
+      const data = await response.json().catch(() => null) as { error?: string; jobId?: string; auditId?: string } | null;
+      if (!response.ok) throw new Error(data?.error ?? "The audit could not be started.");
+      if (!data) throw new Error("The audit service returned an unreadable response.");
       setJobId(data.jobId ?? ""); setMessage(data.jobId ? "Audit queued. Live job progress is available in the top bar." : "Audit request accepted.");
       if (data.auditId) setReportHref(`/audit/${encodeURIComponent(data.auditId)}`);
       if (data.jobId) window.dispatchEvent(new CustomEvent("citemend:job-created", { detail: data.jobId }));

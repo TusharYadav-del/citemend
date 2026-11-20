@@ -27,17 +27,18 @@ test("daily Vercel jobs and the every-minute Supabase worker use protected cron 
   assert.match(outreachSetup, /\/api\/cron\/outreach\/daily/);
 });
 
-test("migrations 001 through 045 apply in order and expose the columns used by the application", async () => {
+test("migrations 001 through 046 apply in order and expose the columns used by the application", async () => {
   const db = new PGlite({ extensions: { vector } });
   try {
     await db.exec("create role anon; create role authenticated; create role service_role bypassrls;");
     await db.exec("create schema auth; create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$; grant usage on schema auth to authenticated, service_role; grant execute on function auth.jwt() to authenticated, service_role;");
     const directory = new URL("../supabase/migrations/", import.meta.url);
     const files = (await readdir(directory)).filter(name => /^\d{3}_.+\.sql$/.test(name)).sort();
-  assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 45 }, (_, index) => String(index + 1).padStart(3, "0")));
+  assert.deepEqual(files.map(name => name.slice(0, 3)), Array.from({ length: 46 }, (_, index) => String(index + 1).padStart(3, "0")));
     for (const file of files) await db.exec(await readFile(new URL(file, directory), "utf8"));
     const expected: Record<string, string[]> = {
       audits: ["id", "user_id", "domain", "buyer_prompt", "status", "created_at", "completed_at", "competitor_domains", "ground_truth_pricing", "indexnow_key", "share_of_model_score", "engine_matrix_json", "agency_brand_name", "agency_logo_url", "agency_primary_color", "agency_cta_url", "agency_cta_text", "llms_txt_content", "webhook_url", "sitemap_url_count"],
+      workspace_domains: ["owner_user_id", "domain", "created_at"],
       broken_links: ["id", "audit_id", "cited_url", "http_status", "suggested_redirect", "url_state", "approval_status", "approved_by", "approved_at", "previous_destination_url", "deployed_at", "rolled_back_at", "match_evidence_reason", "match_confidence", "link_health_json", "wayback_snapshot_json", "created_at"],
       recovery_findings: ["id", "audit_id", "broken_link_id", "domain", "finding_type", "normalized_path", "signal_evidence", "guardrail_classification", "approval_status", "suggested_target_url", "confidence_score", "match_reason", "rejected_soft_404_count", "blocked_loop_count", "qa_checked_at", "qa_status", "qa_old_url_status", "qa_destination_status", "qa_detail", "created_at"],
       subscriptions: ["id", "user_id", "store_id", "product_id", "variant_id", "billing_provider", "status", "plan", "plan_name", "test_mode", "lemonsqueezy_customer_id", "lemonsqueezy_subscription_id", "lemonsqueezy_order_id", "customer_portal_url", "update_payment_method_url", "trial_ends_at", "current_period_end", "ends_at", "cancelled", "provider_updated_at"],

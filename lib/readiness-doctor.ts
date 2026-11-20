@@ -4,6 +4,7 @@ export const REQUIRED_READINESS_TABLES = [
   "cms_connections", "rescued_ai_visits", "workspace_integrations", "pixel_intercept_quotas", "action_audit_logs",
   "ai_observation_evidence", "ai_provenance_events", "recovery_outcomes", "webhook_events_log", "billing_webhook_events", "workspace_api_keys",
   "autonomous_agent_runs", "ecommerce_catalog_items", "organization_members", "workspace_governance_policies",
+  "workspace_domains",
   "scheduled_reports", "citation_change_events", "workspace_api_rate_windows", "workspace_operating_metrics",
   "case_studies", "design_partner_applications", "agency_referrals", "forensic_teaser_rate_windows", "free_provenance_leads",
   "background_jobs", "founder_weekly_scorecards", "support_tickets",

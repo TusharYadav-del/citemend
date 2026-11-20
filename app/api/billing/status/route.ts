@@ -3,19 +3,26 @@ import { createServerDatabase } from "@/lib/supabase-server";
 import { grantsProAccess } from "@/lib/subscription";
 import { PLAN_TIERS } from "@/lib/integrations-workflow";
 import { planTier } from "@/lib/audit-quota";
+import { resolveWorkspaceAccess } from "@/lib/workspace-access";
+import { canWorkspace } from "@/lib/rbac";
 
 const headers = { "Cache-Control": "private, no-store" };
 
 export async function GET() {
-  const { userId } = await auth();
-  if (!userId) return Response.json({ error: "Sign in to view billing." }, { status: 401, headers });
+  let session: Awaited<ReturnType<typeof auth>>;
+  try { session = await auth(); } catch { return Response.json({ error: "Authentication is temporarily unavailable." }, { status: 503, headers }); }
+  if (!session.userId) return Response.json({ error: "Sign in to view billing." }, { status: 401, headers });
   try {
     const db = createServerDatabase();
+    const access = await resolveWorkspaceAccess(db, session.userId, session.orgId ?? null, session.orgRole ?? null);
+    if (!canWorkspace(access.role, "manage_integrations")) return Response.json({ error: "Workspace administrator access is required for billing." }, { status: 403, headers });
+    const ownerUserId = access.ownerUserIds[0];
+    const workspaceId = access.organizationId ?? ownerUserId;
     const monthStart = new Date();
     monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0);
     const [subscriptions, audits] = await Promise.all([
-      db.from("subscriptions").select("id,user_id,plan,plan_name,status,cancelled,ends_at,renews_at,current_period_end,test_mode,billing_provider,updated_at").eq("user_id", userId).order("updated_at", { ascending: false }).limit(50),
-      db.from("audits").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("created_at", monthStart.toISOString()),
+      db.from("subscriptions").select("id,user_id,workspace_id,plan,plan_name,status,cancelled,ends_at,renews_at,current_period_end,test_mode,billing_provider,updated_at").eq("user_id", ownerUserId).eq("workspace_id", workspaceId).order("updated_at", { ascending: false }).limit(50),
+      db.from("audits").select("id", { count: "exact", head: true }).in("user_id", access.ownerUserIds).gte("created_at", monthStart.toISOString()),
     ]);
     if (subscriptions.error || audits.error) throw new Error("Billing data is unavailable. Apply the latest billing migration.");
     const rows = subscriptions.data ?? [];

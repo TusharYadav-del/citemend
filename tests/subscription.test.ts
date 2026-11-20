@@ -15,6 +15,13 @@ test("Pro access respects subscription status and cancellation grace period", ()
   assert.equal(grantsProAccess({ plan: "pro_beta", status: "active", cancelled: false, ends_at: null, current_period_end: "2026-12-01T00:00:00Z" }, now), false);
 });
 
+test("one-time Pilot access expires at its webhook-recorded 30-day end time", () => {
+  const pilot = { plan: "pro", plan_name: "pilot", status: "active", cancelled: false, ends_at: "2026-11-01T00:01:00Z" };
+  assert.equal(grantsProAccess(pilot, now), true);
+  assert.equal(grantsProAccess(pilot, Date.parse("2026-11-01T00:01:00Z")), false);
+  assert.equal(grantsProAccess(pilot, Date.parse("2026-11-02T00:00:00Z")), false);
+});
+
 test("production paid access excludes test subscriptions when test mode is disabled", () => {
   process.env = { ...oldEnv, NODE_ENV: "production", DODO_PAYMENTS_ENVIRONMENT: "live_mode" };
   assert.equal(grantsProAccess({ plan: "pro", status: "active", cancelled: false, ends_at: null, test_mode: true }, now), false);

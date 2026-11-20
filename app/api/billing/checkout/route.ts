@@ -1,4 +1,4 @@
-import { auth, currentUser } from "@clerk/nextjs/server";
+import type { auth as clerkAuth } from "@clerk/nextjs/server";
 import { BillingConfigError, BillingProviderError, createBillingCheckout, productForTier, type BillingTier, billingReadiness } from "@/lib/billing-checkout";
 import { createServerDatabase } from "@/lib/supabase-server";
 import { grantsProAccess } from "@/lib/subscription";
@@ -11,9 +11,15 @@ export async function GET() {
   return Response.json({ error: "Use POST /api/billing/checkout to start a paid checkout." }, { status: 405, headers: { ...headers, Allow: "POST" } });
 }
 
-export async function POST(request: Request) {
-  let session: Awaited<ReturnType<typeof auth>>;
-  try { session = await auth(); }
+type CheckoutRouteDependencies = {
+  authenticate?: () => Promise<Awaited<ReturnType<typeof clerkAuth>>>;
+  createCheckout?: typeof createBillingCheckout;
+};
+
+export async function handleBillingCheckout(request: Request, dependencies: CheckoutRouteDependencies = {}) {
+  const authenticate = dependencies.authenticate ?? (async () => (await import("@clerk/nextjs/server")).auth());
+  let session: Awaited<ReturnType<typeof clerkAuth>>;
+  try { session = await authenticate(); }
   catch { return Response.json({ error: "Sign-in is temporarily unavailable." }, { status: 503, headers }); }
   if (!session.userId) return Response.json({ error: "Sign in before upgrading." }, { status: 401, headers });
   let body: { tier?: unknown; productId?: unknown };
@@ -35,7 +41,7 @@ export async function POST(request: Request) {
     if (body.productId !== undefined && String(body.productId) !== productId) {
       return Response.json({ error: "The requested product does not match this plan." }, { status: 400, headers });
     }
-    const user = await currentUser();
+    const user = await (await import("@clerk/nextjs/server")).currentUser();
     const email = user?.emailAddresses.find(item => item.id === user.primaryEmailAddressId)?.emailAddress;
     if (!user || user.id !== session.userId || !email) return Response.json({ error: "Your Clerk account needs a primary email before checkout." }, { status: 400, headers });
     const { data: subscriptions, error: lookupError } = await db.from("subscriptions")
@@ -44,10 +50,14 @@ export async function POST(request: Request) {
     if ((subscriptions ?? []).some(item => item.plan !== "pro_beta" && item.workspace_id === workspaceId && grantsProAccess(item))) {
       return Response.json({ error: "Manage your current paid subscription before starting another checkout." }, { status: 409, headers });
     }
-    const checkoutUrl = await createBillingCheckout(tier, ownerUserId, email, workspaceId);
+    const checkoutUrl = await (dependencies.createCheckout ?? createBillingCheckout)(tier, ownerUserId, email, workspaceId);
     return Response.json({ checkoutUrl, testMode: process.env.DODO_PAYMENTS_ENVIRONMENT === "test_mode" }, { headers });
   } catch (error) {
     if (error instanceof BillingConfigError) return Response.json({ error: error.message }, { status: 503, headers });
     return Response.json({ error: error instanceof BillingProviderError ? error.message : "Checkout is temporarily unavailable." }, { status: 502, headers });
   }
+}
+
+export async function POST(request: Request) {
+  return handleBillingCheckout(request);
 }

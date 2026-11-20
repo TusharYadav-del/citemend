@@ -3,6 +3,8 @@ import { test } from "node:test";
 import { analyzeFreeAuditMetadata, normalizeFreeAuditUrl, runFreeProvenanceAudit } from "../lib/free-provenance-audit";
 
 test("free auditor only accepts public HTTP pages and strips fragments", () => {
+  assert.equal(normalizeFreeAuditUrl("mystore.com"), "https://mystore.com/");
+  assert.equal(normalizeFreeAuditUrl("www.mystore.com"), "https://www.mystore.com/");
   assert.equal(normalizeFreeAuditUrl("Example.com/old#section"), "https://example.com/old");
   for (const value of ["http://localhost/", "http://127.0.0.1/", "https://example.com:8443/", "file:///tmp/file", "https://name:pass@example.com/", "https://example.internal/"]) {
     assert.throws(() => normalizeFreeAuditUrl(value));

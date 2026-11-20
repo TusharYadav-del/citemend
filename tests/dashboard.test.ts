@@ -12,6 +12,8 @@ test("citation health excludes unknowns and returns no score without evidence", 
 });
 test("normalizes origins and copies an actual 301 rule rather than a 308 config", () => {
   assert.equal(normalizeDashboardDomain(" https://Stripe.com/ "), "stripe.com");
+  assert.equal(normalizeDashboardDomain(" mystore.com "), "mystore.com");
+  assert.equal(normalizeDashboardDomain("www.mystore.com"), "www.mystore.com");
   assert.throws(() => normalizeDashboardDomain("example.com/path"));
   assert.equal(redirectRule("https://example.com/old?x=1", "https://example.com/new"), 'Redirect 301 "/old" "https://example.com/new"');
   assert.throws(() => redirectRule("file:///old", "https://example.com/new"));

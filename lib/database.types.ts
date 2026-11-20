@@ -2,6 +2,12 @@ type OutreachTable<Row extends Record<string, unknown>> = { Row: Row; Insert: Pa
 export type Database = {
   public: {
     Tables: {
+      workspace_domains: {
+        Row: { owner_user_id: string; domain: string; created_at: string };
+        Insert: { owner_user_id: string; domain: string; created_at?: string };
+        Update: { owner_user_id?: string; domain?: string; created_at?: string };
+        Relationships: [];
+      };
       case_studies: {
         Row: { id: string; slug: string; user_id: string; workspace_domain: string; audit_id: string; anonymized: boolean; is_public: boolean; study_json: Record<string, unknown>; created_at: string };
         Insert: { id?: string; slug: string; user_id: string; workspace_domain: string; audit_id: string; anonymized?: boolean; is_public?: boolean; study_json: Record<string, unknown>; created_at?: string };

@@ -20,12 +20,14 @@ function tierForProduct(productId: string): BillingTier | null {
 }
 function validOwner(data: Record<string, unknown>, allowPlanChange = false): { userId: string; workspaceId: string; email: string | null; tier: BillingTier } {
   const meta = metadata(data.metadata);
-  const userId = text(meta.user_id);
+  const legacyUserId = text(meta.user_id);
+  const clerkUserId = text(meta.clerk_user_id);
+  const userId = legacyUserId ?? clerkUserId;
   const workspaceId = text(meta.workspace_id) ?? userId;
   const email = text(meta.user_email) ?? text(metadata(data.customer).email);
   const productId = text(data.product_id);
   const tier = productId ? tierForProduct(productId) : null;
-  if (!userId || !/^user_[A-Za-z0-9]+$/.test(userId) || !workspaceId || !/^(?:user|org)_[A-Za-z0-9]+$/.test(workspaceId) || !tier || (!allowPlanChange && meta.plan_tier !== undefined && meta.plan_tier !== tier)) throw new Error("Dodo billing metadata does not match an account, workspace, and configured product.");
+  if (!userId || clerkUserId && clerkUserId !== userId || !/^user_[A-Za-z0-9]+$/.test(userId) || !workspaceId || !/^(?:user|org)_[A-Za-z0-9]+$/.test(workspaceId) || !tier || (!allowPlanChange && meta.plan_tier !== undefined && meta.plan_tier !== tier)) throw new Error("Dodo billing metadata does not match an account, workspace, and configured product.");
   return { userId, workspaceId, email, tier };
 }
 

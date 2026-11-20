@@ -23,7 +23,9 @@ async function SignInContent({ searchParams }: { searchParams: SearchParams }) {
     return <p role="alert" className="text-center text-foreground">Sign-in is temporarily unavailable. Please try again later.</p>;
   }
   const { redirect_url } = await searchParams;
-  return <SignIn routing="path" path="/sign-in" forceRedirectUrl={safeRedirect(redirect_url)} appearance={{ variables: { colorPrimary: "#10B981", colorBackground: "#101216", colorForeground: "#F5F6F7", colorMutedForeground: "#A1A8B3", colorInput: "#0B0D10", colorInputForeground: "#F5F6F7", borderRadius: "0.75rem" }, elements: { rootBox: "mx-auto w-full", cardBox: "border border-white/10 shadow-2xl", card: "shadow-none", headerTitle: "tracking-tight", formButtonPrimary: "font-semibold" } }} />;
+  const returnTo = safeRedirect(redirect_url);
+  const signUpUrl = `/sign-up?redirect_url=${encodeURIComponent(returnTo)}`;
+  return <SignIn routing="path" path="/sign-in" signUpUrl={signUpUrl} forceRedirectUrl={returnTo} appearance={{ variables: { colorPrimary: "#10B981", colorBackground: "#101216", colorForeground: "#F5F6F7", colorMutedForeground: "#A1A8B3", colorInput: "#0B0D10", colorInputForeground: "#F5F6F7", borderRadius: "0.75rem" }, elements: { rootBox: "mx-auto w-full", cardBox: "border border-white/10 shadow-2xl", card: "shadow-none", headerTitle: "tracking-tight", formButtonPrimary: "font-semibold" } }} />;
 }
 
 export default function SignInPage({ searchParams }: { searchParams: SearchParams }) {

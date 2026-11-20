@@ -8,7 +8,9 @@ import { canWorkspace } from "@/lib/rbac";
 const headers = { "Cache-Control": "private, no-store" };
 
 export async function POST(request: Request) {
-  const session = await auth();
+  let session: Awaited<ReturnType<typeof auth>>;
+  try { session = await auth(); }
+  catch { return Response.json({ error: "Authentication is temporarily unavailable." }, { status: 503, headers }); }
   if (!session.userId) return Response.json({ error: "Sign in to manage billing." }, { status: 401, headers });
   if (!isBillingEnabled()) return Response.json({ error: "Paid billing is not enabled yet." }, { status: 503, headers });
   let action: unknown;

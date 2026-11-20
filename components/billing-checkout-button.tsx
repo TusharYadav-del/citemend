@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { BillingTier } from "@/lib/billing-checkout";
+import { billingSignInHref } from "@/lib/billing-flow";
 
 export function BillingCheckoutButton({ tier, label, ready = true }: { tier: BillingTier; label: string; ready?: boolean }) {
   const [busy, setBusy] = useState(false);
@@ -20,13 +21,12 @@ export function BillingCheckoutButton({ tier, label, ready = true }: { tier: Bil
         body: JSON.stringify({ tier }),
       });
       if (response.status === 401) {
-        const returnTo = `${window.location.pathname}${window.location.search}` || "/pricing";
-        router.push(`/sign-in?redirect_url=${encodeURIComponent(returnTo)}`);
+        router.push(billingSignInHref(tier));
         return;
       }
-      const body = await response.json() as { checkoutUrl?: unknown; error?: unknown };
-      if (!response.ok || typeof body.checkoutUrl !== "string") {
-        throw new Error(typeof body.error === "string" ? body.error : "Checkout is temporarily unavailable.");
+      const body = await response.json().catch(() => null) as { checkoutUrl?: unknown; error?: unknown } | null;
+      if (!response.ok || typeof body?.checkoutUrl !== "string") {
+        throw new Error(typeof body?.error === "string" ? body.error : "Checkout is temporarily unavailable.");
       }
       const url = new URL(body.checkoutUrl);
       if (url.protocol !== "https:") throw new Error("Checkout returned an unsafe URL.");

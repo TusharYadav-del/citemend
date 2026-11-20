@@ -7,6 +7,7 @@ import { resolveWorkspaceAccess } from "@/lib/workspace-access";
 import { getUserAuditHistory } from "@/lib/audit-history";
 import { DashboardAppShell } from "@/components/dashboard-app-shell";
 import { canWorkspace } from "@/lib/rbac";
+import { getWorkspaceDomains } from "@/lib/workspace-domain-store";
 
 async function DashboardWorkspaceShell({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -19,7 +20,7 @@ async function DashboardWorkspaceShell({ children }: { children: React.ReactNode
     canScan = canWorkspace(access.role, "scan");
     canApprove = canWorkspace(access.role, "approve_redirect");
     const audits = await getUserAuditHistory(session.userId, access.ownerUserIds);
-    domains = [...new Set(audits.map(audit => audit.domain))];
+    domains = await getWorkspaceDomains(createServerDatabase(), access.ownerUserIds, audits.map(audit => audit.domain));
   } catch { /* Route pages render their own retry and empty states when workspace data is unavailable. */ }
   const jar = await cookies();
   const cookieDomain = decodeURIComponent(jar.get("citemend_active_domain")?.value ?? "");

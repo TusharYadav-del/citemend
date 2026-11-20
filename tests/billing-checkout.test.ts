@@ -23,8 +23,8 @@ test("Dodo checkout binds the authenticated owner, email, tier, product, and ret
   assert.equal(url, "https://checkout.dodopayments.com/session/abc");
   assert.deepEqual(request.product_cart, [{ product_id: "pdt_pilot", quantity: 1 }]);
   assert.equal(request.customer.email, "owner@example.com");
-  assert.deepEqual(request.metadata, { user_id: "user_123", user_email: "owner@example.com", plan_tier: "pilot", workspace_id: "org_456" });
-  assert.equal(request.return_url, "https://citemend.vercel.app/dashboard?billing=success");
+  assert.deepEqual(request.metadata, { clerk_user_id: "user_123", user_id: "user_123", user_email: "owner@example.com", plan_tier: "pilot", workspace_id: "org_456" });
+  assert.equal(request.return_url, "https://citemend.vercel.app/dashboard/billing?billing=success&checkout=pilot");
 });
 
 test("Dodo checkout rejects invalid identity, incomplete configuration, invalid origin, and unsafe provider URLs", async () => {

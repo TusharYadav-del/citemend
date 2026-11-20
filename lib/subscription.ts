@@ -1,7 +1,7 @@
 import "server-only";
 import { createServerDatabase } from "./supabase-server";
 
-export type SubscriptionState = { status: string; cancelled: boolean; ends_at: string | null; plan?: string | null; current_period_end?: string | null; test_mode?: boolean | null };
+export type SubscriptionState = { status: string; cancelled: boolean; ends_at: string | null; plan?: string | null; plan_name?: string | null; current_period_end?: string | null; test_mode?: boolean | null };
 
 export function isMissingOptionalSubscriptionColumns(error: { code?: string } | null): boolean {
   return error?.code === "42703" || error?.code === "PGRST204";

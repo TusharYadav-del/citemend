@@ -1,5 +1,6 @@
 import "server-only";
 import DodoPayments, { type ClientOptions } from "dodopayments";
+import { billingReturnUrl } from "./billing-flow";
 
 export type BillingTier = "pilot" | "growth" | "agency";
 export class BillingConfigError extends Error {}
@@ -65,8 +66,8 @@ export async function createBillingCheckout(tier: BillingTier, userId: string, e
     const checkout = await createDodoClient(fetcher ? { fetch: fetcher } : {}).checkoutSessions.create({
       product_cart: [{ product_id: productId, quantity: 1 }],
       customer: { email },
-      metadata: { user_id: userId, user_email: email, plan_tier: tier, workspace_id: workspaceId },
-      return_url: `${origin}/dashboard?billing=success`,
+      metadata: { clerk_user_id: userId, user_id: userId, user_email: email, plan_tier: tier, workspace_id: workspaceId },
+      return_url: billingReturnUrl(origin, tier),
       cancel_url: `${origin}/pricing?billing=cancelled`,
     });
     if (typeof checkout.checkout_url !== "string") throw new BillingProviderError("Dodo Payments returned no checkout URL.");

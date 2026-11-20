@@ -18,21 +18,21 @@ type BillingStatus = {
   quotaUsage: { auditsThisMonth: number; monthlyAuditLimit: number };
 };
 
-export function BillingPanel({ checkoutReady = true, checkoutMissing = [] }: { checkoutReady?: boolean; checkoutMissing?: string[] }) {
+export function BillingPanel({ checkoutReady = true, checkoutMissing = [], selectedTier }: { checkoutReady?: boolean; checkoutMissing?: string[]; selectedTier?: BillingTier }) {
   const [billing, setBilling] = useState<BillingStatus | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<"manage" | "payment" | null>(null);
   useEffect(() => {
     fetch("/api/billing/status", { cache: "no-store" })
-      .then(async response => { const data = await response.json(); if (!response.ok) throw new Error(data.error ?? "Billing status is unavailable."); return data as BillingStatus; })
+      .then(async response => { const data = await response.json().catch(() => null) as (BillingStatus & { error?: string }) | null; if (!response.ok) throw new Error(data?.error ?? "Billing status is unavailable."); if (!data) throw new Error("Billing status returned an unreadable response."); return data as BillingStatus; })
       .then(setBilling).catch(cause => setError(cause instanceof Error ? cause.message : "Billing status is unavailable."));
   }, []);
   async function openPortal(action: "manage" | "payment") {
     setBusy(action); setError("");
     try {
       const response = await fetch("/api/billing/portal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
-      const data = await response.json() as { url?: unknown; error?: unknown };
-      if (!response.ok || typeof data.url !== "string") throw new Error(typeof data.error === "string" ? data.error : "Billing portal is unavailable.");
+      const data = await response.json().catch(() => null) as { url?: unknown; error?: unknown } | null;
+      if (!response.ok || typeof data?.url !== "string") throw new Error(typeof data?.error === "string" ? data.error : "Billing portal is unavailable.");
       const url = new URL(data.url);
       if (url.protocol !== "https:") throw new Error("Billing portal returned an unsafe URL.");
       window.location.assign(url.href);
@@ -61,6 +61,6 @@ export function BillingPanel({ checkoutReady = true, checkoutMissing = [] }: { c
       { tier: "pilot" as const, name: "30-Day Recovery Pilot", price: "$149", cadence: "one-time", detail: "One workspace · 30 days" },
       { tier: "growth" as const, name: "Growth Store", price: "$99", cadence: "/ month", detail: "Continuous monitoring" },
       { tier: "agency" as const, name: "Agency Multi-Workspace", price: "$249", cadence: "/ month", detail: "Up to 5 client domains" },
-    ]).map(plan => <article key={plan.tier} className={`flex min-w-0 flex-col rounded-xl border p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.05)] ${plan.tier === "pilot" ? "border-accent/35 bg-surface-raised" : "border-border bg-surface"}`}><div className="flex items-center gap-2"><span className="grid size-7 place-items-center rounded-md border border-border bg-background"><Check className={`size-3.5 ${plan.tier === "pilot" ? "text-accent-strong" : "text-text-tertiary"}`}/></span><h3 className="text-xs font-semibold text-foreground">{plan.name}</h3></div><p className="mt-4 font-mono text-2xl font-semibold tabular-nums">{plan.price}<span className="ml-1 text-[10px] font-normal text-text-secondary">{plan.cadence}</span></p><p className="mt-1 min-h-8 text-[10px] leading-4 text-text-tertiary">{plan.detail}</p><div className="mt-auto pt-4"><BillingCheckoutButton tier={plan.tier} ready={checkoutReady} label={plan.tier === "pilot" ? "Start $149 Pilot" : plan.tier === "growth" ? "Choose Growth" : "Choose Agency"}/></div></article>)}</section></div>
+    ]).map(plan => { const selected = selectedTier === plan.tier; return <article key={plan.tier} aria-current={selected ? "step" : undefined} className={`flex min-w-0 flex-col rounded-xl border p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.05)] ${selected ? "border-accent bg-accent/5 ring-1 ring-accent/35" : plan.tier === "pilot" ? "border-accent/35 bg-surface-raised" : "border-border bg-surface"}`}><div className="flex items-center gap-2"><span className="grid size-7 place-items-center rounded-md border border-border bg-background"><Check className={`size-3.5 ${selected || plan.tier === "pilot" ? "text-accent-strong" : "text-text-tertiary"}`}/></span><h3 className="text-xs font-semibold text-foreground">{plan.name}</h3>{selected && <span className="ml-auto rounded-full border border-accent/30 px-2 py-0.5 font-mono text-[9px] uppercase text-accent">Selected</span>}</div><p className="mt-4 font-mono text-2xl font-semibold tabular-nums">{plan.price}<span className="ml-1 text-[10px] font-normal text-text-secondary">{plan.cadence}</span></p><p className="mt-1 min-h-8 text-[10px] leading-4 text-text-tertiary">{plan.detail}</p><div className="mt-auto pt-4"><BillingCheckoutButton tier={plan.tier} ready={checkoutReady} label={selected ? `Continue with ${plan.tier === "pilot" ? "Pilot" : plan.tier === "growth" ? "Growth" : "Agency"}` : plan.tier === "pilot" ? "Start $149 Pilot" : plan.tier === "growth" ? "Choose Growth" : "Choose Agency"}/></div></article>; })}</section></div>
   </section>;
 }
