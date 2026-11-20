@@ -1,4 +1,4 @@
-﻿import { createServerDatabase } from "@/lib/supabase-server";
+import { createServerDatabase } from "@/lib/supabase-server";
 import { getWorkspaceOperatingMetrics } from "@/lib/operating-metrics";
 import { OperatingMetricsPanel } from "@/components/operating-metrics-panel";
 
@@ -21,5 +21,5 @@ export async function WorkspaceOperatingMetrics({ domain, ownerUserIds, actorUse
 }
 
 export function OperatingMetricsSkeleton() {
-  return <section aria-label="Loading operating metrics" aria-busy="true" className="mb-5 rounded-xl border border-white/10 bg-white/[.02] p-4"><div className="h-4 w-48 animate-pulse rounded bg-white/10" /><div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 6 }, (_, index) => <div key={index} className="h-24 animate-pulse rounded-lg border border-white/5 bg-white/[.03]" />)}</div><span className="sr-only">Loading measured workspace and unit economics data...</span></section>;
+  return <section aria-label="Loading operating metrics" aria-busy="true" className="mb-5 rounded-xl border border-border bg-surface p-4"><div className="h-4 w-48 animate-pulse rounded bg-surface-soft" /><div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 6 }, (_, index) => <div key={index} className="h-24 animate-pulse rounded-lg border border-border bg-surface-raised" />)}</div><span className="sr-only">Loading measured workspace and unit economics data...</span></section>;
 }

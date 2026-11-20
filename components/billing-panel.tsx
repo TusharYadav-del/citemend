@@ -41,19 +41,19 @@ export function BillingPanel() {
   const status = billing?.status === "cancelled" && billing.endsAt && billing.active
     ? `Cancelled - Active until ${new Date(billing.endsAt).toLocaleDateString()}`
     : billing?.status === "past_due" ? "Past Due" : billing?.status === "active" ? "Active" : billing?.status ?? "Free";
-  return <section id="billing" className="mb-5 rounded-xl border border-white/10 bg-white/[0.02] p-4">
+  return <section id="billing" className="mb-5 rounded-xl border border-border bg-surface p-4">
     <h2 className="text-sm font-semibold">Billing</h2>
-    {!billing && !error && <p className="mt-2 text-xs text-slate-400">Loading billing status…</p>}
+    {!billing && !error && <p className="mt-2 text-xs text-text-secondary">Loading billing status…</p>}
     {billing && <>
-      <div className="mt-3 flex flex-wrap gap-2 text-xs"><span className="rounded-full border border-emerald-300/30 px-3 py-1 text-emerald-200">{label}</span><span className="rounded-full border border-white/15 px-3 py-1">{status}</span>{billing.testMode && <span className="rounded-full border border-amber-300/50 px-3 py-1 text-amber-200">Test Mode Active</span>}</div>
-      <p className="mt-3 text-xs text-slate-400">Audits this month: {billing.quotaUsage.auditsThisMonth} of {billing.quotaUsage.monthlyAuditLimit}{billing.renewsAt ? ` · Renews ${new Date(billing.renewsAt).toLocaleDateString()}` : ""}</p>
+      <div className="mt-3 flex flex-wrap gap-2 text-xs"><span className="rounded-full border border-success/30 px-3 py-1 text-success">{label}</span><span className="rounded-full border border-border px-3 py-1">{status}</span>{billing.testMode && <span className="rounded-full border border-warning/50 px-3 py-1 text-warning">Test Mode Active</span>}</div>
+      <p className="mt-3 text-xs text-text-secondary">Audits this month: {billing.quotaUsage.auditsThisMonth} of {billing.quotaUsage.monthlyAuditLimit}{billing.renewsAt ? ` · Renews ${new Date(billing.renewsAt).toLocaleDateString()}` : ""}</p>
       {billing.hasSubscription && <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" onClick={() => void openPortal("manage")} disabled={!!busy} className="rounded-lg border border-emerald-300/30 px-3 py-2 text-xs font-semibold text-emerald-200 disabled:opacity-60">{busy === "manage" ? "Opening…" : "Manage Subscription / Download Invoices"}</button>
-        <button type="button" onClick={() => void openPortal("payment")} disabled={!!busy} className="rounded-lg border border-white/20 px-3 py-2 text-xs font-semibold disabled:opacity-60">{busy === "payment" ? "Opening…" : "Update Payment Method"}</button>
+        <button type="button" onClick={() => void openPortal("manage")} disabled={!!busy} className="rounded-md border border-success/30 px-3 py-2 text-xs font-semibold text-success hover:bg-success/5 focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-60">{busy === "manage" ? "Opening…" : "Manage Subscription / Download Invoices"}</button>
+        <button type="button" onClick={() => void openPortal("payment")} disabled={!!busy} className="rounded-md border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-surface-soft focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-60">{busy === "payment" ? "Opening…" : "Update Payment Method"}</button>
       </div>}
       {!billing.active && <div className="mt-4 flex flex-wrap gap-3">{(["pilot", "growth", "agency"] as const).map(tier => <BillingCheckoutButton key={tier} tier={tier} label={tier === "pilot" ? "Start $149 Pilot" : `Choose ${tier[0].toUpperCase() + tier.slice(1)}`} />)}</div>}
     </>}
-    {error && <p role="alert" className="mt-3 text-xs text-amber-200">{error}</p>}
+    {error && <p role="alert" className="mt-3 text-xs text-warning">{error}</p>}
     {!billing && <div className="mt-4 flex flex-wrap gap-3">{(["pilot", "growth", "agency"] as const).map(tier => <BillingCheckoutButton key={tier} tier={tier} label={tier === "pilot" ? "Start $149 Pilot" : `Choose ${tier[0].toUpperCase() + tier.slice(1)}`} />)}</div>}
   </section>;
 }

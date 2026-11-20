@@ -13,7 +13,7 @@ function SaveReport({ report, state, action, pending }: { report: MockAudit; sta
       <input type="hidden" name="intent" value="save" />
       <input type="hidden" name="domain" value={report.domain} />
       <input type="hidden" name="prompt" value={report.prompt} />
-      <button disabled={pending || !!state.saved} className="rounded-lg bg-zinc-900 px-5 py-3 text-sm font-medium text-white disabled:opacity-50">{pending ? "Saving and verifying..." : state.saved ? "Saved to Supabase" : "Save mock audit"}</button>
+      <button disabled={pending || !!state.saved} className="rounded-lg bg-zinc-900 px-5 py-3 text-sm font-medium text-foreground disabled:opacity-50">{pending ? "Saving and verifying..." : state.saved ? "Saved to Supabase" : "Save mock audit"}</button>
     </form>
     {state.error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{state.error}</p>}
     {state.saved && <div role="status" className="space-y-2 rounded-lg bg-emerald-50 p-4 text-sm text-emerald-900">
@@ -45,7 +45,7 @@ export default function ProbeForm() {
             <textarea id="prompt" name="prompt" required maxLength={4000} defaultValue="Find documentation citations and suggested replacement URLs." className="mt-2 block min-h-24 w-full rounded-lg border border-zinc-300 p-3" />
           </label>
           <p className="text-xs text-zinc-500">The domain personalizes sample URLs. The prompt is retained for the preview; it does not change the fixed mock findings.</p>
-          <button disabled={pending} className="rounded-lg bg-emerald-700 px-5 py-3 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-50">{pending ? "Preparing preview..." : "Generate mock audit"}</button>
+          <button disabled={pending} className="rounded-lg bg-emerald-700 px-5 py-3 text-sm font-medium text-foreground hover:bg-emerald-800 disabled:opacity-50">{pending ? "Preparing preview..." : "Generate mock audit"}</button>
         </form>
         {state.error && !report && <p role="alert" className="rounded-lg bg-red-50 p-4 text-red-800">{state.error}</p>}
         {!report && <p className="py-8 text-center text-zinc-500">Your sample report will appear here. Nothing is saved until you choose Save mock audit.</p>}

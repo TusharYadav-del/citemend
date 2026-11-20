@@ -69,7 +69,7 @@ export default function CitationCapsuleModal(input: CapsuleInput) {
             </TabsContent>
             <TabsContent value="jsonld" className="min-w-0 space-y-3">
               <div className="relative overflow-hidden rounded-xl border border-[#dfe5dc] bg-[#f7f8f4] p-4">
-                {result.canCopyJsonLd && result.jsonLdSchema ? <pre aria-label="JSON-LD code" className="max-h-72 overflow-auto whitespace-pre-wrap break-words text-xs">{result.jsonLdSchema}</pre> : <><pre aria-hidden="true" className="select-none whitespace-pre-wrap break-words text-xs blur-sm">{lockedPreview}</pre><p className="absolute inset-0 flex items-center justify-center gap-2 bg-white/50 p-4 text-center text-sm font-medium"><LockKeyhole className="size-4 shrink-0" />Pro unlocks your JSON-LD schema</p></>}
+                {result.canCopyJsonLd && result.jsonLdSchema ? <pre aria-label="JSON-LD code" className="max-h-72 overflow-auto whitespace-pre-wrap break-words text-xs">{result.jsonLdSchema}</pre> : <><pre aria-hidden="true" className="select-none whitespace-pre-wrap break-words text-xs blur-sm">{lockedPreview}</pre><p className="absolute inset-0 flex items-center justify-center gap-2 bg-surface-soft0 p-4 text-center text-sm font-medium"><LockKeyhole className="size-4 shrink-0" />Pro unlocks your JSON-LD schema</p></>}
               </div>
               <Button type="button" onClick={() => void copy("jsonld")} disabled={copying}><Copy className="size-4" />Copy JSON-LD{!result.canCopyJsonLd && " ? Pro"}</Button>
               <p className="text-xs leading-5 text-[#68736b]">Publish the matching FAQ answers visibly on the page. Product schema must describe a real offering; markup alone does not guarantee citations or search features.</p>

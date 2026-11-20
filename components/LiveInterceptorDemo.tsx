@@ -29,14 +29,14 @@ export default function LiveInterceptorDemo() {
       ? { label: "Recovered · visitor reaches pricing", color: "text-emerald-700", icon: <Check className="size-4" /> }
       : state === "dead"
         ? { label: "404 · visitor hits a dead end", color: "text-rose-700", icon: <CircleAlert className="size-4" /> }
-        : { label: "Click the link to try the demo", color: "text-slate-500", icon: <ArrowDown className="size-4" /> };
+        : { label: "Click the link to try the demo", color: "text-text-tertiary", icon: <ArrowDown className="size-4" /> };
 
-  return <section aria-labelledby="demo-heading" className="border-y border-white/[.06] bg-[#0a0e14] px-5 py-16 sm:px-8 sm:py-22">
+  return <section aria-labelledby="demo-heading" className="border-y border-border bg-[#0a0e14] px-5 py-16 sm:px-8 sm:py-22">
     <div className="mx-auto max-w-7xl">
       <div className="mx-auto max-w-3xl text-center">
-        <p className="inline-flex items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/[.05] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[.15em] text-emerald-300"><Sparkles className="size-3.5" /> Try the sandbox</p>
-        <h2 id="demo-heading" className="mt-4 text-3xl font-semibold tracking-[-.045em] text-white sm:text-5xl">See a lost AI referral find its way.</h2>
-        <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-400 sm:text-base">A clickable, simulated journey shows how a broken recommendation can reach a live page when recovery is enabled.</p>
+        <p className="inline-flex items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/[.05] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[.15em] text-accent"><Sparkles className="size-3.5" /> Try the sandbox</p>
+        <h2 id="demo-heading" className="mt-4 text-3xl font-semibold tracking-[-.045em] text-foreground sm:text-5xl">See a lost AI referral find its way.</h2>
+        <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-text-secondary sm:text-base">A clickable, simulated journey shows how a broken recommendation can reach a live page when recovery is enabled.</p>
       </div>
 
       <div className="mt-9 grid overflow-hidden rounded-[1.75rem] border border-[#dce5d6] bg-white shadow-[0_24px_80px_-48px_#193c2a] lg:grid-cols-[1fr_1fr]">
