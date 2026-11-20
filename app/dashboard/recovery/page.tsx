@@ -5,6 +5,7 @@ import { RecoveryExportActions } from "@/components/recovery-export-actions";
 import { RecoveryCenter, type RecoveryEvidence, type RecoveryOutcome, type RecoveryLog } from "@/components/recovery-center";
 import { canWorkspace } from "@/lib/rbac";
 import { hasProSubscription } from "@/lib/subscription";
+import { PageHeader } from "@/components/ui/page-header";
 
 export default async function RecoveryPage({ searchParams }: { searchParams: Promise<{ domain?: string; recovery?: string }> }) {
   const params = await searchParams; const data = await getDashboardPageData(params.domain);
@@ -29,11 +30,10 @@ export default async function RecoveryPage({ searchParams }: { searchParams: Pro
     destinationRequestsServed = Object.fromEntries(rules.filter(rule => rule.source_link_id).map(rule => [rule.source_link_id!, rule.hits_recovered ?? 0]));
   }
   const latestAudit = audits[0]; const isPro = await hasProSubscription(data.ownerUserIds[0]).catch(() => null);
-  return <div><p className="font-mono text-[10px] uppercase tracking-[.16em] text-accent">Defend / recovery</p><h2 className="mt-1 text-2xl font-semibold">Recovery Center</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-text-secondary">Review owned dead URLs and third-party broken citations. Soft-404, redirect-loop, and destination checks stay in force; deployment requires human approval.</p>
-    <div className="mt-5 flex flex-wrap items-center gap-2"><RecoveryExportActions domain={data.domain} /><Link href="/dashboard/settings" className="rounded-md border border-border px-3 py-2 text-xs text-foreground">Shopify integration settings</Link></div>
+  return <div className="space-y-4"><PageHeader eyebrow="Defend / recovery" title="Recovery Center" description="Review owned dead URLs and third-party broken citations. Soft-404, redirect-loop, and destination checks stay in force; deployment requires human approval." actions={<><RecoveryExportActions domain={data.domain} /><Link href="/dashboard/settings" className="cm-button-secondary">Shopify integration settings</Link></>} />
     {!rows.length && <p className="mt-5 rounded-xl border border-dashed border-border p-5 text-sm text-text-secondary">No recovery evidence is available for this workspace yet. Run an audit to discover candidates.</p>}
     <RecoveryCenter rows={rows} evidence={evidence} outcomes={outcomes} logs={logs} canApprove={canWorkspace(data.access.role, "approve_redirect")} isPro={isPro} activeRules={activeRules} syncedLinks={syncedLinks} pendingOnly={params.recovery === "pending"} evidenceError={evidenceError} destinationRequestsServed={destinationRequestsServed} auditId={latestAudit?.id} workspaceDomain={data.domain} />
-    <div className="mt-6"><RecoveryDeploymentTools domain={data.domain} findings={findings} /></div>
-    <div className="mt-4 rounded-lg border border-warning/20 bg-warning/5 p-4 text-xs leading-5 text-text-secondary"><strong className="text-foreground">Safety guardrails:</strong> Soft-404s and low-confidence mappings remain in review; HTTP failures can be transient; only reviewed equivalent pages should receive redirects. Historical Wayback context is shown when available on each finding.</div>
+    <div><RecoveryDeploymentTools domain={data.domain} findings={findings} /></div>
+    <div className="rounded-lg border border-warning/20 bg-warning/5 p-4 text-xs leading-5 text-text-secondary"><strong className="text-foreground">Safety guardrails:</strong> Soft-404s and low-confidence mappings remain in review; HTTP failures can be transient; only reviewed equivalent pages should receive redirects. Historical Wayback context is shown when available on each finding.</div>
   </div>;
 }

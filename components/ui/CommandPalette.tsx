@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, FileDown, Globe2, Link2, Loader2, Search, ShieldCheck, Sparkles, X } from "lucide-react";
 import type { SidebarItem } from "./sidebar";
 import { normalizeDashboardDomain } from "@/lib/audit-dashboard";
+import { useWorkspace } from "@/components/workspace-provider";
 
 type Command = { id: string; label: string; detail: string; keywords: string; action: () => void };
 type ActionForm = "scan" | "forensic" | null;
@@ -23,6 +24,7 @@ export function CommandPalette({ items, domains, selectedDomain, canScan, canApp
   items: SidebarItem[]; domains: string[]; selectedDomain: string; canScan: boolean; canApprove: boolean; latestAuditId?: string;
 }) {
   const router = useRouter();
+  const { setActiveDomain } = useWorkspace();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -47,12 +49,12 @@ export function CommandPalette({ items, domains, selectedDomain, canScan, canApp
   const scopedRecovery = `/dashboard/recovery${selectedDomain ? `?domain=${encodeURIComponent(selectedDomain)}` : ""}`;
   const commands = useMemo<Command[]>(() => [
     ...items.map(item => ({ id: `screen:${item.label}`, label: item.label, detail: "Dashboard screen", keywords: item.href, action: () => navigate(item.href) })),
-    ...domains.map(value => ({ id: `domain:${value}`, label: value, detail: "Switch workspace", keywords: "client domain workspace", action: () => navigate(`/dashboard?domain=${encodeURIComponent(value)}`) })),
+    ...domains.map(value => ({ id: `domain:${value}`, label: value, detail: "Switch workspace", keywords: "client domain workspace", action: () => { setActiveDomain(value); setOpen(false); } })),
     ...(canScan ? [{ id: "scan", label: "New background scan", detail: "Run two buyer prompts in the job queue", keywords: "audit model probe", action: () => { setForm("scan"); setQuery(""); setMessage(null); } }] : []),
     { id: "forensic", label: "Run forensic check", detail: "Check one buyer prompt and public evidence", keywords: "forensics diagnosis", action: () => { setForm("forensic"); setQuery(""); setMessage(null); } },
     ...(canApprove ? [{ id: "approvals", label: "URLs awaiting approval", detail: "Open the pending Recovery Center queue", keywords: "broken redirect review", action: () => navigate(`${scopedRecovery}${scopedRecovery.includes("?") ? "&" : "?"}recovery=pending`) }] : []),
     ...(latestAuditId ? [{ id: "export", label: "Export before and after report", detail: "Open print view; save as PDF with configured branding", keywords: "white label pdf", action: () => navigate(`/audit/${latestAuditId}?print=1`) }] : []),
-  ], [items, domains, canScan, canApprove, latestAuditId, scopedRecovery, navigate]);
+  ], [items, domains, canScan, canApprove, latestAuditId, scopedRecovery, navigate, setActiveDomain]);
   const filtered = commands.filter(command => matches(query, command)).slice(0, 18);
   function handleSearchKey(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === "ArrowDown") { event.preventDefault(); setActiveIndex(index => (index + 1) % Math.max(filtered.length, 1)); }
@@ -85,9 +87,9 @@ export function CommandPalette({ items, domains, selectedDomain, canScan, canApp
     finally { setBusy(false); }
   }
   return <>
-    <button ref={openerRef} type="button" onClick={() => { setForm(null); setMessage(null); setOpen(true); }} className="flex min-h-10 min-w-0 items-center gap-2 rounded-lg border border-border bg-surface-raised px-3 text-left text-xs text-text-secondary hover:border-border hover:text-foreground focus-visible:outline-2 focus-visible:outline-emerald-300 sm:w-60" aria-label="Open command palette"><Search className="size-4 shrink-0" /><span className="min-w-0 flex-1 truncate">Search or run a command</span><kbd className="hidden rounded border border-border px-1.5 py-0.5 font-mono text-[10px] sm:inline">⌘K / Ctrl K</kbd></button>
+    <button ref={openerRef} type="button" onClick={() => { setForm(null); setMessage(null); setOpen(true); }} className="flex size-10 min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-surface-raised px-0 text-left text-xs text-text-secondary transition-colors hover:bg-surface-soft hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent sm:w-60 sm:justify-start sm:px-3" aria-label="Open command palette (Command or Control K)"><Search className="size-4 shrink-0" /><span className="hidden min-w-0 flex-1 truncate sm:block">Search or run a command</span><kbd className="hidden rounded border border-border px-1.5 py-0.5 font-mono text-[10px] sm:inline">⌘K</kbd></button>
     {open && <div className="fixed inset-0 z-[100] flex justify-center bg-black/75 px-3 pt-[10vh] backdrop-blur-sm" onMouseDown={event => { if (event.target === event.currentTarget) setOpen(false); }}>
-      <section role="dialog" aria-modal="true" aria-label="Command palette" onKeyDown={event => { if (event.key !== "Tab") return; const controls = [...event.currentTarget.querySelectorAll<HTMLElement>('input:not([disabled]),textarea:not([disabled]),button:not([disabled])')]; const first = controls[0]; const last = controls[controls.length - 1]; if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); } }} className="h-fit max-h-[80vh] w-full max-w-xl overflow-hidden rounded-xl border border-white/[.12] bg-[#101722] shadow-2xl">
+      <section role="dialog" aria-modal="true" aria-label="Command palette" onKeyDown={event => { if (event.key !== "Tab") return; const controls = [...event.currentTarget.querySelectorAll<HTMLElement>('input:not([disabled]),textarea:not([disabled]),button:not([disabled])')]; const first = controls[0]; const last = controls[controls.length - 1]; if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); } }} className="h-fit max-h-[80vh] w-full max-w-xl overflow-hidden rounded-xl border border-border bg-surface-raised shadow-2xl">
         <div className="flex items-center gap-3 border-b border-border px-4"><Search className="size-4 text-accent" /><input ref={inputRef} value={query} onChange={event => { setQuery(event.target.value); setActiveIndex(0); setForm(null); }} onKeyDown={handleSearchKey} placeholder="Find a screen, workspace, or action" aria-label="Search commands" className="h-14 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-text-tertiary" /><button type="button" onClick={() => setOpen(false)} aria-label="Close command palette" className="rounded-md p-2 text-text-secondary hover:bg-surface-soft hover:text-foreground"><X className="size-4" /></button></div>
         {form ? <form onSubmit={submit} className="max-h-[65vh] space-y-3 overflow-y-auto p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground">{form === "scan" ? <Sparkles className="size-4 text-accent" /> : <ShieldCheck className="size-4 text-accent" />}{form === "scan" ? "New background scan" : "Forensic check"}</div>
@@ -97,7 +99,7 @@ export function CommandPalette({ items, domains, selectedDomain, canScan, canApp
           <div className="flex gap-2"><button type="button" onClick={() => { setForm(null); setMessage(null); }} className="rounded-lg border border-border px-4 py-2 text-xs text-text-secondary">Back</button><button disabled={busy} type="submit" className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-background disabled:opacity-60">{busy && <Loader2 className="size-3.5 animate-spin" />}{form === "scan" ? "Queue scan" : "Run forensic check"}</button></div>
           {message && <p role="status" className="rounded-lg border border-border bg-surface-raised p-3 text-xs leading-5 text-foreground">{message}</p>}
         </form> : <div className="max-h-[65vh] overflow-y-auto p-2">
-          {filtered.length ? filtered.map((command, index) => <button key={command.id} type="button" onMouseEnter={() => setActiveIndex(index)} onClick={command.action} className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left focus-visible:outline-2 focus-visible:outline-emerald-300 ${index === activeIndex ? "bg-white/[.07]" : "hover:bg-surface-raised"}`}><span className="grid size-8 shrink-0 place-items-center rounded-lg border border-border text-accent">{command.id.startsWith("domain:") ? <Globe2 className="size-4" /> : command.id === "export" ? <FileDown className="size-4" /> : command.id === "approvals" ? <Link2 className="size-4" /> : <ArrowRight className="size-4" />}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm text-foreground">{command.label}</span><span className="block truncate text-[11px] text-text-tertiary">{command.detail}</span></span></button>) : <p className="p-6 text-center text-sm text-text-secondary">No matching command. Try a screen name or workspace domain.</p>}
+          {filtered.length ? filtered.map((command, index) => <button key={command.id} type="button" onMouseEnter={() => setActiveIndex(index)} onClick={command.action} className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left focus-visible:outline-2 focus-visible:outline-accent ${index === activeIndex ? "bg-white/[.07]" : "hover:bg-surface-raised"}`}><span className="grid size-8 shrink-0 place-items-center rounded-lg border border-border text-accent">{command.id.startsWith("domain:") ? <Globe2 className="size-4" /> : command.id === "export" ? <FileDown className="size-4" /> : command.id === "approvals" ? <Link2 className="size-4" /> : <ArrowRight className="size-4" />}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm text-foreground">{command.label}</span><span className="block truncate text-[11px] text-text-tertiary">{command.detail}</span></span></button>) : <p className="p-6 text-center text-sm text-text-secondary">No matching command. Try a screen name or workspace domain.</p>}
         </div>}
       </section>
     </div>}

@@ -2,75 +2,58 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { Activity, BarChart3, Bot, BriefcaseBusiness, CreditCard, FileText, Globe2, LayoutDashboard, Menu, PanelLeftClose, PanelLeftOpen, Radar, Search, ShieldCheck, Target, X, Zap, type LucideIcon } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Activity, BarChart3, BriefcaseBusiness, CreditCard, FileText, Globe2, LayoutDashboard, Radar, Search, Settings2, ShieldCheck, Zap, X, type LucideIcon } from "lucide-react";
+import type { KeyboardEvent, ReactNode } from "react";
 
-export type SidebarItem = { label: string; href: string; active?: boolean };
+export type SidebarGroup = "Core" | "Defend & Optimize" | "Prove & Grow" | "Workspace" | "More tools" | "Founder";
+export type SidebarItem = { label: string; href: string; group?: SidebarGroup; active?: boolean };
 
-const groups = [
-  { label: "Core & overview", items: ["Overview", "AI Scanner"] },
-  { label: "1. Defend · Recovery", items: ["Recovery Center", "Traffic Interceptor"] },
-  { label: "2. Win · Acquisition", items: ["Competitor Intelligence", "Outreach"] },
-  { label: "3. Optimize · Authority", items: ["GEO Optimizer"] },
-  { label: "4. Prove · Intelligence", items: ["AI Visibility", "Reports"] },
-  { label: "Workspace", items: ["Automations", "Workspaces", "Billing", "Founder OS", "AI Outreach"] },
-] as const;
+const groups: { label: SidebarGroup; items: SidebarGroup[] }[] = [
+  { label: "Core", items: ["Core"] },
+  { label: "Defend & Optimize", items: ["Defend & Optimize"] },
+  { label: "Prove & Grow", items: ["Prove & Grow"] },
+  { label: "Workspace", items: ["Workspace"] },
+  { label: "More tools", items: ["More tools", "Founder"] },
+];
 const icons: Record<string, LucideIcon> = {
   Overview: LayoutDashboard, "AI Scanner": Search, "Recovery Center": ShieldCheck,
-  "Traffic Interceptor": Zap, "Competitor Intelligence": Target, Outreach: BriefcaseBusiness,
-  "GEO Optimizer": Radar, "AI Visibility": Activity, Reports: FileText,
-  Automations: Bot, Workspaces: Globe2, Billing: CreditCard, "Founder OS": BarChart3, "AI Outreach": BriefcaseBusiness,
+  "GEO & Claims": Radar, "AI Analytics": Activity, Reports: FileText, Outreach: BriefcaseBusiness,
+  "Settings & API": Settings2, Billing: CreditCard, "Traffic Interceptor": Zap,
+  "Founder OS": BarChart3, "AI Outreach": BriefcaseBusiness,
 };
 
-export function Sidebar({ items, brand = "CITEMEND" }: { items: SidebarItem[]; brand?: string }) {
+export function Sidebar({ items, brand = "CITEMEND", domains = [], activeDomain = "", onSelectDomain, mobileOpen = false, onMobileOpenChange, footer }: {
+  items: SidebarItem[]; brand?: string; domains?: string[]; activeDomain?: string;
+  onSelectDomain?: (domain: string) => void; mobileOpen?: boolean; onMobileOpenChange?: (open: boolean) => void; footer?: ReactNode;
+}) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [hash, setHash] = useState("");
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const closeRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    const sync = () => setHash(window.location.hash);
-    sync(); window.addEventListener("hashchange", sync);
-    return () => window.removeEventListener("hashchange", sync);
-  }, []);
-  useEffect(() => { if (mobileOpen) closeRef.current?.focus(); }, [mobileOpen]);
+  const drawerRef = useRef<HTMLElement>(null);
+  const drawerCloseRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => { if (mobileOpen) drawerCloseRef.current?.focus(); }, [mobileOpen]);
   function handleDrawerKeyDown(event: KeyboardEvent<HTMLElement>) {
-    if (event.key === "Escape") { setMobileOpen(false); triggerRef.current?.focus(); }
-    if (event.key === "Tab") {
-      const controls = [...event.currentTarget.querySelectorAll<HTMLElement>('a[href],button:not([disabled])')];
-      const first = controls[0]; const last = controls[controls.length - 1];
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-    }
+    if (event.key === "Escape") { onMobileOpenChange?.(false); return; }
+    if (event.key !== "Tab" || !drawerRef.current) return;
+    const controls = [...drawerRef.current.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),select:not([disabled])')];
+    const first = controls[0]; const last = controls[controls.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
   }
-  const active = (item: SidebarItem) => {
-    const [path, targetHash] = item.href.split("#");
-    if (path.split("?")[0] !== pathname) return false;
-    return targetHash ? hash === `#${targetHash}` || (!hash && item.label === "Overview") : true;
-  };
-  const nav = (compact: boolean, onNavigate?: () => void) => <nav aria-label="Workspace navigation" className="mt-6 space-y-5">
-    {groups.map(group => {
-      const visible = items.filter(item => (group.items as readonly string[]).includes(item.label));
-      if (!visible.length) return null;
-      return <div key={group.label}>
-        <p className={`mb-1 px-3 text-[10px] font-semibold uppercase tracking-[.16em] text-text-tertiary ${compact ? collapsed ? "sr-only" : "hidden xl:block" : ""}`}>{group.label}</p>
-        <div className="space-y-0.5">{visible.map(item => {
-          const Icon = icons[item.label] ?? Globe2;
-          const isActive = active(item);
-          return <Link key={item.label} href={item.href} title={compact ? item.label : undefined} aria-label={compact ? item.label : undefined} aria-current={isActive ? "page" : undefined} onClick={() => { setHash(item.href.includes("#") ? `#${item.href.split("#")[1]}` : ""); onNavigate?.(); }} className={`flex min-h-10 items-center gap-3 rounded-md border px-3 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-cyan-300 ${item.label === "Recovery Center" ? "border-accent/20" : "border-transparent"} ${isActive ? "bg-cyan-300/10 text-accent" : "text-text-secondary hover:bg-white/[.05] hover:text-foreground"}`}>
-            <Icon className="size-4 shrink-0" aria-hidden="true" /><span className={compact ? collapsed ? "sr-only" : "hidden xl:inline" : ""}>{item.label}</span>
-          </Link>;
-        })}</div>
-      </div>;
-    })}
-  </nav>;
-  return <>
-    <aside className={`sticky top-0 hidden h-screen shrink-0 overflow-y-auto border-r border-border bg-surface px-2 py-6 transition-[width] duration-200 motion-reduce:transition-none lg:block lg:w-16 print:hidden ${collapsed ? "xl:w-16" : "xl:w-64 xl:px-3"}`}>
-      <div className="flex items-center justify-between gap-1 px-1"><Link href="/dashboard" aria-label="CiteMend command center" className="grid size-10 shrink-0 place-items-center rounded-md border border-accent/20 bg-cyan-300/10 font-mono text-xs font-bold text-accent">CM</Link>{!collapsed && <span className="hidden min-w-0 flex-1 truncate text-xs font-bold tracking-[.1em] text-foreground xl:block">{brand}</span>}<button type="button" onClick={() => setCollapsed(value => !value)} aria-label={collapsed ? "Expand workspace sidebar" : "Collapse workspace sidebar"} aria-expanded={!collapsed} className="hidden size-10 shrink-0 place-items-center rounded-md text-text-secondary hover:bg-surface-soft hover:text-foreground focus-visible:outline-2 focus-visible:outline-cyan-300 xl:grid">{collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}</button></div>
-      {nav(true)}
-    </aside>
-    <div className="sticky top-0 z-40 flex min-h-14 items-center border-b border-border bg-surface px-4 lg:hidden print:hidden"><button ref={triggerRef} type="button" onClick={() => setMobileOpen(true)} aria-haspopup="dialog" aria-expanded={mobileOpen} className="inline-flex min-h-11 items-center gap-3 text-sm font-semibold text-foreground focus-visible:outline-2 focus-visible:outline-accent"><Menu className="size-5 text-accent" />{brand}<span className="sr-only">Open workspace navigation</span></button></div>
-    {mobileOpen && <div className="fixed inset-0 z-50 bg-black/70 lg:hidden print:hidden"><button type="button" aria-label="Close workspace navigation" onClick={() => { setMobileOpen(false); triggerRef.current?.focus(); }} className="absolute inset-0 size-full cursor-default" /><aside role="dialog" aria-modal="true" aria-label="Workspace navigation" onKeyDown={handleDrawerKeyDown} className="absolute inset-y-0 left-0 w-[min(18rem,86vw)] overflow-y-auto border-r border-border bg-surface p-4 shadow-2xl"><div className="flex items-center justify-between"><span className="font-semibold tracking-wide text-foreground">{brand}</span><button ref={closeRef} type="button" onClick={() => { setMobileOpen(false); triggerRef.current?.focus(); }} aria-label="Close workspace navigation" className="grid size-10 place-items-center rounded-md text-text-secondary hover:bg-surface-soft"><X className="size-4" /></button></div>{nav(false, () => setMobileOpen(false))}</aside></div>}
-  </>;
+  const active = (item: SidebarItem) => item.href === "/dashboard" ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`);
+  const onNavigate = () => onMobileOpenChange?.(false);
+  const nav = <nav aria-label="Workspace navigation" className="mt-5 space-y-5">{groups.map(group => {
+    const visible = items.filter(item => group.items.includes(item.group ?? "More tools"));
+    if (!visible.length) return null;
+    return <section key={group.label} aria-label={group.label}><h2 className="mb-2 px-3 font-mono text-[9px] font-semibold uppercase tracking-[.15em] text-text-tertiary">{group.label}</h2><div className="space-y-1">{visible.map(item => {
+      const Icon = icons[item.label] ?? Globe2; const selected = active(item);
+      return <Link key={item.href} href={item.href} onClick={onNavigate} aria-current={selected ? "page" : undefined} className={`group/nav relative flex min-h-10 items-center gap-3 overflow-hidden rounded-lg px-3 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent ${selected ? "bg-white/[.06] text-foreground" : "text-text-secondary hover:bg-white/[.035] hover:text-foreground"}`}><span aria-hidden="true" className={`absolute inset-y-2 left-0 w-[2px] rounded-r-full transition-opacity ${selected ? "bg-accent opacity-100" : "bg-accent opacity-0 group-hover/nav:opacity-50"}`} /><Icon className={`ml-1 size-4 shrink-0 ${selected ? "text-accent-strong" : "text-text-tertiary group-hover/nav:text-text-secondary"}`} aria-hidden="true"/><span className="truncate">{item.label}</span></Link>;
+    })}</div></section>;
+  })}</nav>;
+
+  const content = <div className="flex h-full min-h-0 flex-col bg-surface px-3 py-4 sm:px-4"><div className="flex items-center gap-3 px-2"><Link href="/dashboard" onClick={onNavigate} aria-label="CiteMend overview" className="grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-surface-raised text-accent-strong shadow-[inset_0_1px_0_rgba(255,255,255,.06)]"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="size-4"><path d="M5 7h8a4 4 0 0 1 0 8H9m10 2H11a4 4 0 0 1 0-8h4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/><path d="m7 4-3 3 3 3m10 10 3-3-3-3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg></Link><div className="min-w-0 flex-1"><p className="truncate text-[13px] font-semibold tracking-tight text-foreground">{brand}</p><p className="font-mono text-[9px] uppercase tracking-[.13em] text-text-tertiary">Reliability workspace</p></div><button ref={drawerCloseRef} type="button" onClick={onNavigate} aria-label="Close workspace navigation" className="grid size-9 place-items-center rounded-md text-text-secondary hover:bg-surface-soft lg:hidden"><X className="size-4"/></button></div>
+    <div className="mt-5 rounded-xl border border-border bg-surface-raised p-2 shadow-[inset_0_1px_0_rgba(255,255,255,.04)]"><div className="flex items-center gap-2.5 px-2 py-1.5"><span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-lg border border-border bg-surface text-[11px] font-semibold text-text-secondary">{activeDomain ? activeDomain.replace(/^www\./, "").slice(0, 1).toUpperCase() : "—"}</span><div className="min-w-0 flex-1"><p className="font-mono text-[9px] uppercase tracking-wider text-text-tertiary">Active workspace</p>{domains.length ? <select aria-label="Select active workspace domain" value={activeDomain} onChange={event => onSelectDomain?.(event.target.value)} className="mt-0.5 w-full truncate bg-transparent text-xs font-medium text-foreground outline-none"><option value="" className="bg-surface-raised">All workspaces</option>{domains.map(domain => <option className="bg-surface-raised" key={domain} value={domain}>{domain}</option>)}</select> : <p className="mt-0.5 truncate text-xs font-medium text-text-secondary">No domain connected</p>}</div><span aria-hidden="true" className="text-xs text-text-tertiary">⌄</span></div><Link href="/dashboard/scanner" onClick={onNavigate} className="mt-2 flex min-h-8 items-center gap-2 rounded-md px-2 text-[11px] font-medium text-text-secondary transition-colors hover:bg-white/[.05] hover:text-foreground"><span className="text-accent-strong">＋</span>Connect domain</Link></div>
+    {nav}<div className="mt-auto border-t border-border pt-3">{footer}</div></div>;
+
+  return <><aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 border-r border-border print:hidden lg:block">{content}</aside><AnimatePresence>{mobileOpen && <motion.div className="fixed inset-0 z-[80] lg:hidden print:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .18 }}><button type="button" aria-label="Close workspace navigation" onClick={() => onMobileOpenChange?.(false)} className="absolute inset-0 size-full cursor-default bg-black/70 backdrop-blur-sm"/><motion.aside ref={drawerRef} role="dialog" aria-modal="true" aria-label="Workspace navigation" onKeyDown={handleDrawerKeyDown} initial={{ x: "-100%" }} animate={{ x: 0 }} exit={{ x: "-100%" }} transition={{ type: "spring", stiffness: 380, damping: 38 }} className="absolute inset-y-0 left-0 w-[min(19rem,88vw)] border-r border-border shadow-2xl">{content}</motion.aside></motion.div>}</AnimatePresence></>;
 }

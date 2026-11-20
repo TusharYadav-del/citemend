@@ -127,6 +127,17 @@ a, button, input, select, textarea, summary { -webkit-tap-highlight-color: trans
 .cm-audit-progress [data-slot="progress-indicator"]::after { position: absolute; inset: 0 auto 0 -45%; width: 40%; background: linear-gradient(90deg, transparent, rgb(255 255 255 / 65%), transparent); content: ""; animation: cm-scan 1.6s ease-in-out infinite; }
 @keyframes cm-scan { to { transform: translateX(360%); } }
 
+/* Dashboard controls inherit the same token surfaces across legacy workflows. */
+.dashboard-shell :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { border-color: var(--border); background-color: var(--surface); color: var(--foreground); }
+.dashboard-shell :where(input, select, textarea)::placeholder { color: var(--text-tertiary); opacity: 1; }
+.dashboard-shell :where(input, select, textarea):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dashboard-shell :where(table) { border-collapse: collapse; color: var(--foreground); }
+.dashboard-shell :where(th) { color: var(--text-secondary); font-size: .6875rem; font-weight: 600; letter-spacing: .04em; text-align: left; }
+.dashboard-shell :where(th, td) { border-bottom: 1px solid var(--border); padding: .7rem .8rem; vertical-align: top; }
+.dashboard-shell :where(td) { color: var(--text-secondary); font-size: .75rem; }
+.dashboard-shell :where(code) { color: var(--text-primary); }
+@media (max-width: 639px) { .dashboard-shell :where(table) { display: block; max-width: 100%; overflow-x: auto; } }
+
 .report-print-only { display: none; }
 @media print {
   @page { size: A4; margin: 15mm; }
